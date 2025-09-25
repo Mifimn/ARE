@@ -5,7 +5,7 @@ export default function DashboardPage() {
   const user = {
     username: 'GamerPro123',
     fullName: 'John Doe',
-    avatar: 'https://via.placeholder.com/100x100?text=JD',
+    avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop&crop=face',
     rank: 'Gold III',
     level: 25
   };

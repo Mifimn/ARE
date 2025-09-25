@@ -17,7 +17,7 @@ export default function LandingPage() {
       date: '2024-02-15',
       prize: '$5,000',
       participants: 128,
-      image: 'https://via.placeholder.com/300x200?text=FIFA+24'
+      image: 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=300&h=200&fit=crop'
     },
     {
       id: 2,
@@ -26,7 +26,7 @@ export default function LandingPage() {
       date: '2024-02-20',
       prize: '$3,000',
       participants: 64,
-      image: 'https://via.placeholder.com/300x200?text=Mobile+Legends'
+      image: 'https://images.unsplash.com/photo-1556438064-2d7646166914?w=300&h=200&fit=crop'
     },
     {
       id: 3,
@@ -35,7 +35,7 @@ export default function LandingPage() {
       date: '2024-02-25',
       prize: '$4,000',
       participants: 96,
-      image: 'https://via.placeholder.com/300x200?text=COD+Warzone'
+      image: 'https://images.unsplash.com/photo-1552820728-8b83bb6b773f?w=300&h=200&fit=crop'
     },
   ];
 
@@ -44,19 +44,19 @@ export default function LandingPage() {
       name: 'Kwame Asante',
       role: 'Pro FIFA Player',
       content: 'ARE gave me the platform to showcase my skills and compete at the highest level. The community here is incredible!',
-      avatar: 'https://via.placeholder.com/60x60?text=KA'
+      avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=60&h=60&fit=crop&crop=face'
     },
     {
       name: 'Amina Hassan',
       role: 'Mobile Legends Champion',
       content: 'Thanks to Africa Rise Esports, I was able to turn my passion for gaming into a career. The support is unmatched.',
-      avatar: 'https://via.placeholder.com/60x60?text=AH'
+      avatar: 'https://images.unsplash.com/photo-1494790108755-2616c02e02d1?w=60&h=60&fit=crop&crop=face'
     },
     {
       name: 'David Okafor',
       role: 'Tournament Organizer',
       content: 'The tools and community at ARE make organizing tournaments seamless. It\'s the future of African esports.',
-      avatar: 'https://via.placeholder.com/60x60?text=DO'
+      avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=60&h=60&fit=crop&crop=face'
     },
   ];
 

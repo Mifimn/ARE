@@ -6,7 +6,7 @@ export default function TeamPage() {
   const team = {
     id: 1,
     name: 'Thunder Hawks',
-    logo: 'https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=150&h=150&fit=crop',
+    logo: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?w=150&h=150&fit=crop',
     game: 'COD Warzone',
     country: 'Nigeria',
     city: 'Lagos',

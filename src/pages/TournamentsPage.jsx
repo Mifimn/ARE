@@ -17,7 +17,7 @@ export default function TournamentsPage() {
       startDate: '2024-03-15',
       status: 'Registration Open',
       difficulty: 'Professional',
-      image: 'https://images.unsplash.com/photo-1551698618-1dfe5d97d256?w=400&h=200&fit=crop'
+      image: 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=400&h=200&fit=crop'
     },
     {
       id: 2,
@@ -28,7 +28,7 @@ export default function TournamentsPage() {
       startDate: '2024-03-20',
       status: 'Registration Open',
       difficulty: 'Amateur',
-      image: 'https://images.unsplash.com/photo-1511512578047-dfb367046420?w=400&h=200&fit=crop'
+      image: 'https://images.unsplash.com/photo-1556438064-2d7646166914?w=400&h=200&fit=crop'
     },
     {
       id: 3,
@@ -39,7 +39,7 @@ export default function TournamentsPage() {
       startDate: '2024-03-25',
       status: 'Registration Open',
       difficulty: 'Professional',
-      image: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?w=400&h=200&fit=crop'
+      image: 'https://images.unsplash.com/photo-1552820728-8b83bb6b773f?w=400&h=200&fit=crop'
     },
     {
       id: 4,
@@ -50,7 +50,7 @@ export default function TournamentsPage() {
       startDate: '2024-04-01',
       status: 'Coming Soon',
       difficulty: 'Semi-Pro',
-      image: 'https://images.unsplash.com/photo-1552820728-8b83bb6b773f?w=400&h=200&fit=crop'
+      image: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?w=400&h=200&fit=crop'
     }
   ];
 
