@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Eye, EyeOff } from 'lucide-react';
@@ -20,8 +19,9 @@ export default function SignUpPage() {
       alert('Passwords do not match');
       return;
     }
-    // Handle signup logic here
     console.log('Signup:', formData);
+    // For demo purposes, always redirect to dashboard
+    window.location.href = '/dashboard';
   };
 
   const handleChange = (e) => {

@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Eye, EyeOff } from 'lucide-react';
@@ -12,8 +11,9 @@ export default function LoginPage() {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    // Handle login logic here
     console.log('Login:', formData);
+    // For demo purposes, always redirect to dashboard
+    window.location.href = '/dashboard';
   };
 
   const handleChange = (e) => {
