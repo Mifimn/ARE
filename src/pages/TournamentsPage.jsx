@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Search, Filter, Calendar, Trophy, Users, MapPin } from 'lucide-react';
@@ -11,60 +10,48 @@ export default function TournamentsPage() {
   const tournaments = [
     {
       id: 1,
-      name: 'FIFA 24 African Championship',
+      name: 'FIFA 24 Championship',
       game: 'FIFA 24',
-      status: 'upcoming',
-      startDate: '2024-02-15',
-      endDate: '2024-02-18',
+      participants: '64/128',
       prizePool: '$5,000',
-      participants: 128,
-      maxParticipants: 128,
-      location: 'Online',
-      image: 'https://via.placeholder.com/300x200?text=FIFA+24',
-      description: 'The biggest FIFA tournament in Africa featuring the best players from across the continent.'
+      startDate: '2024-03-15',
+      status: 'Registration Open',
+      difficulty: 'Professional',
+      image: 'https://images.unsplash.com/photo-1551698618-1dfe5d97d256?w=400&h=200&fit=crop'
     },
     {
       id: 2,
-      name: 'Mobile Legends Continental Cup',
+      name: 'Mobile Legends Cup',
       game: 'Mobile Legends',
-      status: 'live',
-      startDate: '2024-02-10',
-      endDate: '2024-02-14',
-      prizePool: '$3,000',
-      participants: 64,
-      maxParticipants: 64,
-      location: 'Online',
-      image: 'https://via.placeholder.com/300x200?text=Mobile+Legends',
-      description: 'Fast-paced MOBA action with teams competing for continental supremacy.'
+      participants: '32/64',
+      prizePool: '$2,500',
+      startDate: '2024-03-20',
+      status: 'Registration Open',
+      difficulty: 'Amateur',
+      image: 'https://images.unsplash.com/photo-1511512578047-dfb367046420?w=400&h=200&fit=crop'
     },
     {
       id: 3,
-      name: 'Call of Duty Warzone Africa',
+      name: 'COD Warzone Battle',
       game: 'COD Warzone',
-      status: 'upcoming',
-      startDate: '2024-02-20',
-      endDate: '2024-02-22',
-      prizePool: '$4,000',
-      participants: 96,
-      maxParticipants: 150,
-      location: 'Online',
-      image: 'https://via.placeholder.com/300x200?text=COD+Warzone',
-      description: 'Battle royale intensity with squads fighting for victory and glory.'
+      participants: '48/100',
+      prizePool: '$3,000',
+      startDate: '2024-03-25',
+      status: 'Registration Open',
+      difficulty: 'Professional',
+      image: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?w=400&h=200&fit=crop'
     },
     {
       id: 4,
-      name: 'Valorant Champions Series',
+      name: 'Valorant Champions',
       game: 'Valorant',
-      status: 'completed',
-      startDate: '2024-01-15',
-      endDate: '2024-01-20',
-      prizePool: '$6,000',
-      participants: 32,
-      maxParticipants: 32,
-      location: 'Lagos, Nigeria',
-      image: 'https://via.placeholder.com/300x200?text=Valorant',
-      description: 'Tactical shooter competition featuring the best teams in Africa.'
-    },
+      participants: '16/32',
+      prizePool: '$1,500',
+      startDate: '2024-04-01',
+      status: 'Coming Soon',
+      difficulty: 'Semi-Pro',
+      image: 'https://images.unsplash.com/photo-1552820728-8b83bb6b773f?w=400&h=200&fit=crop'
+    }
   ];
 
   const games = ['FIFA 24', 'Mobile Legends', 'COD Warzone', 'Valorant', 'Fortnite', 'Apex Legends'];
@@ -75,7 +62,7 @@ export default function TournamentsPage() {
                          tournament.game.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesGame = selectedGame === 'all' || tournament.game === selectedGame;
     const matchesStatus = selectedStatus === 'all' || tournament.status === selectedStatus;
-    
+
     return matchesSearch && matchesGame && matchesStatus;
   });
 
@@ -84,6 +71,8 @@ export default function TournamentsPage() {
       case 'upcoming': return 'text-blue-400 bg-blue-400/10';
       case 'live': return 'text-green-400 bg-green-400/10';
       case 'completed': return 'text-gray-400 bg-gray-400/10';
+      case 'Registration Open': return 'text-green-400 bg-green-400/10';
+      case 'Coming Soon': return 'text-yellow-400 bg-yellow-400/10';
       default: return 'text-gray-400 bg-gray-400/10';
     }
   };
@@ -93,6 +82,8 @@ export default function TournamentsPage() {
       case 'upcoming': return 'Upcoming';
       case 'live': return 'Live';
       case 'completed': return 'Completed';
+      case 'Registration Open': return 'Registration Open';
+      case 'Coming Soon': return 'Coming Soon';
       default: return 'Unknown';
     }
   };
@@ -154,16 +145,13 @@ export default function TournamentsPage() {
         {/* Tournament Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {filteredTournaments.map(tournament => (
-            <div key={tournament.id} className="card hover:scale-105 transition-transform">
-              <div className="relative mb-4">
+            <div key={tournament.id} className="card hover:scale-105 transition-transform duration-300">
+              <div className="mb-4">
                 <img
                   src={tournament.image}
                   alt={tournament.name}
-                  className="w-full h-48 object-cover rounded-lg"
+                  className="w-full h-48 object-cover rounded-lg mb-4"
                 />
-                <div className={`absolute top-3 right-3 px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(tournament.status)}`}>
-                  {getStatusText(tournament.status)}
-                </div>
               </div>
 
               <h3 className="text-xl font-bold mb-2">{tournament.name}</h3>
@@ -181,7 +169,7 @@ export default function TournamentsPage() {
                 </div>
                 <div className="flex items-center text-gray-400 text-sm">
                   <Users size={16} className="mr-2" />
-                  {tournament.participants}/{tournament.maxParticipants} Participants
+                  {tournament.participants} Participants
                 </div>
                 <div className="flex items-center text-gray-400 text-sm">
                   <MapPin size={16} className="mr-2" />
@@ -196,7 +184,7 @@ export default function TournamentsPage() {
                 >
                   View Details
                 </Link>
-                {tournament.status === 'upcoming' && tournament.participants < tournament.maxParticipants && (
+                {tournament.status === 'Registration Open' && tournament.participants < tournament.maxParticipants && (
                   <button className="btn-primary flex-1">
                     Join Tournament
                   </button>

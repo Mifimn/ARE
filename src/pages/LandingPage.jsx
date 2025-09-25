@@ -1,4 +1,3 @@
-
 import { Link } from 'react-router-dom';
 import { Play, Users, Trophy, Star, ChevronRight, Calendar, MapPin } from 'lucide-react';
 
@@ -64,10 +63,17 @@ export default function LandingPage() {
   return (
     <div className="pt-20">
       {/* Hero Section */}
-      <section className="relative min-h-screen flex items-center justify-center bg-gradient-to-br from-dark-900 via-dark-800 to-primary-900">
-        <div className="absolute inset-0 bg-black opacity-50"></div>
-        <div className="relative z-10 text-center max-w-4xl mx-auto px-4">
-          <h1 className="text-5xl md:text-7xl font-bold mb-6 bg-gradient-to-r from-white to-primary-500 bg-clip-text text-transparent">
+      <section className="relative h-screen flex items-center justify-center">
+        <div className="absolute inset-0 z-0">
+          <img
+            src="https://images.unsplash.com/photo-1542751371-adc38448a05e?w=1920&h=1080&fit=crop"
+            alt="Esports Arena"
+            className="w-full h-full object-cover"
+          />
+          <div className="absolute inset-0 bg-black bg-opacity-70"></div>
+        </div>
+        <div className="text-center z-10">
+          <h1 className="text-5xl md:text-7xl font-bold mb-6 bg-gradient-to-r from-primary-400 to-primary-600 bg-clip-text text-transparent">
             Africa Rise Esports
           </h1>
           <p className="text-2xl md:text-3xl font-semibold mb-4 text-primary-400">
@@ -113,7 +119,7 @@ export default function LandingPage() {
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-bold mb-6">About Africa Rise Esports</h2>
             <p className="text-xl text-gray-300 max-w-3xl mx-auto">
-              We're dedicated to building the premier esports ecosystem in Africa, providing opportunities 
+              We're dedicated to building the premier esports ecosystem in Africa, providing opportunities
               for gamers to compete, grow, and achieve their dreams on both continental and global stages.
             </p>
           </div>
@@ -155,8 +161,8 @@ export default function LandingPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {featuredTournaments.map((tournament) => (
               <div key={tournament.id} className="card hover:scale-105 transition-transform">
-                <img 
-                  src={tournament.image} 
+                <img
+                  src={tournament.image}
                   alt={tournament.name}
                   className="w-full h-48 object-cover rounded-lg mb-4"
                 />
@@ -170,7 +176,7 @@ export default function LandingPage() {
                   <span className="text-green-400 font-semibold">{tournament.prize}</span>
                   <span className="text-gray-400">{tournament.participants} players</span>
                 </div>
-                <Link 
+                <Link
                   to={`/tournament/${tournament.id}`}
                   className="btn-primary w-full text-center"
                 >
@@ -192,8 +198,8 @@ export default function LandingPage() {
             {testimonials.map((testimonial, index) => (
               <div key={index} className="card">
                 <div className="flex items-center mb-4">
-                  <img 
-                    src={testimonial.avatar} 
+                  <img
+                    src={testimonial.avatar}
                     alt={testimonial.name}
                     className="w-12 h-12 rounded-full mr-4"
                   />

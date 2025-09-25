@@ -20,6 +20,8 @@ import AboutPage from './pages/AboutPage';
 import ContactPage from './pages/ContactPage';
 import PlayersDirectoryPage from './pages/PlayersDirectoryPage';
 import RulesPage from './pages/RulesPage';
+import TermsPage from './pages/TermsPage';
+import PrivacyPage from './pages/PrivacyPage';
 import './App.css';
 
 export default function App() {
@@ -47,6 +49,8 @@ export default function App() {
             <Route path="/contact" element={<ContactPage />} />
             <Route path="/players" element={<PlayersDirectoryPage />} />
             <Route path="/rules" element={<RulesPage />} />
+            <Route path="/terms" element={<TermsPage />} />
+            <Route path="/privacy" element={<PrivacyPage />} />
           </Routes>
         </main>
         <Footer />
