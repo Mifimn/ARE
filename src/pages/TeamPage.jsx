@@ -1,22 +1,5 @@
 
-<old_str>import { Users } from 'lucide-react';
-
-export default function TeamPage() {
-  return (
-    <div className="pt-20 min-h-screen bg-dark-900">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="card">
-          <h1 className="text-3xl font-bold mb-6 flex items-center">
-            <Users className="mr-3 text-primary-500" size={32} />
-            Team Details
-          </h1>
-          <p className="text-gray-300">Team information and roster will be displayed here.</p>
-        </div>
-      </div>
-    </div>
-  );
-}</old_str>
-<new_str>import { Users, Trophy, Calendar, MapPin, Star, Mail, Edit3, UserPlus, Settings } from 'lucide-react';
+import { Users, Trophy, Calendar, MapPin, Star, Mail, Edit3, UserPlus, Settings } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 export default function TeamPage() {
@@ -38,227 +21,287 @@ export default function TeamPage() {
   const members = [
     {
       id: 1,
-      username: 'ThunderLeader',
-      fullName: 'John Doe',
+      username: 'ThunderStrike',
+      fullName: 'Ahmed Okafor',
       role: 'Captain',
-      avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop&crop=face',
       joinDate: '2023-03-15',
-      kd: '2.45',
-      status: 'online'
+      avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=80&h=80&fit=crop&crop=face',
+      stats: { kills: 1250, deaths: 890, assists: 340 }
     },
     {
       id: 2,
-      username: 'HawkSniper',
-      fullName: 'Mike Johnson',
+      username: 'HawkEye92',
+      fullName: 'David Adebayo',
       role: 'Sniper',
-      avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop&crop=face',
-      joinDate: '2023-03-20',
-      kd: '3.12',
-      status: 'online'
+      joinDate: '2023-04-01',
+      avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=80&h=80&fit=crop&crop=face',
+      stats: { kills: 980, deaths: 720, assists: 210 }
     },
     {
       id: 3,
-      username: 'StormAssault',
-      fullName: 'David Wilson',
-      role: 'Assault',
-      avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&h=100&fit=crop&crop=face',
-      joinDate: '2023-04-01',
-      kd: '1.98',
-      status: 'offline'
+      username: 'StormRider',
+      fullName: 'Kemi Adegoke',
+      role: 'Support',
+      joinDate: '2023-04-15',
+      avatar: 'https://images.unsplash.com/photo-1494790108755-2616c02e02d1?w=80&h=80&fit=crop&crop=face',
+      stats: { kills: 750, deaths: 650, assists: 520 }
     },
     {
       id: 4,
-      username: 'LightningSupport',
-      fullName: 'Alex Brown',
-      role: 'Support',
-      avatar: 'https://images.unsplash.com/photo-1519244703995-f4e0f30006d5?w=100&h=100&fit=crop&crop=face',
-      joinDate: '2023-04-10',
-      kd: '1.76',
-      status: 'online'
+      username: 'NightFury',
+      fullName: 'Chima Okeke',
+      role: 'Assault',
+      joinDate: '2023-05-01',
+      avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=80&h=80&fit=crop&crop=face',
+      stats: { kills: 1100, deaths: 800, assists: 280 }
     }
   ];
 
   const recentMatches = [
     {
       id: 1,
-      tournament: 'African COD Championship',
       opponent: 'Desert Eagles',
       result: 'Win',
-      score: '3-1',
-      date: '2024-02-10',
-      map: 'Verdansk'
+      score: '16-12',
+      date: '2024-01-14',
+      duration: '45 min'
     },
     {
       id: 2,
-      tournament: 'Regional Qualifiers',
-      opponent: 'Storm Riders',
+      opponent: 'Lion Pride',
       result: 'Win',
-      score: '3-0',
-      date: '2024-02-08',
-      map: 'Rebirth Island'
+      score: '16-8',
+      date: '2024-01-12',
+      duration: '38 min'
     },
     {
       id: 3,
-      tournament: 'Weekly Tournament',
-      opponent: 'Fire Squad',
+      opponent: 'Atlas Warriors',
       result: 'Loss',
-      score: '1-3',
-      date: '2024-02-05',
-      map: 'Caldera'
+      score: '12-16',
+      date: '2024-01-10',
+      duration: '52 min'
     }
   ];
 
   const achievements = [
     {
-      title: 'Regional Champions',
-      description: 'Won the West African COD Championship',
-      date: '2024-01-15',
-      icon: Trophy
+      title: 'African Champions',
+      description: 'Won COD Warzone African Championship 2023',
+      icon: Trophy,
+      date: '2023-12-15'
     },
     {
-      title: 'Tournament Streak',
-      description: '10 consecutive tournament wins',
-      date: '2023-12-20',
-      icon: Star
+      title: 'Regional Dominators',
+      description: 'Won West African Regional League',
+      icon: Star,
+      date: '2023-10-20'
     },
     {
-      title: 'Team Formation',
-      description: 'Official team registration',
-      date: '2023-03-15',
-      icon: Users
+      title: 'Team of the Year',
+      description: 'Awarded Best COD Team in Nigeria 2023',
+      icon: Users,
+      date: '2023-11-30'
     }
   ];
+
+  const winRate = Math.round((team.wins / (team.wins + team.losses)) * 100);
 
   return (
     <div className="pt-20 min-h-screen bg-dark-900">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Team Header */}
         <div className="card mb-8">
-          <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-6">
-            <div className="flex items-center mb-4 md:mb-0">
+          <div className="flex flex-col md:flex-row items-center md:items-start gap-6">
+            <div className="relative">
               <img
                 src={team.logo}
                 alt={team.name}
-                className="w-20 h-20 rounded-lg mr-6"
+                className="w-32 h-32 rounded-lg object-cover"
               />
-              <div>
-                <div className="flex items-center mb-2">
-                  <h1 className="text-3xl font-bold mr-3">{team.name}</h1>
-                  {team.verified && (
-                    <div className="bg-blue-600 text-white px-2 py-1 rounded text-xs font-medium">
-                      Verified
-                    </div>
-                  )}
+              {team.verified && (
+                <div className="absolute -top-2 -right-2 w-8 h-8 bg-primary-600 rounded-full flex items-center justify-center">
+                  <Star className="w-5 h-5 text-white" />
                 </div>
-                <p className="text-primary-400 text-lg">{team.game}</p>
-                <div className="flex items-center text-gray-400 mt-1">
-                  <MapPin size={16} className="mr-1" />
-                  <span>{team.city}, {team.country}</span>
+              )}
+            </div>
+            
+            <div className="flex-1 text-center md:text-left">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4">
+                <div>
+                  <h1 className="text-3xl font-bold mb-2">{team.name}</h1>
+                  <p className="text-xl text-primary-400 mb-2">{team.game}</p>
+                  <div className="flex items-center justify-center md:justify-start text-gray-400 mb-2">
+                    <MapPin size={16} className="mr-1" />
+                    {team.city}, {team.country}
+                  </div>
+                  <div className="flex items-center justify-center md:justify-start text-gray-400 mb-2">
+                    <Calendar size={16} className="mr-1" />
+                    Founded {new Date(team.founded).toLocaleDateString()}
+                  </div>
+                </div>
+                <div className="flex gap-3">
+                  <button className="btn-primary flex items-center">
+                    <UserPlus className="mr-2" size={16} />
+                    Join Team
+                  </button>
+                  <button className="btn-secondary flex items-center">
+                    <Settings className="mr-2" size={16} />
+                    Manage
+                  </button>
                 </div>
               </div>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-6">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-primary-400">#{team.ranking}</div>
+                  <div className="text-gray-400 text-sm">Global Rank</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-green-400">{team.wins}</div>
+                  <div className="text-gray-400 text-sm">Wins</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-red-400">{team.losses}</div>
+                  <div className="text-gray-400 text-sm">Losses</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-blue-400">{winRate}%</div>
+                  <div className="text-gray-400 text-sm">Win Rate</div>
+                </div>
+              </div>
+              
+              <p className="text-gray-300">{team.description}</p>
             </div>
-            <div className="flex gap-3">
-              <button className="btn-primary flex items-center">
-                <UserPlus className="mr-2" size={16} />
-                Join Team
-              </button>
-              <button className="btn-secondary flex items-center">
-                <Settings className="mr-2" size={16} />
-                Manage
-              </button>
-            </div>
-          </div>
-
-          {/* Team Stats */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-            <div className="text-center">
-              <div className="text-2xl font-bold text-green-400">{team.wins}</div>
-              <div className="text-gray-400 text-sm">Wins</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-red-400">{team.losses}</div>
-              <div className="text-gray-400 text-sm">Losses</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-yellow-400">#{team.ranking}</div>
-              <div className="text-gray-400 text-sm">Ranking</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-blue-400">{members.length}</div>
-              <div className="text-gray-400 text-sm">Members</div>
-            </div>
-          </div>
-
-          {/* Description */}
-          <div>
-            <h3 className="text-lg font-semibold mb-2">About</h3>
-            <p className="text-gray-300">{team.description}</p>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Team Roster */}
-          <div className="card">
-            <h2 className="text-2xl font-bold mb-6">Team Roster</h2>
-            <div className="space-y-4">
-              {members.map((member) => (
-                <div key={member.id} className="bg-dark-800 rounded-lg p-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center">
-                      <div className="relative">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Main Content */}
+          <div className="lg:col-span-2 space-y-8">
+            {/* Team Members */}
+            <div className="card">
+              <h2 className="text-2xl font-bold mb-6">Team Members</h2>
+              <div className="space-y-4">
+                {members.map((member) => (
+                  <div key={member.id} className="bg-dark-800 rounded-lg p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center">
                         <img
                           src={member.avatar}
                           alt={member.fullName}
                           className="w-12 h-12 rounded-full mr-4"
                         />
-                        <div className={`absolute bottom-0 right-4 w-3 h-3 rounded-full border-2 border-dark-800 ${
-                          member.status === 'online' ? 'bg-green-400' : 'bg-gray-400'
-                        }`}></div>
+                        <div>
+                          <h3 className="font-semibold">{member.username}</h3>
+                          <p className="text-gray-400 text-sm">{member.fullName}</p>
+                          <p className="text-primary-400 text-sm">{member.role}</p>
+                        </div>
                       </div>
-                      <div>
-                        <h3 className="font-semibold">{member.fullName}</h3>
-                        <p className="text-gray-400 text-sm">@{member.username}</p>
-                        <p className="text-primary-400 text-sm">{member.role}</p>
+                      <div className="text-right text-sm text-gray-400">
+                        <p>Joined {new Date(member.joinDate).toLocaleDateString()}</p>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <div className="text-lg font-bold">{member.kd}</div>
-                      <div className="text-gray-400 text-sm">K/D Ratio</div>
+                    <div className="grid grid-cols-3 gap-4 text-sm">
+                      <div className="text-center">
+                        <div className="font-semibold text-green-400">{member.stats.kills}</div>
+                        <div className="text-gray-400">Kills</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="font-semibold text-red-400">{member.stats.deaths}</div>
+                        <div className="text-gray-400">Deaths</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="font-semibold text-blue-400">{member.stats.assists}</div>
+                        <div className="text-gray-400">Assists</div>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
+            </div>
+
+            {/* Recent Matches */}
+            <div className="card">
+              <h2 className="text-2xl font-bold mb-6">Recent Matches</h2>
+              <div className="space-y-4">
+                {recentMatches.map((match) => (
+                  <div key={match.id} className="bg-dark-800 rounded-lg p-4">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <h3 className="font-semibold mb-1">vs {match.opponent}</h3>
+                        <p className="text-gray-400 text-sm">{match.duration} • {new Date(match.date).toLocaleDateString()}</p>
+                      </div>
+                      <div className="text-right">
+                        <div className={`font-bold mb-1 ${
+                          match.result === 'Win' ? 'text-green-400' : 'text-red-400'
+                        }`}>
+                          {match.result}
+                        </div>
+                        <div className="text-gray-400 text-sm">{match.score}</div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
 
-          {/* Recent Matches */}
-          <div className="card">
-            <h2 className="text-2xl font-bold mb-6">Recent Matches</h2>
-            <div className="space-y-4">
-              {recentMatches.map((match) => (
-                <div key={match.id} className="bg-dark-800 rounded-lg p-4">
-                  <div className="flex justify-between items-start mb-2">
-                    <div>
-                      <h3 className="font-semibold">{match.tournament}</h3>
-                      <p className="text-gray-400 text-sm">vs {match.opponent}</p>
-                      <p className="text-gray-500 text-xs">{match.map}</p>
-                    </div>
-                    <div className="text-right">
-                      <span className={`px-2 py-1 rounded text-sm font-medium ${
-                        match.result === 'Win' 
-                          ? 'bg-green-900 text-green-300' 
-                          : 'bg-red-900 text-red-300'
-                      }`}>
-                        {match.result}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="flex justify-between items-center text-sm text-gray-400">
-                    <span>{match.score}</span>
-                    <span>{new Date(match.date).toLocaleDateString()}</span>
-                  </div>
+          {/* Sidebar */}
+          <div className="space-y-8">
+            {/* Quick Stats */}
+            <div className="card">
+              <h2 className="text-xl font-bold mb-4">Quick Stats</h2>
+              <div className="space-y-3">
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Total Matches:</span>
+                  <span>{team.wins + team.losses}</span>
                 </div>
-              ))}
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Win Streak:</span>
+                  <span className="text-green-400">7</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Best Streak:</span>
+                  <span className="text-primary-400">12</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Avg Match Duration:</span>
+                  <span>42 min</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Upcoming Tournaments */}
+            <div className="card">
+              <h2 className="text-xl font-bold mb-4">Upcoming Tournaments</h2>
+              <div className="space-y-3">
+                <div className="bg-dark-800 rounded-lg p-3">
+                  <h4 className="font-medium mb-1">African Championship</h4>
+                  <p className="text-sm text-gray-400">Starts February 15, 2024</p>
+                  <p className="text-sm text-primary-400">$10,000 Prize Pool</p>
+                </div>
+                <div className="bg-dark-800 rounded-lg p-3">
+                  <h4 className="font-medium mb-1">Regional League</h4>
+                  <p className="text-sm text-gray-400">Starts March 1, 2024</p>
+                  <p className="text-sm text-primary-400">$5,000 Prize Pool</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Contact */}
+            <div className="card">
+              <h2 className="text-xl font-bold mb-4">Contact Team</h2>
+              <div className="space-y-3">
+                <button className="w-full btn-secondary flex items-center justify-center">
+                  <Mail className="mr-2" size={16} />
+                  Send Message
+                </button>
+                <button className="w-full btn-primary flex items-center justify-center">
+                  <UserPlus className="mr-2" size={16} />
+                  Request to Join
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -283,4 +326,4 @@ export default function TeamPage() {
       </div>
     </div>
   );
-}</new_str>
+}
