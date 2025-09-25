@@ -1,6 +1,5 @@
-
 import { useState } from 'react';
-import { Search, Filter, Trophy, Star, Users, MapPin, Gamepad2 } from 'lucide-react';
+import { Search, Filter, Trophy, Star, Users, MapPin, Gamepad2, Shield } from 'lucide-react';
 
 export default function PlayersDirectoryPage() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -148,7 +147,7 @@ export default function PlayersDirectoryPage() {
                          player.fullName.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesGame = selectedGame === 'all' || player.games.includes(selectedGame);
     const matchesCountry = selectedCountry === 'all' || player.country === selectedCountry;
-    
+
     return matchesSearch && matchesGame && matchesCountry;
   });
 
@@ -156,7 +155,7 @@ export default function PlayersDirectoryPage() {
     const matchesSearch = team.name.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesGame = selectedGame === 'all' || team.game === selectedGame;
     const matchesCountry = selectedCountry === 'all' || team.country === selectedCountry;
-    
+
     return matchesSearch && matchesGame && matchesCountry;
   });
 
