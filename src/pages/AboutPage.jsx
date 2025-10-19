@@ -115,10 +115,10 @@ export default function AboutPage() {
             <p className="mb-4">
               Africa Rise Esports was born from a simple observation: Africa has incredible gaming talent, 
               but limited opportunities to showcase and develop that talent on a professional level. 
-              Founded in 2023 by a group of passionate gamers and entrepreneurs, we set out to change that narrative.
+              Founded in 2024 by a group of passionate gamers and entrepreneurs, we set out to change that narrative.
             </p>
             <p className="mb-4">
-              Starting with our first FIFA tournament in Lagos with just 32 participants, we've grown 
+              Starting with our first FREE FIRE tournament in Cape Town with just 32 participants, we've grown 
               to host continental competitions featuring thousands of players across multiple games. 
               Our platform now connects gamers from over 20 African countries, providing them with 
               the tools and opportunities they need to compete at the highest levels.
