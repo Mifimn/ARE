@@ -1,327 +1,225 @@
-                            // src/pages/FreeFirePage.jsx
+// src/pages/FreeFirePage.jsx
 
-                            import { Link } from 'react-router-dom';
-                            import { Trophy, Users, ArrowRight, PlusCircle, Calendar, Gamepad2, Hash, Clock } from 'lucide-react';
-                            import { useState } from 'react';
-                            import AnimatedSection from '../components/AnimatedSection';
+import { Link, useParams } from 'react-router-dom';
+import { Trophy, Users, ArrowRight, PlusCircle, Calendar, Gamepad2, Hash, Clock, BarChart } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import AnimatedSection from '../components/AnimatedSection';
 
-                            // --- Placeholder Data & Components ---
+// --- Placeholder Data & Components ---
 
-                            const upcomingCups = [
-                                { id: 1, title: 'Free Fire Clash Squads - MYTHIC\'25', format: '4v4', entries: 47, date: '20 Oct', prize: 'R1000+' },
-                                { id: 2, title: 'Free Fire Royale Squads - MYTHIC\'25', format: 'Quads', entries: 36, date: '22 Oct', prize: 'R1000+' },
-                                { id: 3, title: 'Free Fire Solo Royale - MYTHIC\'25', format: 'Solos', entries: 67, date: '27 Oct', prize: 'R1000+' },
-                            ];
+const upcomingCups = [
+    { id: 1, title: 'Free Fire Clash Squads - MYTHIC\'25', format: '4v4', entries: 47, date: '20 Oct', prize: 'R1000+', image: '/images/action_1.jpg' },
+    { id: 2, title: 'Free Fire Royale Squads - MYTHIC\'25', format: 'Quads', entries: 36, date: '22 Oct', prize: 'R1000+', image: '/images/action_4.jpg' },
+    { id: 3, title: 'Free Fire Solo Royale - MYTHIC\'25', format: 'Solos', entries: 67, date: '27 Oct', prize: 'R1000+', image: '/images/action_3.jpg' },
+];
 
-                            const topTeams = [
-                                { rank: 1, name: 'Team Zeus', points: 1500, members: 5, logo: '/images/team_z.png' },
-                                { rank: 2, name: 'Elite Force', points: 1450, members: 4, logo: '/images/team_a.png' },
-                                { rank: 3, name: 'Phoenix Rising', points: 1390, members: 5, logo: '/images/team_o.png' },
-                                { rank: 4, name: 'Shadow Squad', points: 1210, members: 4, logo: '/images/team_l.png' },
-                            ];
-
-                            const allTeams = [
-                                { name: 'Gamer Legion', members: 5, logo: '/images/team_d.png' },
-                                { name: 'Raging Bulls', members: 4, logo: '/images/team_r.png' },
-                                { name: 'Lagos Lions', members: 5, logo: '/images/team_s.png' },
-                                { name: 'Accra Apex', members: 3, logo: '/images/team_c.png' },
-                                { name: 'Kigali Kings', members: 5, logo: '/images/team_o.png' },
-                            ];
-
-                            const CupListItem = ({ cup }) => (
-                                <div className="flex items-center p-4 bg-dark-800 rounded-xl hover:bg-dark-700 transition-colors border-l-4 border-primary-500/70 shadow-md">
-                                    <div className="w-16 h-16 mr-6 flex-shrink-0">
-                                        <img src="/images/ff_cup_thumb.jpg" alt="Cup thumbnail" className="w-full h-full object-cover rounded-lg" />
-                                    </div>
-                                    <div className="flex-grow">
-                                        <p className="text-base font-bold text-white mb-1">{cup.title}</p>
-                                        <p className="text-sm text-gray-400">{cup.format} &bull; {cup.entries} Entries</p>
-                                    </div>
-                                    <div className="text-right flex-shrink-0 ml-6">
-                                        <p className="text-xl font-extrabold text-yellow-400 leading-none">{cup.prize}</p>
-                                        <p className="text-sm text-gray-500 leading-none">{cup.date} Oct</p>
-                                    </div>
-                                </div>
-                            );
+const pastCups = [
+    { id: 101, title: 'Free Fire Legends Series - Season 1', format: '4v4', entries: 128, date: '15 Aug', prize: 'R5000', image: '/images/action_2.jpg', winner: 'Team Zeus'},
+    { id: 102, title: 'Solo Survival Challenge - Aug', format: 'Solos', entries: 200, date: '01 Aug', prize: 'R500', image: '/images/action_1.jpg', winner: 'SniperAce'},
+];
 
 
-                            // --- Conditional Content Components ---
+const topTeams = [
+    { rank: 1, name: 'Team Zeus', points: 1500, members: 5, logo: '/images/team_z.png' },
+    { rank: 2, name: 'Elite Force', points: 1450, members: 4, logo: '/images/team_a.png' },
+    { rank: 3, name: 'Phoenix Rising', points: 1390, members: 5, logo: '/images/team_o.png' },
+    { rank: 4, name: 'Shadow Squad', points: 1210, members: 4, logo: '/images/team_l.png' },
+];
 
-                            const CupsContent = () => (
-                                <AnimatedSection delay={0} className="px-4 sm:px-6 lg:px-8 space-y-8">
-                                    <h2 className="text-3xl font-bold text-primary-400 border-b border-dark-700 pb-3">Cups & Tournaments (Upcoming & Past)</h2>
-                                    <p className="text-gray-400">This view displays a filterable list of all Free Fire competitions, including **Upcoming Cups** and **Archived/Past Tournaments**.</p>
+const allTeams = [
+    { name: 'Gamer Legion', members: 5, logo: '/images/team_d.png' },
+    { name: 'Raging Bulls', members: 4, logo: '/images/team_r.png' },
+    { name: 'Lagos Lions', members: 5, logo: '/images/team_s.png' },
+    { name: 'Accra Apex', members: 3, logo: '/images/team_c.png' },
+    { name: 'Kigali Kings', members: 5, logo: '/images/team_o.png' },
+];
 
-                                    <div className="space-y-6">
-                                        <h4 className="text-2xl font-semibold text-white flex items-center"><Clock size={20} className="mr-3 text-green-400" /> Upcoming Cups</h4>
-                                        <div className="space-y-4">
-                                            {upcomingCups.map(cup => <CupListItem key={cup.id} cup={cup} />)}
-                                        </div>
-
-                                        <h4 className="text-2xl font-semibold text-white pt-6 border-t border-dark-800 flex items-center"><Trophy size={20} className="mr-3 text-yellow-400" /> Past Tournaments</h4>
-                                        <div className="p-6 bg-dark-800 rounded-xl text-gray-500 border border-dark-700">
-                                            <p>A paginated list of all concluded Free Fire events would appear here, showing winners and final scores.</p>
-                                        </div>
-                                    </div>
-                                </AnimatedSection>
-                            );
-
-                            const LeaderboardContent = () => (
-                                <AnimatedSection delay={0} className="px-4 sm:px-6 lg:px-8 space-y-6">
-                                    <h2 className="text-3xl font-bold text-primary-400 border-b border-dark-700 pb-3">Top 100 Team Leaderboard</h2>
-                                    <p className="text-gray-400">This view displays the **Top 100 teams** based on ranking points accumulated from official tournaments and leagues.</p>
-
-                                    <div className="bg-dark-800 p-6 rounded-xl shadow-inner">
-                                        {/* Header Row (Hidden on small screens for better vertical flow) */}
-                                        <div className="hidden sm:flex justify-between items-center text-lg font-bold text-gray-400 mb-4 pb-3 border-b border-dark-700">
-                                            <span className="w-1/12 text-center">#</span>
-                                            <span className="w-5/12">Team Name</span>
-                                            <span className="w-3/12 text-center">Members</span>
-                                            <span className="w-3/12 text-right">Points</span>
-                                        </div>
-
-                                        {/* Team Blocks (List) */}
-                                        <div className="space-y-3">
-                                            {topTeams.map((team) => (
-                                                // 🔑 MOBILE FIX: Changed to flex-wrap on small screens to prevent overflow
-                                                <div key={team.rank} className="flex flex-wrap sm:flex-nowrap items-center p-3 bg-dark-700 rounded-lg hover:bg-dark-600 transition-colors border-l-4 border-yellow-500/50">
-
-                                                    {/* Rank & Team Info - Takes full width on mobile, then 6/12 on large screens */}
-                                                    <div className="flex items-center space-x-3 w-full sm:w-6/12 pb-2 sm:pb-0">
-                                                        <span className="text-center font-extrabold text-xl text-yellow-400 w-8 flex-shrink-0">{team.rank}</span>
-                                                        <img src={team.logo || '/images/team_placeholder.png'} alt={team.name} className="w-10 h-10 rounded-full object-cover border border-primary-500/50 flex-shrink-0" />
-                                                        <div className="flex-grow">
-                                                            <p className="font-semibold text-white text-base leading-tight">{team.name}</p>
-                                                            <Link to={`/team/${team.name.toLowerCase().replace(/\s/g, '-')}`} className="text-xs text-primary-400 hover:text-primary-300">View Team</Link>
-                                                        </div>
-                                                    </div>
-
-                                                    {/* Members & Points - Now wrap to a new line on mobile */}
-                                                    <div className="flex justify-end space-x-4 sm:space-x-0 w-full sm:w-6/12 text-sm">
-                                                        {/* Members */}
-                                                        <div className="w-1/2 sm:w-3/12 text-left sm:text-center text-gray-400 flex items-center justify-start sm:justify-center">
-                                                            <Users size={16} className="mr-1" />
-                                                            <span>{team.members} / 5</span>
-                                                        </div>
-
-                                                        {/* Points */}
-                                                        <span className="w-1/2 sm:w-3/12 text-right font-bold text-base sm:text-xl text-yellow-400">{team.points.toLocaleString()}</span>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                            <p className="text-center text-sm text-gray-500 pt-4">... Showing top {topTeams.length} of 100 Teams</p>
-                                        </div>
-                                    </div>
-                                </AnimatedSection>
-                            );
-
-                            const TeamsContent = () => (
-                                <AnimatedSection delay={0} className="px-4 sm:px-6 lg:px-8 space-y-6">
-                                    <h2 className="text-3xl font-bold text-primary-400 border-b border-dark-700 pb-3">All Free Fire Teams Directory</h2>
-                                    <p className="text-gray-400">This view provides a directory of **all registered Free Fire teams**. Use the search bar (conceptual) to find specific teams.</p>
-
-                                    {/* Conceptual Search Bar */}
-                                    <div className="p-4 bg-dark-700 rounded-lg flex items-center border border-dark-600">
-                                        <input 
-                                            type="text" 
-                                            placeholder="Search all 250+ registered teams..." 
-                                            className="w-full bg-transparent text-white placeholder-gray-500 focus:outline-none text-lg"
-                                        />
-                                    </div>
-
-                                    {/* Team Blocks (List) */}
-                                    <div className="space-y-4">
-                                        {allTeams.map((team, index) => (
-                                            // 🔑 MOBILE FIX: Use flex-wrap on mobile and adjust widths
-                                            <div key={index} className="flex flex-wrap items-center p-4 sm:p-5 bg-dark-800 rounded-xl hover:bg-dark-700 transition-colors shadow-lg">
-
-                                                {/* Team Logo and Name - Takes full width on mobile, then 5/12 on large screens */}
-                                                <div className="flex items-center w-full sm:w-5/12 space-x-4 pb-2 sm:pb-0">
-                                                    <img src={team.logo || '/images/team_placeholder.png'} alt={team.name} className="w-12 h-12 rounded-full object-cover border-2 border-primary-500/50" />
-                                                    <p className="font-bold text-white text-lg sm:text-xl">{team.name}</p>
-                                                </div>
-
-                                                {/* Members - Hidden on base mobile view, shown on small screens and up */}
-                                                <div className="hidden sm:flex w-4/12 items-center text-gray-400 text-base">
-                                                    <Users size={20} className="mr-2 text-primary-400" />
-                                                    <span>{team.members} Team Members</span>
-                                                </div>
-
-                                                {/* View Team Button - Takes full width on mobile, pushes to the right on large screens */}
-                                                <div className="w-full sm:w-3/12 text-right pt-2 sm:pt-0">
-                                                    <Link 
-                                                        to={`/team/${team.name.toLowerCase().replace(/\s/g, '-')}`}
-                                                        className="bg-primary-600 hover:bg-primary-700 text-white font-semibold py-2.5 px-5 rounded-lg text-sm sm:text-base transition-colors flex items-center justify-center sm:justify-end w-full"
-                                                    >
-                                                        View Team <ArrowRight size={18} className="ml-2" />
-                                                    </Link>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </AnimatedSection>
-                            );
+// --- Enhanced Cup List Item ---
+// UPDATED: Link target changed
+const CupListItem = ({ cup, isPast = false }) => (
+    <Link
+        to="/tournament" // CHANGED: Link points to the generic /tournament route
+        className="block relative group overflow-hidden rounded-xl shadow-lg border border-dark-700 hover:border-primary-500/50 transition-all duration-300"
+    >
+        <img
+            src={cup.image || '/images/ff_cup_thumb.jpg'}
+            alt="Cup Background"
+            className={`absolute inset-0 w-full h-full object-cover transition-all duration-500 group-hover:scale-110 ${isPast ? 'opacity-20 group-hover:opacity-30' : 'opacity-30 group-hover:opacity-40'}`}
+        />
+        <div className="relative z-10 p-5 bg-gradient-to-r from-dark-800/90 via-dark-800/80 to-transparent flex items-center justify-between">
+            <div className="flex-grow pr-4">
+                <h4 className={`text-lg font-bold mb-1 transition-colors ${isPast ? 'text-gray-400 group-hover:text-gray-300' : 'text-white group-hover:text-primary-300'}`}>
+                    {cup.title}
+                </h4>
+                <p className="text-sm text-gray-400">{cup.format} &bull; {cup.entries} Entries</p>
+                {isPast && cup.winner && <p className="text-xs text-yellow-500 mt-1">Winner: {cup.winner}</p>}
+            </div>
+            <div className="text-right flex-shrink-0">
+                <p className={`text-2xl font-extrabold leading-none mb-1 ${isPast ? 'text-yellow-600' :'text-yellow-400'}`}>{cup.prize}</p>
+                <p className="text-xs text-gray-500 uppercase tracking-wider">{cup.date}</p>
+            </div>
+        </div>
+         <div className="absolute top-4 right-4 text-primary-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+             <ArrowRight size={20} />
+         </div>
+    </Link>
+);
 
 
-                            export default function FreeFirePage() {
-                                const [activeTab, setActiveTab] = useState('rundown'); 
+// --- Content Components ---
 
-                                const navTabs = [
-                                    { name: 'RUNDOWN', path: 'rundown' },
-                                    { name: 'CUPS', path: 'cups' },
-                                    { name: 'LEADERBOARD', path: 'leaderboard' },
-                                    { name: 'TEAMS', path: 'teams' },
-                                ];
+const CupsContent = () => (
+    <AnimatedSection delay={0} className="space-y-10">
+        <h2 className="text-3xl font-bold text-primary-400 border-b-2 border-primary-500/30 pb-3 flex items-center">
+            <Trophy size={28} className="mr-3" /> Cups & Tournaments
+        </h2>
+        <p className="text-gray-300 text-lg">Browse upcoming competitions or look back at past glories in the Free Fire arena.</p>
 
-                                const recentMatches = [
-                                    { winner: 'Mr._Jostrice', loser: '94GAMER', winnerScore: 1, loserScore: 0, winnerLogo: '/images/player_j.png', loserLogo: '/images/player_94.png' },
-                                    { teams: ['/images/team_a.png', '/images/team_d.png', '/images/team_c.png', '/images/team_l.png', '/images/team_r.png', '/images/team_s.png'] },
-                                    { teams: ['/images/team_w.png', '/images/team_o.png', '/images/team_z.png', '/images/team_x.png', '/images/team_y.png', '/images/team_kk.png'] },
-                                ];
+        <div className="space-y-6">
+            <h3 className="text-2xl font-semibold text-white flex items-center"><Clock size={20} className="mr-3 text-green-400" /> Upcoming Cups</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {upcomingCups.map((cup, index) => (
+                    <AnimatedSection key={cup.id} delay={100 + index * 100}>
+                        <CupListItem cup={cup} />
+                    </AnimatedSection>
+                ))}
+                 {upcomingCups.length === 0 && <p className="text-gray-500 md:col-span-2">No upcoming cups scheduled right now.</p>}
+            </div>
+        </div>
 
-                                // Function to render the correct content based on the active tab
-                                const renderContent = () => {
-                                    if (activeTab === 'cups') return <CupsContent />;
-                                    if (activeTab === 'leaderboard') return <LeaderboardContent />;
-                                    if (activeTab === 'teams') return <TeamsContent />;
+        <div className="space-y-6 pt-8 border-t border-dark-700">
+            <h3 className="text-2xl font-semibold text-white flex items-center"><Calendar size={20} className="mr-3 text-yellow-400" /> Past Events Archive</h3>
+            {pastCups.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {pastCups.map((cup, index) => (
+                        <AnimatedSection key={cup.id} delay={300 + index * 100}>
+                            <CupListItem cup={cup} isPast={true} />
+                        </AnimatedSection>
+                    ))}
+                </div>
+            ) : (
+                <div className="p-8 bg-dark-800 rounded-xl text-center text-gray-500 border border-dark-700">
+                    <Trophy size={40} className="mx-auto mb-4 opacity-50"/>
+                    <p>No past tournament data available yet.</p>
+                </div>
+            )}
+        </div>
+    </AnimatedSection>
+);
 
-                                    // Default: RUNDOWN Content
-                                    return (
-                                        // RUNDOWN content container with padding
-                                        <div className="flex flex-col lg:flex-row gap-8 lg:gap-12 px-4 sm:px-6 lg:px-8">
+// --- LeaderboardContent and TeamsContent remain unchanged ---
+const LeaderboardContent = () => (
+    <AnimatedSection delay={0} className="space-y-8">
+        <h2 className="text-3xl font-bold text-primary-400 border-b-2 border-primary-500/30 pb-3 flex items-center">
+            <BarChart size={28} className="mr-3" /> Team Leaderboard
+        </h2>
+        <p className="text-gray-300 text-lg">Top teams battle for supremacy. Rankings based on official ARE tournament points.</p>
 
-                                            {/* --- Left Column (Upcoming Cups - 2/3 width) --- */}
-                                            <div className="lg:w-2/3 space-y-8 lg:space-y-10">
-                                                <AnimatedSection delay={100} className="bg-purple-800/80 p-6 sm:p-8 rounded-2xl shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between border-4 border-purple-600">
-                                                    <div>
-                                                        <h2 className="text-3xl sm:text-4xl font-extrabold text-white mb-1">MYTHIC 25</h2>
-                                                        <p className="text-purple-200 text-base sm:text-lg mb-4 sm:mb-0">Featured Seasonal Championship Event</p>
-                                                    </div>
-                                                    <Link to="/event/mythic-25" className="bg-primary-600 hover:bg-primary-700 text-white font-bold py-3 px-6 rounded-xl flex items-center transition-colors text-base shadow-lg mt-4 sm:mt-0">
-                                                        GO TO EVENT <ArrowRight size={20} className="ml-2" />
-                                                    </Link>
-                                                </AnimatedSection>
+        <div className="bg-dark-800 p-4 sm:p-6 rounded-xl shadow-inner border border-dark-700">
+            <div className="hidden sm:flex justify-between items-center text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4 pb-3 border-b border-dark-700">
+                <span className="w-1/12 text-center">Rank</span> <span className="w-5/12 pl-4">Team</span> <span className="w-3/12 text-center">Members</span> <span className="w-3/12 text-right pr-4">Points</span>
+            </div>
+            <div className="space-y-3">
+                {topTeams.map((team, index) => (
+                    <AnimatedSection key={team.rank} delay={100 + index * 50} className={`flex flex-wrap sm:flex-nowrap items-center p-3 rounded-lg transition-all duration-300 border-l-4 ${ index === 0 ? 'bg-yellow-500/10 border-yellow-400 hover:bg-yellow-500/20' : index === 1 ? 'bg-gray-500/10 border-gray-400 hover:bg-gray-500/20' : index === 2 ? 'bg-amber-600/10 border-amber-500 hover:bg-amber-600/20' : 'bg-dark-700 hover:bg-dark-600 border-transparent hover:border-primary-500/50' }`} >
+                        <div className="flex items-center space-x-3 w-full sm:w-6/12 pb-2 sm:pb-0">
+                            <span className={`text-center font-extrabold text-xl w-8 flex-shrink-0 ${index < 3 ? 'text-white' : 'text-gray-400'}`}>{team.rank}</span>
+                            <img src={team.logo || '/images/team_placeholder.png'} alt={team.name} className="w-10 h-10 rounded-full object-cover border-2 border-dark-600 flex-shrink-0" />
+                            <div className="flex-grow"><p className={`font-semibold text-base leading-tight ${index < 3 ? 'text-white' : 'text-gray-200'}`}>{team.name}</p><Link to={`/team/${team.name.toLowerCase().replace(/\s/g, '-')}`} className="text-xs text-primary-400 hover:text-primary-300">View Team</Link></div>
+                        </div>
+                        <div className="flex justify-between sm:justify-end space-x-4 sm:space-x-0 w-full sm:w-6/12 text-sm pl-12 sm:pl-0">
+                            <div className="w-auto sm:w-3/12 text-left sm:text-center text-gray-400 flex items-center justify-start sm:justify-center"><Users size={16} className="mr-1 sm:mr-2" /> <span>{team.members}</span></div>
+                            <span className={`w-auto sm:w-3/12 text-right font-bold text-base sm:text-lg ${index < 3 ? 'text-white' : 'text-yellow-400'}`}>{team.points.toLocaleString()}</span>
+                        </div>
+                    </AnimatedSection>
+                ))}
+                <p className="text-center text-sm text-gray-500 pt-4">... View Full Leaderboard (Top 100)</p>
+            </div>
+        </div>
+    </AnimatedSection>
+);
 
-                                                <AnimatedSection delay={200}>
-                                                    <div className="flex justify-between items-center mb-6">
-                                                        <h3 className="text-2xl font-bold text-primary-400">UPCOMING CUPS & TOURNEYS</h3>
-                                                        <button onClick={() => setActiveTab('cups')} className="text-sm text-gray-400 hover:text-white transition-colors flex items-center">
-                                                            View All Cups <ArrowRight size={16} className="ml-1" />
-                                                        </button>
-                                                    </div>
-                                                    <div className="space-y-4">
-                                                        {upcomingCups.map((cup, index) => (
-                                                            <AnimatedSection key={cup.id} delay={250 + index * 50}>
-                                                                <CupListItem cup={cup} />
-                                                            </AnimatedSection>
-                                                        ))}
-                                                    </div>
-                                                </AnimatedSection>
-                                            </div>
+const TeamsContent = () => (
+    <AnimatedSection delay={0} className="space-y-8">
+        <h2 className="text-3xl font-bold text-primary-400 border-b-2 border-primary-500/30 pb-3 flex items-center"><Users size={28} className="mr-3" /> Team Directory</h2>
+        <p className="text-gray-300 text-lg">Find registered Free Fire teams or create your own squad.</p>
+        <AnimatedSection delay={100} className="bg-gradient-to-r from-green-600/30 to-dark-800/50 p-6 rounded-xl border border-green-500/50 shadow-lg flex items-center justify-between">
+            <div><h3 className="text-2xl font-bold text-white mb-2">Ready to Build Your Legacy?</h3><p className="text-green-200">Assemble your squad and register for upcoming competitions.</p></div>
+            <Link to="/my-teams" className="btn-primary bg-green-600 hover:bg-green-700 flex items-center flex-shrink-0"><PlusCircle size={18} className="mr-2"/> Create Team</Link>
+        </AnimatedSection>
+        <AnimatedSection delay={200} className="space-y-6 pt-6">
+            <h3 className="text-2xl font-semibold text-white">Registered Teams ({allTeams.length})</h3>
+            <div className="p-4 bg-dark-700 rounded-lg flex items-center border border-dark-600"><input type="text" placeholder="Search teams..." className="w-full bg-transparent text-white placeholder-gray-500 focus:outline-none text-lg"/></div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {allTeams.map((team, index) => (
+                    <AnimatedSection key={index} delay={250 + index * 50} className="flex items-center p-4 bg-dark-800 rounded-xl hover:bg-dark-700 transition-colors shadow-lg border border-dark-700 hover:border-primary-500/50">
+                         <img src={team.logo || '/images/team_placeholder.png'} alt={team.name} className="w-12 h-12 rounded-full object-cover border-2 border-dark-600 mr-4" />
+                         <div className="flex-grow"><p className="font-bold text-white text-lg">{team.name}</p><span className="text-gray-400 text-sm flex items-center"><Users size={14} className="mr-1"/> {team.members} Members</span></div>
+                         <Link to={`/team/${team.name.toLowerCase().replace(/\s/g, '-')}`} className="btn-secondary text-sm px-3 py-1.5 transition-transform hover:scale-105"> View </Link>
+                    </AnimatedSection>
+                ))}
+            </div>
+        </AnimatedSection>
+    </AnimatedSection>
+);
 
-                                            {/* --- Right Column (Scrims & Recent Matches - 1/3 width) --- */}
-                                            <div className="lg:w-1/3 space-y-8 lg:space-y-10">
-                                                <AnimatedSection delay={300} className="bg-dark-800 p-6 rounded-xl shadow-lg border border-dark-700">
-                                                    <div className="flex justify-between items-center mb-4">
-                                                        <h3 className="text-2xl font-bold text-primary-400">SCRIMS</h3>
-                                                        <button className="bg-green-600/30 text-green-300 hover:bg-green-600/50 font-semibold py-1.5 px-4 rounded-lg text-sm flex items-center transition-colors">
-                                                            <PlusCircle size={16} className="mr-1" /> ACTIVATE SCRIM
-                                                        </button>
-                                                    </div>
+// --- Main Page Component ---
+export default function FreeFirePage() {
+    const [activeTab, setActiveTab] = useState('rundown');
+    const navTabs = [ { name: 'RUNDOWN', path: 'rundown', icon: Hash }, { name: 'CUPS', path: 'cups', icon: Trophy }, { name: 'LEADERBOARD', path: 'leaderboard', icon: BarChart }, { name: 'TEAMS', path: 'teams', icon: Users }, ];
+    const recentMatchesRundown = [ { winner: 'Mr._Jostrice', loser: '94GAMER', winnerScore: 1, loserScore: 0, winnerLogo: '/images/player_j.png', loserLogo: '/images/player_94.png' }, { teams: ['/images/team_a.png', '/images/team_d.png', '/images/team_c.png', '/images/team_l.png', '/images/team_r.png', '/images/team_s.png'] }, { teams: ['/images/team_w.png', '/images/team_o.png', '/images/team_z.png', '/images/team_x.png', '/images/team_y.png', '/images/team_kk.png'] }, ];
 
-                                                    {/* Single Scrim Entry */}
-                                                    <div className="bg-dark-700 p-4 rounded-lg flex justify-between items-center border border-dark-600">
-                                                        <div>
-                                                            <p className="text-base font-semibold text-white">Daily Fire Scrim</p>
-                                                            <p className="text-sm text-gray-400 flex items-center">
-                                                                <Calendar size={14} className="mr-1" /> Best of 1 - Free Entry
-                                                            </p>
-                                                        </div>
-                                                        <div className="text-right">
-                                                            <p className="text-xl font-bold text-green-400 leading-none">18:00</p>
-                                                            <p className="text-sm text-gray-500 leading-none">19 OCT</p>
-                                                        </div>
-                                                    </div>
-                                                </AnimatedSection>
+    const renderContent = () => {
+        switch (activeTab) {
+            case 'cups': return <CupsContent />;
+            case 'leaderboard': return <LeaderboardContent />;
+            case 'teams': return <TeamsContent />;
+            case 'rundown': default: return (
+                <div className="flex flex-col lg:flex-row gap-8 lg:gap-12 px-4 sm:px-6 lg:px-8">
+                    <div className="lg:w-2/3 space-y-10">
+                        <AnimatedSection delay={100} className="relative group overflow-hidden bg-gradient-to-br from-purple-700 via-indigo-800 to-purple-900 p-6 sm:p-8 rounded-2xl shadow-xl border-2 border-purple-500/50">
+                             <div className="absolute inset-0 bg-[url('/images/lan_6.jpg')] bg-repeat opacity-[0.03] mix-blend-overlay"></div>
+                             <div className="relative z-10 flex flex-col sm:flex-row items-start sm:items-center justify-between"><h2 className="text-3xl sm:text-4xl font-extrabold text-white mb-1 drop-shadow-lg">MYTHIC 25</h2><p className="text-purple-200 text-base sm:text-lg mb-4 sm:mb-0">Featured Seasonal Championship Event</p><Link to="/event/mythic-25" className="btn-primary bg-white text-purple-800 hover:bg-purple-100 font-bold py-3 px-6 rounded-xl flex items-center transition-colors text-base shadow-lg mt-4 sm:mt-0 transform hover:scale-105">GO TO EVENT <ArrowRight size={20} className="ml-2" /></Link></div>
+                        </AnimatedSection>
+                        <AnimatedSection delay={200}>
+                            <div className="flex justify-between items-center mb-6"><h3 className="text-2xl font-bold text-primary-400 flex items-center"><Clock size={20} className="mr-2"/> UPCOMING CUPS</h3><button onClick={() => setActiveTab('cups')} className="text-sm text-gray-400 hover:text-white transition-colors flex items-center">View All <ArrowRight size={16} className="ml-1" /></button></div>
+                            <div className="space-y-4">{upcomingCups.map((cup, index) => (<AnimatedSection key={cup.id} delay={250 + index * 50}><CupListItem cup={cup} /></AnimatedSection>))}</div>
+                        </AnimatedSection>
+                    </div>
+                    <div className="lg:w-1/3 space-y-10">
+                        <AnimatedSection delay={300} className="card bg-dark-800 p-6 rounded-xl shadow-lg border border-dark-700">
+                             <div className="flex justify-between items-center mb-4"><h3 className="text-2xl font-bold text-green-400">SCRIMS</h3><button className="bg-green-600/30 text-green-300 hover:bg-green-600/50 font-semibold py-1.5 px-4 rounded-lg text-sm flex items-center transition-colors"><PlusCircle size={16} className="mr-1" /> Activate Scrim</button></div>
+                            <div className="bg-dark-900 p-4 rounded-lg flex justify-between items-center border border-dark-600 hover:border-green-500/50 transition-colors"><div><p className="text-base font-semibold text-white">Daily Fire Scrim</p><p className="text-sm text-gray-400 flex items-center"><Calendar size={14} className="mr-1" /> Best of 1 - Free Entry</p></div><div className="text-right"><p className="text-xl font-bold text-green-400 leading-none">18:00</p><p className="text-sm text-gray-500 leading-none">Today</p></div></div>
+                        </AnimatedSection>
+                        <AnimatedSection delay={400} className="card bg-dark-800 p-6 rounded-xl shadow-lg border border-dark-700">
+                            <h3 className="text-2xl font-bold text-primary-400 mb-6">RECENT MATCHES</h3><div className="space-y-4"><div className="border border-dark-700 p-3 rounded-lg bg-dark-900"><div className="flex items-center justify-between mb-1 text-sm"><div className="flex items-center"><img src={recentMatchesRundown[0].loserLogo} alt="loser" className="w-6 h-6 rounded-full mr-2 opacity-70"/> <span className="text-gray-400 line-through">{recentMatchesRundown[0].loser}</span></div><span className="font-semibold text-red-500">{recentMatchesRundown[0].loserScore}</span></div><div className="flex items-center justify-between text-sm"><div className="flex items-center"><img src={recentMatchesRundown[0].winnerLogo} alt="winner" className="w-6 h-6 rounded-full mr-2 border-2 border-green-500"/> <span className="font-bold text-white">{recentMatchesRundown[0].winner}</span></div><span className="font-bold text-green-400">{recentMatchesRundown[0].winnerScore}</span></div></div>{[recentMatchesRundown[1], recentMatchesRundown[2]].map((match, idx) => (<div key={idx} className="flex flex-wrap gap-2 p-3 bg-dark-700 rounded-lg border border-dark-600">{match.teams.map((logo, index) => (<img key={index} src={logo} alt={`Team ${index}`} className="w-6 h-6 rounded-full object-cover border border-dark-900" title={`Team ${index+1}`} />))}</div>))}</div><button className="w-full mt-6 text-center text-sm text-primary-400 hover:text-primary-300 transition-colors font-medium">View Match History</button>
+                        </AnimatedSection>
+                    </div>
+                </div>
+            );
+        }
+    };
 
-                                                <AnimatedSection delay={400} className="bg-dark-800 p-6 rounded-xl shadow-lg border border-dark-700">
-                                                    <h3 className="text-2xl font-bold text-primary-400 mb-6">RECENT MATCHES</h3>
-
-                                                    {/* Match 1 (Score-based) */}
-                                                    <div className="border border-dark-700 p-4 rounded-lg mb-4">
-                                                        <div className="flex items-center justify-between mb-1 text-base">
-                                                            <div className="flex items-center">
-                                                                <img src={'/images/player_94.png'} alt="94GAMER" className="w-8 h-8 rounded-full object-cover mr-2 border-2 border-red-500/50" />
-                                                                <span className="text-gray-300">94GAMER</span>
-                                                            </div>
-                                                            <span className="font-bold text-red-500">{0}</span>
-                                                        </div>
-                                                        <div className="flex items-center justify-between text-base pt-1 border-t border-dark-700 mt-2">
-                                                            <div className="flex items-center">
-                                                                <img src={'/images/player_j.png'} alt="Mr._Jostrice" className="w-8 h-8 rounded-full object-cover mr-2 border-2 border-green-500/50" />
-                                                                <span className="font-bold text-white">Mr._Jostrice (W)</span>
-                                                            </div>
-                                                            <span className="font-bold text-green-400">{1}</span>
-                                                        </div>
-                                                    </div>
-
-                                                    {/* Match 2 & 3 (Logo Grids) */}
-                                                    <div className="space-y-4">
-                                                        {[recentMatches[1], recentMatches[2]].map((match, idx) => (
-                                                            <div key={idx} className="flex flex-wrap gap-3 p-3 bg-dark-700 rounded-lg border border-dark-600">
-                                                                {match.teams.map((logo, index) => (
-                                                                    <img key={index} src={logo} alt={`Team ${index}`} className="w-7 h-7 rounded-full object-cover border-2 border-dark-600" />
-                                                                ))}
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                    <button className="w-full mt-6 text-center text-base text-primary-400 hover:text-primary-300 transition-colors font-medium">
-                                                        View All Match History
-                                                    </button>
-                                                </AnimatedSection>
-                                            </div>
-                                        </div>
-                                    );
-                                };
-
-
-                                return (
-                                    <div className="pt-8 min-h-screen bg-dark-900 text-white">
-                                        {/* Main wrapper: max-w-full and px-0 for full bleed */}
-                                        <div className="max-w-full mx-auto px-0 space-y-8 sm:space-y-10">
-
-                                            {/* --- Game Header & Tabs --- */}
-                                            <AnimatedSection delay={0} className="px-4 sm:px-6 lg:px-8 space-y-6">
-                                                <div className="flex items-center justify-between border-b border-dark-700 pb-4">
-                                                    <div className="flex items-center">
-                                                        <Gamepad2 className="w-9 h-9 mr-4 text-primary-400" />
-                                                        <h1 className="text-4xl md:text-5xl font-extrabold text-white">FREE FIRE HUB</h1>
-                                                    </div>
-                                                    <div className="space-x-4">
-                                                        <button className="bg-dark-700 hover:bg-dark-600 text-gray-300 font-semibold py-2 px-4 rounded-lg text-lg transition-colors">
-                                                            <span className="text-xl">🔗</span>
-                                                        </button>
-                                                    </div>
-                                                </div>
-
-                                                {/* Tabs Navigation - Added overflow-x-auto to prevent horizontal scroll from pushing page out */}
-                                                <nav className="flex space-x-8 text-xl font-semibold text-gray-400 border-b border-dark-700 overflow-x-auto pb-1">
-                                                    {navTabs.map((tab) => (
-                                                        <button 
-                                                            key={tab.name}
-                                                            onClick={() => setActiveTab(tab.path)}
-                                                            className={`py-3 transition-colors flex-shrink-0 ${activeTab === tab.path ? 'text-primary-400 border-b-2 border-primary-400' : 'hover:text-white'}`}
-                                                        >
-                                                            {tab.name}
-                                                        </button>
-                                                    ))}
-                                                </nav>
-                                            </AnimatedSection>
-
-                                            {/* --- Main Content Area (Renders the active tab) --- */}
-                                            {renderContent()}
-
-                                        </div>
-                                    </div>
-                                );
-                            }
+    return (
+        <div className="bg-dark-900 text-white min-h-screen">
+            <div className="max-w-full mx-auto space-y-10 pb-10">
+                <AnimatedSection delay={0} className="relative h-64 sm:h-80 w-full overflow-hidden shadow-xl">
+                    <img src="/images/FF_ban.jpg" alt="Free Fire Banner" className="absolute inset-0 w-full h-full object-cover object-center scale-105 blur-sm opacity-40"/>
+                    <div className="absolute inset-0 bg-gradient-to-t from-dark-900 via-dark-900/70 to-transparent"></div>
+                    <div className="relative z-10 h-full flex flex-col justify-end max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-8 sm:pb-12">
+                         <div className="flex items-center mb-4"><Gamepad2 className="w-10 h-10 sm:w-12 sm:h-12 mr-4 text-primary-400 bg-dark-800/50 p-2 rounded-lg border border-primary-500/30" /><h1 className="text-4xl md:text-6xl font-extrabold text-white drop-shadow-md">FREE FIRE HUB</h1></div>
+                         <p className="text-lg sm:text-xl text-gray-300 max-w-3xl">Your central command for all Free Fire tournaments, leaderboards, and team activities on Africa Rise Esports.</p>
+                    </div>
+                </AnimatedSection>
+                <AnimatedSection delay={50} className="sticky top-16 bg-dark-900 z-30 shadow-md border-b border-dark-700">
+                    <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex space-x-6 sm:space-x-8 text-base sm:text-lg font-semibold text-gray-400 overflow-x-auto">
+                        {navTabs.map((tab) => (<button key={tab.name} onClick={() => setActiveTab(tab.path)} className={`flex items-center py-4 px-1 whitespace-nowrap border-b-2 transition-all duration-200 ${activeTab === tab.path ? 'text-primary-400 border-primary-400' : 'border-transparent hover:text-white hover:border-gray-500'}`}><tab.icon size={18} className="mr-2 hidden sm:inline-block"/> {tab.name}</button>))}
+                    </nav>
+                </AnimatedSection>
+                <div className="max-w-7xl mx-auto mt-8">
+                    {renderContent()}
+                </div>
+            </div>
+        </div>
+    );
+}

@@ -1,47 +1,51 @@
-// src/pages/TournamentsPage.jsx (Updated with Free Fire entry)
+// src/pages/TournamentsPage.jsx
 
 import { Link } from 'react-router-dom';
 import { Gamepad2, ChevronRight } from 'lucide-react';
 import AnimatedSection from '../components/AnimatedSection'; // Import the animation wrapper
 
-// Define games data (mirroring GamesSidebar, but with images and links)
-// IMPORTANT: Replace placeholder image paths with actual paths to your game icons/banners
+// Define the specific games supported and their corresponding hub paths/images
+// ** IMPORTANT: Replace placeholder images with actual game banner images **
 const supportedGames = [
-  // ... existing games
-  { value: 'FIFA 24', label: 'FIFA 24', imageSrc: 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=300&h=400&fit=crop', description: 'Compete in the premier virtual football league.' },
-  { value: 'Mobile Legends', label: 'Mobile Legends', imageSrc: 'https://images.unsplash.com/photo-1556438064-2d7646166914?w=300&h=400&fit:crop', description: 'Battle it out in the popular mobile MOBA arena.' },
-  { value: 'COD Warzone', label: 'COD Warzone', imageSrc: 'https://images.unsplash.com/photo-1552820728-8b83bb6b773f?w=300&h=400&fit:crop', description: 'Drop into intense battle royale action.' },
-  { value: 'Valorant', label: 'Valorant', imageSrc: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?w=300&h=400&fit:crop', description: 'Strategic 5v5 tactical shooter competitions.' },
-  { value: 'Fortnite', label: 'Fortnite', imageSrc: '/images/action_2.jpg', description: 'Build, battle, and claim Victory Royale.' }, // Using an action image
-  { value: 'Apex Legends', label: 'Apex Legends', imageSrc: '/images/action_4.jpg', description: 'Squad up in the fast-paced hero shooter.' }, // Using an action image
-  // 🔑 ADDED FREE FIRE ENTRY
-  { value: 'Free Fire', label: 'Free Fire', imageSrc: '/images/action_1.jpg', description: 'The ultimate mobile survival shooter.' },
+  { value: 'Free Fire', label: 'Free Fire', imageSrc: '/images/action_1.jpg', description: 'Enter the intense battlegrounds of Free Fire.', hubPath: '/freefire' },
+  { value: 'Mobile Legends', label: 'Mobile Legends', imageSrc: 'https://images.unsplash.com/photo-1556438064-2d7646166914?w=300&h=400&fit=crop', description: 'Battle it out in the popular mobile MOBA arena.', hubPath: '/mobilelegends' }, // Assuming path exists
+  { value: 'COD Warzone', label: 'COD Warzone', imageSrc: '/images/action_3.jpg', description: 'Drop into intense battle royale action.', hubPath: '/cod' },
+  { value: 'Bloodstrike', label: 'Bloodstrike', imageSrc: '/images/action_4.jpg', description: 'Experience fast-paced FPS combat.', hubPath: '/bloodstrike' }, // Assuming path exists
+  { value: 'Farlight 84', label: 'Farlight 84', imageSrc: '/images/lan_7.jpg', description: 'High-octane hero shooter battles await.', hubPath: '/farlight84' },
+  // Add FIFA 24, Valorant, Fortnite, Apex Legends back if needed, e.g.:
+  // { value: 'FIFA 24', label: 'FIFA 24', imageSrc: 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=300&h=400&fit=crop', description: 'Compete in the premier virtual football league.', hubPath: '/fifa' }, // Assuming path exists
 ];
 
+// Removed selectedGameFilter prop as it's not used for filtering on this page anymore
 export default function TournamentsPage() {
 
   return (
+    // Padding is handled in App.jsx's main wrapper
     <div className="bg-dark-900 text-white">
+      {/* Container with padding managed by App.jsx */}
       <div className="space-y-8">
 
         {/* Header Section */}
         <AnimatedSection tag="div" className="text-center mb-12">
-          <h1 className="text-4xl md:text-5xl font-bold mb-4">Explore Games & Tournaments</h1>
+          <h1 className="text-4xl md:text-5xl font-bold mb-4 flex items-center justify-center">
+             <Gamepad2 className="w-10 h-10 mr-3 text-primary-400"/> Games Hub
+          </h1>
           <p className="text-xl text-gray-300 max-w-2xl mx-auto">
-            Find competitions for your favorite esports titles across Africa.
+            Explore the supported games and dive into their dedicated hubs for tournaments and leaderboards.
           </p>
         </AnimatedSection>
 
         {/* Games Grid Section */}
         <AnimatedSection tag="div" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
           {supportedGames.map((game, index) => (
+            // Wrap each game card for staggered animation
             <AnimatedSection
               key={game.value}
-              delay={100 + index * 100}
+              delay={100 + index * 100} // Start delay after header
               className="group card !p-0 overflow-hidden transform transition-all duration-300 hover:scale-[1.03] hover:shadow-lg hover:shadow-primary-500/30"
             >
-              {/* 🔑 UPDATED LINK to use a general game slug (e.g., /game/free-fire) */}
-              <Link to={`/game/${game.value.toLowerCase().replace(/\s/g, '-')}`} className="block relative">
+              {/* Link now points to the specific hubPath */}
+              <Link to={game.hubPath} className="block relative">
                 {/* Image */}
                 <img
                   src={game.imageSrc}
@@ -53,7 +57,7 @@ export default function TournamentsPage() {
                    <h3 className="text-2xl font-bold text-white mb-2">{game.label}</h3>
                    <p className="text-gray-300 text-sm mb-4">{game.description}</p>
                    <div className="inline-flex items-center text-primary-400 group-hover:text-primary-300 text-sm font-medium transition-colors">
-                     View Tournaments
+                     Explore Hub
                      <ChevronRight className="w-4 h-4 ml-1 transform transition-transform group-hover:translate-x-1" />
                    </div>
                 </div>

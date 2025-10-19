@@ -1,43 +1,46 @@
 // src/components/GamesSidebar.jsx
-import { Layers } from 'lucide-react'; // Using Layers icon for "All Games"
+import { Layers } from 'lucide-react';
 
 // Define games with names and image paths
-// IMPORTANT: Replace placeholder paths with actual paths to your game icons later
 const supportedGames = [
-  { value: 'all', label: 'All Games', imageSrc: null }, // Use null for the icon component
-  { value: 'FIFA 24', label: 'FIFA 24', imageSrc: '/images/action_4.jpg' }, // Placeholder
-  { value: 'Mobile Legends', label: 'Mobile Legends', imageSrc: '/images/action_4.jpg' }, // Placeholder
-  { value: 'COD Warzone', label: 'COD Warzone', imageSrc: '/images/action_4.jpg' }, // Placeholder
-  { value: 'Valorant', label: 'Valorant', imageSrc: '/images/action_4.jpg' }, // Placeholder
-  { value: 'Fortnite', label: 'Fortnite', imageSrc: '/images/action_4.jpg' }, // Placeholder
-  { value: 'Apex Legends', label: 'Apex Legends', imageSrc: '/images/action_4.jpg' }, // Placeholder
-  // Add other games here with their specific image paths later
+  { value: 'all', label: 'All Games', imageSrc: null, hubPath: '/tournaments' }, // Link "All" to the main tournaments/games page
+  { value: 'Free Fire', label: 'Free Fire', imageSrc: '/images/action_1.jpg', hubPath: '/freefire' }, // Placeholder image
+  { value: 'Mobile Legends', label: 'Mobile Legends', imageSrc: 'https://images.unsplash.com/photo-1556438064-2d7646166914?w=100&h=100&fit=crop', hubPath: '/mobilelegends' }, // Placeholder - needs route
+  { value: 'COD Warzone', label: 'COD Warzone', imageSrc: '/images/action_3.jpg', hubPath: '/cod' }, // Placeholder image
+  { value: 'Bloodstrike', label: 'Bloodstrike', imageSrc: '/images/action_4.jpg', hubPath: '/bloodstrike' }, // Placeholder image
+  { value: 'Farlight 84', label: 'Farlight 84', imageSrc: '/images/lan_7.jpg', hubPath: '/farlight84' }, // Placeholder image
+  // Add other games here with their specific image paths and hubPath
 ];
 
-export default function GamesSidebar({ selectedGame, onGameSelect }) {
-  return (
-    // Reduced padding slightly for image focus
-    <div className="card p-3">
-      {/* Optional: Add a title if you want */}
-      {/* <h3 className="text-sm font-semibold mb-3 text-gray-400 uppercase tracking-wider text-center">Games</h3> */}
+// Import useNavigate hook from react-router-dom
+import { useNavigate } from 'react-router-dom';
 
-      {/* Use flexbox for layout, centered */}
-      <nav className="flex flex-col items-center space-y-3">
+export default function GamesSidebar({ selectedGame, onGameSelect }) {
+  const navigate = useNavigate(); // Hook for navigation
+
+  const handleSelectAndNavigate = (game) => {
+    onGameSelect(game.value); // Update the state in App.jsx
+    navigate(game.hubPath); // Navigate to the game's hub page
+  };
+
+
+  return (
+    <div className="card !p-3 bg-dark-800 border border-dark-700"> {/* Added border */}
+      <nav className="flex flex-col items-center space-y-4"> {/* Increased spacing */}
         {supportedGames.map((game) => {
-          // Determine if the current game button is active
           const isActive = selectedGame === game.value;
 
           return (
             <button
               key={game.value}
-              onClick={() => onGameSelect(game.value)}
-              // Add tooltip text using title attribute
-              title={game.label}
+              onClick={() => handleSelectAndNavigate(game)} // Use updated handler
+              title={game.label} // Tooltip
               className={`
-                relative w-12 h-12 rounded-lg flex items-center justify-center
+                relative w-14 h-14 rounded-xl flex items-center justify-center
                 overflow-hidden group focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-dark-800
-                transition-all duration-200 ease-in-out transform hover:scale-110
-                ${isActive ? 'ring-2 ring-primary-500 ring-offset-2 ring-offset-dark-800 shadow-lg' : 'bg-dark-700 hover:bg-dark-600'}
+                transition-all duration-300 ease-in-out transform
+                border-2 ${isActive ? 'border-primary-500 scale-110 shadow-lg shadow-primary-500/30' : 'border-transparent hover:border-primary-500/50 hover:scale-115 hover:shadow-md hover:shadow-primary-500/20'}
+                ${!isActive && 'bg-dark-700 hover:bg-dark-600'}
               `}
             >
               {game.imageSrc ? (
@@ -46,20 +49,22 @@ export default function GamesSidebar({ selectedGame, onGameSelect }) {
                   src={game.imageSrc}
                   alt={game.label}
                   className={`
-                    w-full h-full object-cover transition-opacity duration-200
-                    ${isActive ? 'opacity-100' : 'opacity-75 group-hover:opacity-100'}
+                    w-full h-full object-cover transition-opacity duration-300
+                    ${isActive ? 'opacity-100' : 'opacity-70 group-hover:opacity-100'}
                   `}
                 />
               ) : (
                 // "All Games" Icon (using Lucide)
                 <Layers
                   className={`
-                    w-6 h-6 transition-colors duration-200
+                    w-7 h-7 transition-colors duration-300
                     ${isActive ? 'text-primary-400' : 'text-gray-400 group-hover:text-primary-400'}
                   `}
                 />
               )}
-               {/* Optional: Add subtle overlay on hover for images */}
+               {/* Inner glow/border effect on hover/active */}
+              <div className={`absolute inset-0 border-2 rounded-xl transition-all duration-300 pointer-events-none ${isActive ? 'border-primary-500/70' : 'border-transparent group-hover:border-primary-500/30'}`}></div>
+               {/* Subtle overlay on hover for images */}
                {game.imageSrc && (
                  <div className="absolute inset-0 bg-black opacity-0 group-hover:opacity-20 transition-opacity duration-200"></div>
                )}
