@@ -1,5 +1,7 @@
+// src/pages/DashboardPage.jsx
 
 import { Calendar, Trophy, Users, Bell, TrendingUp, Clock, Star } from 'lucide-react';
+import AnimatedSection from '../components/AnimatedSection'; // Import the animation wrapper
 
 export default function DashboardPage() {
   const user = {
@@ -18,81 +20,47 @@ export default function DashboardPage() {
   ];
 
   const upcomingMatches = [
-    {
-      id: 1,
-      tournament: 'FIFA 24 Championship',
-      opponent: 'TeamAlpha',
-      date: '2024-02-15',
-      time: '18:00',
-      game: 'FIFA 24'
-    },
-    {
-      id: 2,
-      tournament: 'Mobile Legends Cup',
-      opponent: 'Lightning Squad',
-      date: '2024-02-16',
-      time: '20:00',
-      game: 'Mobile Legends'
-    },
-    {
-      id: 3,
-      tournament: 'COD Warzone Battle',
-      opponent: 'Desert Hawks',
-      date: '2024-02-18',
-      time: '19:30',
-      game: 'COD Warzone'
-    },
+    { id: 1, tournament: 'FIFA 24 Championship', opponent: 'TeamAlpha', date: '2024-02-15', time: '18:00', game: 'FIFA 24' },
+    { id: 2, tournament: 'Mobile Legends Cup', opponent: 'Lightning Squad', date: '2024-02-16', time: '20:00', game: 'Mobile Legends' },
+    { id: 3, tournament: 'COD Warzone Battle', opponent: 'Desert Hawks', date: '2024-02-18', time: '19:30', game: 'COD Warzone' },
   ];
 
   const recentNews = [
-    {
-      id: 1,
-      title: 'New FIFA 24 Tournament Announced',
-      summary: 'Join the biggest FIFA tournament in African esports history...',
-      date: '2024-02-10',
-      category: 'Tournament'
-    },
-    {
-      id: 2,
-      title: 'Platform Update: New Features Released',
-      summary: 'We\'ve added new team management tools and improved the tournament...',
-      date: '2024-02-08',
-      category: 'Update'
-    },
-    {
-      id: 3,
-      title: 'Spotlight: Rising Stars of African Esports',
-      summary: 'Meet the top 10 players making waves in the competitive scene...',
-      date: '2024-02-05',
-      category: 'Feature'
-    },
+    { id: 1, title: 'New FIFA 24 Tournament Announced', summary: 'Join the biggest FIFA tournament...', date: '2024-02-10', category: 'Tournament' },
+    { id: 2, title: 'Platform Update: New Features', summary: 'We\'ve added new team management tools...', date: '2024-02-08', category: 'Update' },
+    { id: 3, title: 'Spotlight: Rising Stars', summary: 'Meet the top 10 players making waves...', date: '2024-02-05', category: 'Feature' },
   ];
 
   const notifications = [
     { id: 1, message: 'Your team "Thunder Bolts" has a match in 2 hours', type: 'match', time: '2 hours ago' },
-    { id: 2, message: 'Tournament registration for "Valorant Champions" is now open', type: 'tournament', time: '4 hours ago' },
+    { id: 2, message: 'Tournament registration for "Valorant Champions" is open', type: 'tournament', time: '4 hours ago' },
     { id: 3, message: 'You received a team invitation from "Elite Gamers"', type: 'invitation', time: '1 day ago' },
   ];
 
   return (
-    <div className="pt-20 min-h-screen bg-dark-900">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    // Removed pt-20 and min-h-screen. Padding is handled in App.jsx's main section
+    <div className="bg-dark-900 text-white">
+      {/* Container with padding managed by App.jsx, but we might add some vertical space */}
+      <div className="space-y-8"> {/* Add spacing between sections */}
+
         {/* Welcome Header */}
-        <div className="mb-8">
+        <AnimatedSection tag="div" className="mb-8" delay={100}>
           <h1 className="text-3xl md:text-4xl font-bold mb-2">
             Welcome back, {user.username}!
           </h1>
           <p className="text-gray-400">
             Ready to dominate the competition today?
           </p>
-        </div>
+        </AnimatedSection>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        {/* Animate the grid container */}
+        <AnimatedSection tag="div" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8" delay={200}>
           {stats.map((stat, index) => {
             const Icon = stat.icon;
             return (
-              <div key={index} className="card">
+              // Animate each card individually
+              <AnimatedSection key={index} tag="div" className="card" delay={index * 100}>
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-gray-400 text-sm">{stat.label}</p>
@@ -100,14 +68,15 @@ export default function DashboardPage() {
                   </div>
                   <Icon className={`${stat.color}`} size={32} />
                 </div>
-              </div>
+              </AnimatedSection>
             );
           })}
-        </div>
+        </AnimatedSection>
 
+        {/* Matches and News Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Upcoming Matches */}
-          <div className="card">
+          <AnimatedSection tag="div" className="card" direction="left" delay={300}>
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-bold flex items-center">
                 <Clock className="mr-2 text-primary-500" size={24} />
@@ -115,8 +84,9 @@ export default function DashboardPage() {
               </h2>
             </div>
             <div className="space-y-4">
-              {upcomingMatches.map(match => (
-                <div key={match.id} className="bg-dark-700 rounded-lg p-4">
+              {upcomingMatches.map((match, index) => (
+                // Animate each match item
+                <AnimatedSection key={match.id} tag="div" className="bg-dark-700 rounded-lg p-4" delay={index * 100}>
                   <div className="flex justify-between items-start mb-2">
                     <div>
                       <h3 className="font-semibold">{match.tournament}</h3>
@@ -130,13 +100,13 @@ export default function DashboardPage() {
                     <p className="text-gray-300">vs {match.opponent}</p>
                     <p className="text-gray-400 text-sm">{match.time}</p>
                   </div>
-                </div>
+                </AnimatedSection>
               ))}
             </div>
-          </div>
+          </AnimatedSection>
 
           {/* Recent News */}
-          <div className="card">
+          <AnimatedSection tag="div" className="card" direction="right" delay={400}>
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-bold flex items-center">
                 <Bell className="mr-2 text-primary-500" size={24} />
@@ -144,8 +114,9 @@ export default function DashboardPage() {
               </h2>
             </div>
             <div className="space-y-4">
-              {recentNews.map(news => (
-                <div key={news.id} className="bg-dark-700 rounded-lg p-4">
+              {recentNews.map((news, index) => (
+                // Animate each news item
+                <AnimatedSection key={news.id} tag="div" className="bg-dark-700 rounded-lg p-4" delay={index * 100}>
                   <div className="flex justify-between items-start mb-2">
                     <h3 className="font-semibold text-sm">{news.title}</h3>
                     <span className="text-xs bg-dark-600 text-gray-300 px-2 py-1 rounded">
@@ -156,21 +127,22 @@ export default function DashboardPage() {
                   <p className="text-gray-500 text-xs">
                     {new Date(news.date).toLocaleDateString()}
                   </p>
-                </div>
+                </AnimatedSection>
               ))}
             </div>
-          </div>
+          </AnimatedSection>
         </div>
 
         {/* Notifications */}
-        <div className="card mt-8">
+        <AnimatedSection tag="div" className="card mt-8" delay={500}>
           <h2 className="text-xl font-bold mb-6 flex items-center">
             <Bell className="mr-2 text-primary-500" size={24} />
             Recent Notifications
           </h2>
           <div className="space-y-3">
-            {notifications.map(notification => (
-              <div key={notification.id} className="flex items-start justify-between bg-dark-700 rounded-lg p-4">
+            {notifications.map((notification, index) => (
+              // Animate each notification item
+              <AnimatedSection key={notification.id} tag="div" className="flex items-start justify-between bg-dark-700 rounded-lg p-4" delay={index * 100}>
                 <div className="flex-1">
                   <p className="text-gray-300">{notification.message}</p>
                   <p className="text-gray-500 text-sm mt-1">{notification.time}</p>
@@ -178,11 +150,13 @@ export default function DashboardPage() {
                 <button className="text-primary-400 hover:text-primary-300 text-sm font-medium">
                   View
                 </button>
-              </div>
+              </AnimatedSection>
             ))}
           </div>
-        </div>
-      </div>
+        </AnimatedSection>
+
+      </div> {/* End spacing container */}
     </div>
   );
 }
+
