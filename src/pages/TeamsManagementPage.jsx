@@ -1,37 +1,57 @@
 // src/pages/TeamsManagementPage.jsx (FIXED - Using standard Tailwind colors for guaranteed display)
 
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { PlusCircle, Eye, Users, ArrowRight, X, Image, Gamepad, Edit3 } from 'lucide-react';
+import { Link } from 'react-router-dom'; // Ensure Link is imported
+import { PlusCircle, Eye, Users, ArrowRight, X, Image, Gamepad, Edit3, Settings, Trash2 } from 'lucide-react'; // Added needed icons
 import AnimatedSection from '../components/AnimatedSection';
 
 // --- Placeholder Data ---
 const userTeams = [
-    { id: 1, name: 'Lagos Lions', logo: '/images/team_ll.png', game: 'FIFA 24', members: 5, wins: 55 },
-    { id: 4, name: 'Accra Avengers', logo: '/images/team_aa.png', game: 'Valorant', members: 5, wins: 61 },
-    { id: 6, name: 'Kigali Kings', logo: '/images/team_kk.png', game: 'Apex Legends', members: 6, wins: 22 },
+    // Added 'id' property matching the structure needed for the dynamic link
+    { id: 'lagos-lions-1', name: 'Lagos Lions', logo: '/images/team_ll.png', game: 'FIFA 24', members: 5, wins: 55, role: 'Member' },
+    { id: 'accra-avengers-4', name: 'Accra Avengers', logo: '/images/team_aa.png', game: 'Valorant', members: 5, wins: 61, role: 'Captain' },
+    { id: 'kigali-kings-6', name: 'Kigali Kings', logo: '/images/team_kk.png', game: 'Apex Legends', members: 6, wins: 22, role: 'Member' },
 ];
 
 
-// --- Component for a single team in the list (Unchanged) ---
+// --- Component for a single team in the list ---
 const TeamListItem = ({ team, delay }) => (
-    <AnimatedSection tag="div" delay={delay} className="bg-dark-800 p-4 rounded-xl border border-dark-700 flex items-center justify-between transition-colors hover:bg-dark-700/70">
-        <div className="flex items-center">
-            <img 
+    <AnimatedSection tag="div" delay={delay} className="bg-dark-800 p-4 rounded-xl border border-dark-700 flex flex-col sm:flex-row items-center justify-between gap-4 transition-colors hover:bg-dark-700/70">
+        {/* Team Info */}
+        <div className="flex items-center flex-grow w-full sm:w-auto">
+            <img
                 src={team.logo.startsWith('/') ? team.logo : '/images/placeholder_team.png'}
-                alt={`${team.name} logo`} 
-                className="w-10 h-10 rounded-lg object-cover mr-4 border border-primary-500/30"
+                alt={`${team.name} logo`}
+                className="w-12 h-12 rounded-lg object-cover mr-4 border border-primary-500/30 flex-shrink-0"
             />
-            <div>
+            <div className="flex-grow">
                 <h3 className="text-lg font-bold text-white">{team.name}</h3>
                 <p className="text-sm text-gray-400">{team.game} &bull; {team.members} Members</p>
+                {/* Display role if available */}
+                {team.role && <p className="text-xs text-primary-300 mt-1">Your Role: {team.role}</p>}
             </div>
         </div>
 
-        <Link to="/team" className="bg-primary-600 hover:bg-primary-700 text-white font-semibold py-2 px-4 rounded-lg text-sm flex items-center group transition-colors">
-            View Team 
-            <ArrowRight size={16} className="ml-1 transition-transform group-hover:translate-x-1" />
-        </Link>
+        {/* Action Buttons */}
+        <div className="flex flex-row sm:flex-col lg:flex-row gap-2 w-full sm:w-auto justify-center sm:justify-end flex-shrink-0">
+            {/* UPDATED: Link to dynamic /team/:teamId route */}
+            <Link
+                to={`/team/${team.id}`} // Corrected path using team.id
+                className="btn-secondary text-xs px-3 py-1.5 flex items-center justify-center hover:bg-dark-600 flex-1 sm:flex-initial"
+                title="View Team Page"
+            >
+                <Eye size={14} className="mr-1" /> View
+            </Link>
+            <Link
+                to={`/manage-team/${team.id}`} // Link to manage page
+                className="btn-primary text-xs px-3 py-1.5 flex items-center justify-center hover:bg-primary-700 flex-1 sm:flex-initial"
+                title="Manage Team Settings"
+            >
+                <Settings size={14} className="mr-1" /> Manage
+            </Link>
+            {/* Optional Delete Button (needs handler) */}
+            {/* <button className="btn-danger text-xs px-3 py-1.5 flex items-center justify-center flex-1 sm:flex-initial" title="Delete Team"><Trash2 size={14} className="mr-1"/> Delete</button> */}
+        </div>
     </AnimatedSection>
 );
 
@@ -56,16 +76,16 @@ const CreateTeamForm = ({ onClose }) => {
     };
 
     return (
-        // 🔑 FIX: Using standard black/white/blue colors to guarantee visibility.
-        <AnimatedSection delay={0} className="p-6 bg-gray-800 rounded-xl border-2 border-blue-600 shadow-2xl relative text-white">
-            <button 
-                onClick={onClose} 
+        // Using provided dark theme colors
+        <AnimatedSection delay={0} className="p-6 bg-dark-800 rounded-xl border-2 border-primary-600 shadow-2xl relative text-white">
+            <button
+                onClick={onClose}
                 className="absolute top-4 right-4 text-gray-400 hover:text-red-400 transition-colors z-20"
                 aria-label="Close form"
             >
                 <X size={24} />
             </button>
-            <h2 className="text-3xl font-extrabold text-blue-400 mb-6 flex items-center">
+            <h2 className="text-3xl font-extrabold text-primary-400 mb-6 flex items-center">
                 <Edit3 className="mr-3" size={24} /> New Team Registration
             </h2>
 
@@ -74,60 +94,49 @@ const CreateTeamForm = ({ onClose }) => {
                 {/* Team Name */}
                 <div>
                     <label htmlFor="teamName" className="block text-sm font-medium text-gray-300 mb-2 flex items-center">
-                        <Users size={16} className="mr-2 text-blue-400" /> Team Name
+                        <Users size={16} className="mr-2 text-primary-400" /> Team Name
                     </label>
                     <input
-                        type="text"
-                        id="teamName"
-                        value={teamName}
-                        onChange={(e) => setTeamName(e.target.value)}
-                        placeholder="e.g., Cyber Ninjas, Alpha Squad"
-                        required
-                        // 🔑 FIX: Using standard gray/white classes for guaranteed input display
-                        className="w-full p-3 bg-gray-900 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:ring-blue-500 focus:border-blue-500"
+                        type="text" id="teamName" value={teamName} onChange={(e) => setTeamName(e.target.value)}
+                        placeholder="e.g., Cyber Ninjas, Alpha Squad" required
+                        // Using input-field class from your App.css
+                        className="input-field w-full p-3 placeholder-gray-500"
                     />
                 </div>
 
                 {/* Game Title */}
                 <div>
                     <label htmlFor="gameTitle" className="block text-sm font-medium text-gray-300 mb-2 flex items-center">
-                        <Gamepad size={16} className="mr-2 text-blue-400" /> Primary Game Title
+                        <Gamepad2 size={16} className="mr-2 text-primary-400" /> Primary Game Title
                     </label>
                     <input
-                        type="text"
-                        id="gameTitle"
-                        value={gameTitle}
-                        onChange={(e) => setGameTitle(e.target.value)}
-                        placeholder="e.g., Valorant, League of Legends"
-                        required
-                        // 🔑 FIX: Using standard gray/white classes for guaranteed input display
-                        className="w-full p-3 bg-gray-900 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:ring-blue-500 focus:border-blue-500"
+                        type="text" id="gameTitle" value={gameTitle} onChange={(e) => setGameTitle(e.target.value)}
+                        placeholder="e.g., Valorant, League of Legends" required
+                        // Using input-field class
+                        className="input-field w-full p-3 placeholder-gray-500"
                     />
                 </div>
 
                 {/* Team Logo Upload */}
                 <div>
                     <label htmlFor="logo" className="block text-sm font-medium text-gray-300 mb-2 flex items-center">
-                        <Image size={16} className="mr-2 text-blue-400" /> Team Logo
+                        <Image size={16} className="mr-2 text-primary-400" /> Team Logo
                     </label>
                     <input
-                        type="file"
-                        id="logo"
-                        accept="image/*"
-                        onChange={handleFileChange}
-                        // 🔑 FIX: Using standard blue classes
-                        className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-600/20 file:text-blue-400 hover:file:bg-blue-600/30"
+                        type="file" id="logo" accept="image/*" onChange={handleFileChange}
+                        // Styling the file input button using Tailwind utilities
+                        className="w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-primary-600/20 file:text-primary-300 hover:file:bg-primary-600/30 cursor-pointer"
                     />
                     {logoPreview && (
                         <div className="mt-4 flex items-center">
-                            <img src={logoPreview} alt="Logo Preview" className="w-16 h-16 rounded-lg object-cover border-2 border-blue-500" />
+                            <img src={logoPreview} alt="Logo Preview" className="w-16 h-16 rounded-lg object-cover border-2 border-primary-500" />
                             <span className="ml-4 text-sm text-gray-400">Logo preview ready.</span>
                         </div>
                     )}
                 </div>
 
-                {/* 🔑 FIX: Using standard blue classes for the button */}
-                <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg flex items-center justify-center text-lg transition-colors mt-8">
+                {/* Submit Button using btn-primary */}
+                <button type="submit" className="btn-primary w-full py-3 px-4 rounded-lg flex items-center justify-center text-lg transition-colors mt-8">
                     <PlusCircle className="mr-2" size={18} /> Register Team
                 </button>
             </form>
@@ -140,13 +149,13 @@ export default function TeamsManagementPage() {
     const [isCreating, setIsCreating] = useState(false);
 
     return (
-        // 🔑 Using standard Tailwind colors as a visual fix for the background
-        <div className="pt-8 min-h-screen bg-gray-900 text-white">
-            <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
+        // Using dark theme background
+        <div className="bg-dark-900 text-white min-h-screen">
+             {/* Padding handled by App.jsx main */}
+            <div className="space-y-8">
 
                 <AnimatedSection delay={0}>
-                    {/* 🔑 FIX: Using standard blue classes for title */}
-                    <h1 className="text-4xl font-extrabold text-center text-blue-400 flex items-center justify-center mb-2">
+                    <h1 className="text-4xl font-extrabold text-center text-primary-400 flex items-center justify-center mb-2">
                         <Users className="w-8 h-8 mr-3" /> Team Management Hub
                     </h1>
                     <p className="text-center text-gray-400">
@@ -155,21 +164,19 @@ export default function TeamsManagementPage() {
                 </AnimatedSection>
 
                 {/* --- Action Card: Create New Team --- */}
-                {/* 🔑 FIX: Using standard green classes */}
-                <AnimatedSection 
-                    delay={100} 
-                    className="bg-green-700/40 p-6 rounded-xl border border-green-500 shadow-xl flex items-center justify-between transition-transform hover:scale-[1.01] cursor-pointer" 
+                <AnimatedSection
+                    delay={100}
+                    className="bg-gradient-to-r from-primary-700/30 to-dark-800/50 p-6 rounded-xl border border-primary-500/50 shadow-xl flex items-center justify-between transition-transform hover:scale-[1.01] cursor-pointer"
                     onClick={() => setIsCreating(true)}
                 >
                     <div>
                         <div className="flex items-center mb-2">
-                            <PlusCircle className="w-6 h-6 mr-3 text-green-300" />
+                            <PlusCircle className="w-6 h-6 mr-3 text-primary-300" />
                             <h2 className="text-2xl font-bold text-white">Create a New Team</h2>
                         </div>
                         <p className="text-gray-300">Start your own legacy. Assemble your squad today!</p>
                     </div>
-                    {/* 🔑 FIX: Using standard green button */}
-                    <button className="bg-green-600 text-white font-semibold py-2 px-4 rounded-lg text-sm flex items-center w-fit pointer-events-none">
+                    <button className="btn-primary font-semibold py-2 px-4 rounded-lg text-sm flex items-center w-fit pointer-events-none">
                         Create Team <PlusCircle size={16} className="ml-2" />
                     </button>
                 </AnimatedSection>
@@ -182,8 +189,7 @@ export default function TeamsManagementPage() {
                 {/* --- Your Teams List (Hidden when creating a team) --- */}
                 {!isCreating && (
                     <AnimatedSection delay={200}>
-                        {/* 🔑 FIX: Using standard blue classes for title */}
-                        <h2 className="text-2xl font-bold mb-4 text-blue-400 border-b border-gray-700 pb-2">
+                        <h2 className="text-2xl font-bold mb-4 text-primary-400 border-b border-dark-700 pb-2">
                             Your Active Teams ({userTeams.length})
                         </h2>
 
@@ -193,7 +199,7 @@ export default function TeamsManagementPage() {
                                     <TeamListItem key={team.id} team={team} delay={250 + index * 50} />
                                 ))
                             ) : (
-                                <div className="bg-gray-800 p-6 rounded-xl text-center border border-yellow-700/50">
+                                <div className="bg-dark-800 p-6 rounded-xl text-center border border-yellow-700/50">
                                     <Eye className="w-6 h-6 mx-auto text-yellow-500 mb-3" />
                                     <p className="text-yellow-300">
                                         You are not currently listed as a member or manager of any team.
@@ -207,7 +213,7 @@ export default function TeamsManagementPage() {
 
                 {/* Optional: Link to the general Teams Directory / Search */}
                 <AnimatedSection delay={!isCreating ? 500 : 800} className="text-center pt-4">
-                    <Link to="/players?view=teams" className="text-gray-400 hover:text-blue-400 flex items-center justify-center text-sm font-medium">
+                    <Link to="/players?view=teams" className="text-gray-400 hover:text-primary-400 flex items-center justify-center text-sm font-medium">
                         Looking for other teams? Go to the Team Directory Search <ArrowRight size={16} className="ml-1" />
                     </Link>
                 </AnimatedSection>
