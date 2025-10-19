@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 // 🔑 ERROR RESOLVED: Added Tiktok to the import list.
-import { Twitch, Instagram, Youtube, Mail, Tiktok } from 'lucide-react';
+import { Twitch, Instagram, Youtube, Mail, Tiktok } from 'lucide-react';t';
 
 export default function Footer() {
   return (
