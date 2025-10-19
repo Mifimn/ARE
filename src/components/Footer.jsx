@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
-// 🔑 ERROR RESOLVED: Added Tiktok to the import list.
-import { Twitch, Instagram, Youtube, Mail, Tiktok } from 'lucide-react';t';
+// UPDATED: Removed Facebook, added Twitch and MessageSquare (for Discord)
+import { Twitter, Instagram, Youtube, Mail, Twitch, MessageSquare } from 'lucide-react';
 
 export default function Footer() {
   return (
@@ -19,20 +19,25 @@ export default function Footer() {
               Empowering African gamers and building the future of esports across the continent.
               Where legends are born and dreams become reality.
             </p>
+            {/* UPDATED: Social Links */}
             <div className="flex space-x-4">
-              <a href="https://www.tiktok.com/@african_rise9?_t=8nFDKxc7nb4&_r=1" className="text-gray-400 hover:text-primary-500 transition-colors">
-                {/* Tiktok icon is now available */}
-                <Tiktok size={20} /> 
+              {/* Removed Facebook */}
+              <a href="#" className="text-gray-400 hover:text-primary-500 transition-colors" title="Twitter">
+                <Twitter size={20} />
               </a>
-              <a href="https://www.instagram.com/africa_rise9?igsh=Z29vZ3ZwaXU3YmVk" className="text-gray-400 hover:text-primary-500 transition-colors">
+              <a href="https://www.instagram.com/africa_rise9?igsh=Z29vZ3ZwaXU3YmVk" className="text-gray-400 hover:text-primary-500 transition-colors" title="Instagram">
                 <Instagram size={20} />
               </a>
-              <a href="https://youtube.com/@africarise_esports?si=mE0hbMDvxHLphv-g" className="text-gray-400 hover:text-primary-500 transition-colors">
+              <a href="https://youtube.com/@africarise_esports?si=mE0hbMDvxHLphv-g" className="text-gray-400 hover:text-primary-500 transition-colors" title="YouTube">
                 <Youtube size={20} />
               </a>
-              <a href="YOUR_TWITCH_LINK_HERE" className="text-gray-400 hover:text-primary-500 transition-colors">
-                {/* Changed href from duplicate YouTube link */}
+              {/* Added Twitch */}
+              <a href="https://www.twitch.tv/africariseesports?sr=a" className="text-grayhttps://www.twitch.tv/africariseesports?sr=ae-500 transition-colors" title="Twitch">
                 <Twitch size={20} />
+              </a>
+              {/* Added Discord (using MessageSquare placeholder) */}
+              <a href="https://discord.gg/QdkA5WCawH" className="text-gray-400 hover:text-indigo-500 transition-colors" title="Discord">
+                <MessageSquare size={20} />
               </a>
             </div>
           </div>
@@ -41,6 +46,7 @@ export default function Footer() {
           <div>
             <h3 className="text-white font-semibold mb-4">Quick Links</h3>
             <ul className="space-y-2">
+              {/* Updated "Tournaments" to "Games" to match Header */}
               <li><Link to="/tournaments" className="text-gray-400 hover:text-white transition-colors">Games</Link></li>
               <li><Link to="/players" className="text-gray-400 hover:text-white transition-colors">Players</Link></li>
               <li><Link to="/about" className="text-gray-400 hover:text-white transition-colors">About Us</Link></li>
@@ -55,21 +61,28 @@ export default function Footer() {
             <p className="text-gray-400 mb-4 text-sm">
               Get the latest news and tournament updates.
             </p>
-            <div className="flex">
-              <input
-                type="email"
-                placeholder="Enter your email"
-                className="flex-1 px-3 py-2 bg-dark-700 border border-dark-600 rounded-l-md text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500"
-              />
-              <button className="bg-primary-600 hover:bg-primary-700 px-4 py-2 rounded-r-md transition-colors">
-                <Mail size={16} />
-              </button>
-            </div>
+            <form onSubmit={(e) => { e.preventDefault(); alert('Newsletter signup simulated!'); }}> {/* Added basic form handler */}
+              <div className="flex">
+                <input
+                  type="email"
+                  placeholder="Enter your email"
+                  required // Added required attribute
+                  className="flex-1 px-3 py-2 bg-dark-700 border border-dark-600 rounded-l-md text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                />
+           
+
+
+
+     <button type="submit" className="bg-primary-600 hover:bg-primary-700 px-4 py-2 rounded-r-md transition-colors">
+                  <Mail size={16} />
+                </button>
+              </div>
+            </form>
           </div>
         </div>
 
-        <div className="border-t border-dark-700 mt-8 pt-8 text-center text-gray-400">
-          <p>&copy; 2024 Africa Rise Esports. All rights reserved.</p>
+        <div className="border-t border-dark-700 mt-8 pt-8 text-center text-gray-400 text-sm"> {/* Adjusted text size */}
+          <p>&copy; {new Date().getFullYear()} Africa Rise Esports. All rights reserved.</p> {/* Dynamic Year */}
         </div>
       </div>
     </footer>

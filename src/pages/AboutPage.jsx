@@ -118,7 +118,7 @@ export default function AboutPage() {
               Founded in 2024 by a group of passionate gamers and entrepreneurs, we set out to change that narrative.
             </p>
             <p className="mb-4">
-              Starting with our first FREE FIRE tournament in Cape Town with just 32 participants, we've grown 
+              Starting with our first FIFA tournament in Cape Town with just 32 participants, we've grown 
               to host continental competitions featuring thousands of players across multiple games. 
               Our platform now connects gamers from over 20 African countries, providing them with 
               the tools and opportunities they need to compete at the highest levels.
