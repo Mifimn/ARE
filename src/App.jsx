@@ -35,6 +35,7 @@ import PrivacyPage from './pages/PrivacyPage';
 import FreeFirePage from './pages/FreeFirePage';
 import CODPage from './pages/CODPage';
 import Farlight84Page from './pages/Farlight84Page';
+import MobileLegendsPage from './pages/MobileLegendsPage';
 import BloodstrikePage from './pages/BloodstrikePage'; // *** IMPORT NEW PAGE ***
 
 
@@ -87,6 +88,7 @@ export default function App() {
                   <Route path="/freefire" element={<FreeFirePage />} />
                   <Route path="/cod" element={<CODPage />} />
                   <Route path="/farlight84" element={<Farlight84Page />} />
+                  <Route path="/mobilelegends" element={<MobileLegendsPage />} />
                   <Route path="/bloodstrike" element={<BloodstrikePage />} /> {/* *** ADD NEW ROUTE *** */}
                   {/* Add routes for other games like /mobilelegends */}
 
