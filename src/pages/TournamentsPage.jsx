@@ -1,4 +1,4 @@
-// src/pages/TournamentsPage.jsx
+// src/pages/TournamentsPage.jsx (Updated with Free Fire entry)
 
 import { Link } from 'react-router-dom';
 import { Gamepad2, ChevronRight } from 'lucide-react';
@@ -7,24 +7,21 @@ import AnimatedSection from '../components/AnimatedSection'; // Import the anima
 // Define games data (mirroring GamesSidebar, but with images and links)
 // IMPORTANT: Replace placeholder image paths with actual paths to your game icons/banners
 const supportedGames = [
-  // Excluding "All Games" from this main display page, assuming sidebar handles that
+  // ... existing games
   { value: 'FIFA 24', label: 'FIFA 24', imageSrc: 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=300&h=400&fit=crop', description: 'Compete in the premier virtual football league.' },
-  { value: 'Mobile Legends', label: 'Mobile Legends', imageSrc: 'https://images.unsplash.com/photo-1556438064-2d7646166914?w=300&h=400&fit=crop', description: 'Battle it out in the popular mobile MOBA arena.' },
-  { value: 'COD Warzone', label: 'COD Warzone', imageSrc: 'https://images.unsplash.com/photo-1552820728-8b83bb6b773f?w=300&h=400&fit=crop', description: 'Drop into intense battle royale action.' },
-  { value: 'Valorant', label: 'Valorant', imageSrc: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?w=300&h=400&fit=crop', description: 'Strategic 5v5 tactical shooter competitions.' },
+  { value: 'Mobile Legends', label: 'Mobile Legends', imageSrc: 'https://images.unsplash.com/photo-1556438064-2d7646166914?w=300&h=400&fit:crop', description: 'Battle it out in the popular mobile MOBA arena.' },
+  { value: 'COD Warzone', label: 'COD Warzone', imageSrc: 'https://images.unsplash.com/photo-1552820728-8b83bb6b773f?w=300&h=400&fit:crop', description: 'Drop into intense battle royale action.' },
+  { value: 'Valorant', label: 'Valorant', imageSrc: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?w=300&h=400&fit:crop', description: 'Strategic 5v5 tactical shooter competitions.' },
   { value: 'Fortnite', label: 'Fortnite', imageSrc: '/images/action_2.jpg', description: 'Build, battle, and claim Victory Royale.' }, // Using an action image
   { value: 'Apex Legends', label: 'Apex Legends', imageSrc: '/images/action_4.jpg', description: 'Squad up in the fast-paced hero shooter.' }, // Using an action image
-  // Add other games here
+  // 🔑 ADDED FREE FIRE ENTRY
+  { value: 'Free Fire', label: 'Free Fire', imageSrc: '/images/action_1.jpg', description: 'The ultimate mobile survival shooter.' },
 ];
 
-// Note: Removed selectedGameFilter prop, as this page now shows all games.
-// Filtering logic would happen on a *different* page/view or be handled by the sidebar state if staying on this page.
 export default function TournamentsPage() {
 
   return (
-    // Removed pt-20. Padding is handled in App.jsx's main section wrapper
     <div className="bg-dark-900 text-white">
-      {/* Container with padding managed by App.jsx */}
       <div className="space-y-8">
 
         {/* Header Section */}
@@ -38,14 +35,13 @@ export default function TournamentsPage() {
         {/* Games Grid Section */}
         <AnimatedSection tag="div" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
           {supportedGames.map((game, index) => (
-            // Wrap each game card for staggered animation
             <AnimatedSection
               key={game.value}
-              delay={100 + index * 100} // Start delay after header
+              delay={100 + index * 100}
               className="group card !p-0 overflow-hidden transform transition-all duration-300 hover:scale-[1.03] hover:shadow-lg hover:shadow-primary-500/30"
-              // Using !p-0 to override default card padding for image fit
             >
-              <Link to={`/tournaments?game=${encodeURIComponent(game.value)}`} className="block relative">
+              {/* 🔑 UPDATED LINK to use a general game slug (e.g., /game/free-fire) */}
+              <Link to={`/game/${game.value.toLowerCase().replace(/\s/g, '-')}`} className="block relative">
                 {/* Image */}
                 <img
                   src={game.imageSrc}
