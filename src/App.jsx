@@ -5,7 +5,7 @@ import { useState } from 'react';
 
 // Import Components
 import Header from './components/Header';
-import Footer from './components/Footer'; // Re-enabled import
+import Footer from './components/Footer'; 
 import GamesSidebar from './components/GamesSidebar';
 
 // Import Pages
@@ -16,12 +16,15 @@ import ProfilePage from './pages/ProfilePage';
 import EditProfilePage from './pages/EditProfilePage';
 import DashboardPage from './pages/DashboardPage';
 import TeamPage from './pages/TeamPage';
+import TeamsManagementPage from './pages/TeamsManagementPage'; 
+// 🔑 NEW IMPORT: Management page for a specific team
+import ManageTeamPage from './pages/ManageTeamPage'; 
 import CreateTournamentPage from './pages/CreateTournamentPage';
 import TournamentsPage from './pages/TournamentsPage';
-import TournamentDetailsPage from './pages/TournamentDetailsPage';
+import TournamentDetailsPage from './pages/TournamentDetailsPage'; 
 import UpdateTournamentPage from './pages/UpdateTournamentPage';
-import LeaguePage from './pages/LeaguePage';
-import CupPage from './pages/CupPage';
+import LeaguePage from './pages/LeaguePage'; 
+import CupPage from './pages/CupPage'; 
 import NewsPage from './pages/NewsPage';
 import AboutPage from './pages/AboutPage';
 import ContactPage from './pages/ContactPage';
@@ -60,22 +63,33 @@ export default function App() {
 
           {/* Page Content */}
           <main className="flex-1 overflow-y-auto">
-             <div className="p-4 sm:p-6 lg:p-8">
+              <div className="p-4 sm:p-6 lg:p-8">
                 <Routes>
-                  {/* Pass selectedGame to pages that need it */}
+                  {/* General User Routes */}
                   <Route path="/" element={<LandingPage />} />
                   <Route path="/login" element={<LoginPage />} />
                   <Route path="/signup" element={<SignUpPage />} />
                   <Route path="/profile" element={<ProfilePage />} />
                   <Route path="/edit-profile" element={<EditProfilePage />} />
                   <Route path="/dashboard" element={<DashboardPage />} />
-                  <Route path="/team/:id" element={<TeamPage />} />
+
+                  {/* Team Routes (No IDs) */}
+                  <Route path="/team" element={<TeamPage />} />
+                  <Route path="/my-teams" element={<TeamsManagementPage />} /> 
+                  {/* 🔑 New dedicated management route */}
+                  <Route path="/manage-team" element={<ManageTeamPage />} /> 
+
+                  {/* Tournament Routes (No IDs) */}
                   <Route path="/create-tournament" element={<CreateTournamentPage />} />
                   <Route path="/tournaments" element={<TournamentsPage selectedGameFilter={selectedGame} />} />
-                  <Route path="/tournament/:id" element={<TournamentDetailsPage />} />
-                  <Route path="/update-tournament/:id" element={<UpdateTournamentPage />} />
-                  <Route path="/league/:id" element={<LeaguePage />} />
-                  <Route path="/cup/:id" element={<CupPage />} />
+                  <Route path="/tournament" element={<TournamentDetailsPage />} />
+                  <Route path="/update-tournament" element={<UpdateTournamentPage />} />
+
+                  {/* Competition Routes (No IDs) */}
+                  <Route path="/league" element={<LeaguePage />} />
+                  <Route path="/cup" element={<CupPage />} />
+
+                  {/* Directory and Info Pages */}
                   <Route path="/news" element={<NewsPage />} />
                   <Route path="/about" element={<AboutPage />} />
                   <Route path="/contact" element={<ContactPage />} />
@@ -84,13 +98,13 @@ export default function App() {
                   <Route path="/terms" element={<TermsPage />} />
                   <Route path="/privacy" element={<PrivacyPage />} />
                 </Routes>
-             </div>
+              </div>
           </main>
 
         </div> {/* End Main content area flex wrapper */}
 
         {/* Footer is placed outside the flex-1 div, so it sits below */}
-        <Footer /> {/* Re-enabled Footer component */}
+        <Footer />
       </div>
     </Router>
   );
