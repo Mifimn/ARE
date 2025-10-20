@@ -1,4 +1,4 @@
-// src/pages/UpdateTournamentPage.jsx (Refactored + Custom Modal INCLUDED)
+// src/pages/UpdateTournamentPage.jsx (Refactored + Custom Modal INCLUDED - CORRECTED AGAIN)
 
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
@@ -125,8 +125,30 @@ const CustomModal = ({
 
 // --- Sub-Page Components (Use the CustomModal defined above) ---
 
-const ManageFeatures = ({ tournament, onBack }) => (/* ... no changes ... */);
-const ManageResults = ({ tournament, onBack }) => (/* ... no changes ... */);
+// ** FIXED: Added actual component implementation back **
+const ManageFeatures = ({ tournament, onBack }) => (
+    <AnimatedSection className="card bg-dark-800 p-6 rounded-xl shadow-lg">
+        <h2 className="text-2xl font-bold mb-4 text-primary-300">Set Match Features for: {tournament.name}</h2>
+        <p className="text-gray-400 mb-6">This section will allow setting up round details, map pools, specific rules per stage, etc. (Functionality TBD)</p>
+        {/* Add form elements here later */}
+        <button onClick={onBack} className="btn-secondary flex items-center mt-6">
+            <ArrowLeft size={16} className="mr-2" /> Back to List
+        </button>
+    </AnimatedSection>
+);
+
+// ** FIXED: Added actual component implementation back **
+const ManageResults = ({ tournament, onBack }) => (
+    <AnimatedSection className="card bg-dark-800 p-6 rounded-xl shadow-lg">
+        <h2 className="text-2xl font-bold mb-4 text-primary-300">Update Results for: {tournament.name}</h2>
+        <p className="text-gray-400 mb-6">This section will display matches based on the schedule/groups and allow entering scores. (Functionality TBD)</p>
+        {/* Add match list and score input forms here later */}
+        <button onClick={onBack} className="btn-secondary flex items-center mt-6">
+            <ArrowLeft size={16} className="mr-2" /> Back to List
+        </button>
+    </AnimatedSection>
+);
+
 const ManageSchedule = ({ tournament, onBack }) => {
     // ... (Keep the ManageSchedule component implementation from the previous step) ...
      const scheduleData = { // Example bracket structure
@@ -135,7 +157,7 @@ const ManageSchedule = ({ tournament, onBack }) => {
         final: { match: 1, team1: { name: 'Winner SF1' }, team2: { name: 'Winner SF2' } }
       };
 
-    const [scheduleUpdates, setScheduleUpdates] = useState({}); // Store updates like { 'QF-1': '2025-11-10T18:00', ... }
+    const [scheduleUpdates, setScheduleUpdates] = useState({});
 
     const handleDateTimeChange = (matchKey, value) => {
         setScheduleUpdates(prev => ({ ...prev, [matchKey]: value }));
@@ -143,7 +165,7 @@ const ManageSchedule = ({ tournament, onBack }) => {
 
     const handleSaveSchedule = () => {
         console.log("Simulated Schedule Save:", scheduleUpdates);
-        alert("Schedule updates saved (Simulated)."); // Keep standard alert here for now or use modal
+        alert("Schedule updates saved (Simulated).");
         onBack();
     };
 
@@ -188,8 +210,7 @@ const ManageSchedule = ({ tournament, onBack }) => {
     );
 };
 const ManageGroups = ({ tournament, onBack, onGroupingFinalized, openModal }) => {
-    // ... (Keep the ManageGroups component implementation from the previous step,
-    //      it already uses the `openModal` prop) ...
+    // ... (Keep the ManageGroups component implementation from the previous step) ...
     const deadlinePassed = isDeadlinePassed(tournament.registrationDeadline);
 
     const handleRandomizeClick = () => {
@@ -233,7 +254,7 @@ const ManageGroups = ({ tournament, onBack, onGroupingFinalized, openModal }) =>
                     newGroups[index % numGroups].push(participant);
                 });
 
-                 openModal({ title: "Success", message: `Simulated randomization into ${numGroups} groups of ~${teamsPerGroupApprox} teams.` });
+                 openModal({ title: "Success", message: `Simulated randomization into ${numGroups} groups of ~${teamsPerGroupApprox} teams.`, showCancel: false });
                 onGroupingFinalized(tournament.id, newGroups);
             }
         });
@@ -280,6 +301,7 @@ const ManageGroups = ({ tournament, onBack, onGroupingFinalized, openModal }) =>
 
 // --- Main Dashboard Component ---
 export default function UpdateTournamentPage() {
+    // ... (Keep state, useEffect, modal functions, action handlers) ...
     const navigate = useNavigate();
     const [tournaments, setTournaments] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -288,7 +310,6 @@ export default function UpdateTournamentPage() {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [modalContent, setModalContent] = useState({ title: '', message: '', promptLabel: null, onPromptSubmit: null, onConfirm: null });
 
-    // Fetch tournaments
     useEffect(() => {
         setLoading(true);
         setTimeout(() => {
@@ -297,14 +318,12 @@ export default function UpdateTournamentPage() {
         }, 500);
     }, []);
 
-    // --- Modal Control ---
     const openModal = ({ title, message, children, promptLabel, onPromptSubmit, onConfirm, confirmText = 'OK', showCancel = true }) => {
         setModalContent({ title, message, children, promptLabel, onPromptSubmit, onConfirm, confirmText, showCancel });
         setIsModalOpen(true);
     };
     const closeModal = () => setIsModalOpen(false);
 
-    // --- Action Handlers (Using Modal) ---
     const handleDelete = (id, name) => {
          openModal({
             title: `Confirm Deletion`,
@@ -313,7 +332,7 @@ export default function UpdateTournamentPage() {
             onConfirm: () => {
                  console.log(`Confirmed deletion for tournament ID ${id}: ${name}`);
                  setTournaments(prev => prev.filter(t => t.id !== id));
-                 openModal({ title: "Deleted", message: `Tournament "${name}" has been deleted.`, showCancel: false }); // Use modal for confirmation
+                 openModal({ title: "Deleted", message: `Tournament "${name}" has been deleted.`, showCancel: false });
              }
         });
     };
@@ -328,7 +347,6 @@ export default function UpdateTournamentPage() {
         setCurrentView(view);
     };
 
-    // Update state after grouping
     const handleGroupingFinalized = (tournamentId, newGroups) => {
         let updatedTournament = null;
         setTournaments(prevTournaments =>
@@ -345,7 +363,6 @@ export default function UpdateTournamentPage() {
         }
     };
 
-
      // --- Loading State ---
     if (loading) {
         return ( <div className="flex justify-center items-center min-h-[calc(100vh-10rem)]"><div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-primary-500"></div></div> );
@@ -358,12 +375,8 @@ export default function UpdateTournamentPage() {
 
                 {/* Header */}
                 <AnimatedSection delay={0}>
-                    <h1 className="text-4xl font-extrabold text-center text-primary-400 mb-2 flex items-center justify-center">
-                        <Settings className="w-8 h-8 mr-3" /> Tournament Management
-                    </h1>
-                    <p className="text-center text-gray-400">
-                        Oversee tournaments, manage participants, schedules, and results.
-                    </p>
+                     <h1 className="text-4xl font-extrabold text-center text-primary-400 mb-2 flex items-center justify-center"> <Settings className="w-8 h-8 mr-3" /> Tournament Management </h1>
+                     <p className="text-center text-gray-400"> Oversee tournaments, manage participants, schedules, and results. </p>
                 </AnimatedSection>
 
                 {/* Conditional Rendering: List or Sub-Page */}
@@ -435,13 +448,9 @@ export default function UpdateTournamentPage() {
                 .btn-xs { @apply py-1 px-2 text-xs rounded font-bold; }
                 .btn-secondary.btn-xs { @apply bg-dark-600 hover:bg-dark-500 text-gray-200; }
                 .btn-primary.btn-xs { @apply bg-primary-600 hover:bg-primary-700 text-white; }
-                .input-field-sm { @apply text-sm py-1.5 px-2.5 bg-dark-600 border border-dark-500 rounded text-gray-200 focus:ring-primary-500 focus:border-primary-500; } /* Example minimal style */
+                .input-field-sm { @apply text-sm py-1.5 px-2.5 bg-dark-600 border border-dark-500 rounded text-gray-200 focus:ring-primary-500 focus:border-primary-500; }
 
-                /* Custom Modal Fade-in */
-                @keyframes fadeIn {
-                    from { opacity: 0; transform: scale(0.95); }
-                    to { opacity: 1; transform: scale(1); }
-                 }
+                @keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
                 .animate-fade-in { animation: fadeIn 0.2s ease-out forwards; }
              `}</style>
         </div>
