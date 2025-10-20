@@ -1,7 +1,7 @@
 // src/pages/CODPage.jsx
 
 import { Link } from 'react-router-dom';
-import { Trophy, Users, ArrowRight, PlusCircle, Calendar, Gamepad2, Hash, Clock, BarChart } from 'lucide-react';
+import { Trophy, Users, ArrowRight, PlusCircle, Calendar, Gamepad2, Hash, Clock, BarChart, ListChecks } from 'lucide-react'; // Added ListChecks
 import { useState } from 'react';
 import AnimatedSection from '../components/AnimatedSection';
 
@@ -10,7 +10,7 @@ import AnimatedSection from '../components/AnimatedSection';
 const upcomingCups = [
     { id: 201, title: 'Warzone Africa Quads - Season 3 Opener', format: 'Quads BR', entries: 55, date: '25 Oct', prize: '$1500+', image: '/images/action_3.jpg' },
     { id: 202, title: 'Resurgence Trios - Weekly Mayhem', format: 'Trios Resurgence', entries: 40, date: '28 Oct', prize: '$500', image: '/images/action_2.jpg' },
-    { id: 203, title: 'Solo BR Challenge - October Finals', format: 'Solos BR', entries: 72, date: '30 Oct', prize: '$300', image: '/images/action_1.jpg' }, // Reusing images as placeholders
+    { id: 203, title: 'Solo BR Challenge - October Finals', format: 'Solos BR', entries: 72, date: '30 Oct', prize: '$300', image: '/images/action_1.jpg' },
 ];
 
 const pastCups = [
@@ -32,11 +32,19 @@ const allTeams = [
     { name: 'Cairo Commandos', members: 4, logo: '/images/team_o.png' },
 ];
 
-// --- Enhanced Cup List Item (Reused from FreeFirePage) ---
+// --- Placeholder Data for User's Joined COD Tournaments ---
+const myJoinedCodTournaments = [
+    { id: 201, title: 'Warzone Africa Quads - S3 Opener', date: '25 Oct', status: 'Upcoming', nextMatch: 'Round 1 - Group A - 19:00' },
+    { id: 202, title: 'Resurgence Trios - Weekly Mayhem', date: '28 Oct', status: 'Upcoming', nextMatch: 'Check-in 15 mins prior' },
+    // Add more joined COD tournaments here
+];
+// --------------------------------------------------------
+
+
+// --- Enhanced Cup List Item (Reused) ---
 const CupListItem = ({ cup, isPast = false }) => (
     <Link
-        to="/tournament" // Link to the generic tournament details page
-        state={{ tournamentId: cup.id }} // Optional: Pass ID via state if needed by details page
+        to={`/tournament/${cup.id}`} // Use dynamic ID
         className="block relative group overflow-hidden rounded-xl shadow-lg border border-dark-700 hover:border-primary-500/50 transition-all duration-300"
     >
         <img
@@ -172,11 +180,37 @@ export default function CODPage() {
                     </div>
                     {/* Right Column */}
                     <div className="lg:w-1/3 space-y-10">
+                        {/* --- NEW: My Tournaments Section --- */}
                         <AnimatedSection delay={300} className="card bg-dark-800 p-6 rounded-xl shadow-lg border border-dark-700">
+                             <h3 className="text-2xl font-bold text-primary-400 mb-6 flex items-center"><ListChecks size={20} className="mr-2"/> My Tournaments</h3>
+                             {myJoinedCodTournaments.length > 0 ? (
+                                <div className="space-y-4">
+                                    {myJoinedCodTournaments.map((tournament, index) => (
+                                         <AnimatedSection key={tournament.id} delay={350 + index * 50} className="bg-dark-700/50 rounded-lg p-4 border-l-4 border-primary-500/60">
+                                            <div className="flex justify-between items-start mb-1">
+                                                <Link to={`/tournament/${tournament.id}`} className="font-semibold text-white hover:text-primary-300 text-base leading-tight">{tournament.title}</Link>
+                                                <span className={`text-xs px-2 py-0.5 rounded ${tournament.status === 'Upcoming' ? 'bg-blue-600/70 text-blue-100' : 'bg-gray-600/70 text-gray-200'}`}>{tournament.status}</span>
+                                            </div>
+                                            <p className="text-sm text-gray-400 mb-2"><Calendar size={12} className="inline mr-1"/> Starts: {tournament.date}</p>
+                                            <p className="text-sm text-gray-300"><Clock size={12} className="inline mr-1"/> Next: {tournament.nextMatch}</p>
+                                        </AnimatedSection>
+                                    ))}
+                                </div>
+                             ) : (
+                                <p className="text-gray-500 text-center py-4">You haven't joined any COD Warzone tournaments yet.</p>
+                             )}
+                              <button className="w-full mt-6 text-center text-sm text-primary-400 hover:text-primary-300 transition-colors font-medium" onClick={() => setActiveTab('cups')}>
+                                Find Tournaments to Join
+                             </button>
+                        </AnimatedSection>
+                        {/* ---------------------------------- */}
+
+                        <AnimatedSection delay={400} className="card bg-dark-800 p-6 rounded-xl shadow-lg border border-dark-700">
                              <div className="flex justify-between items-center mb-4"><h3 className="text-2xl font-bold text-green-400">FIND SQUAD</h3><button className="bg-green-600/30 text-green-300 hover:bg-green-600/50 font-semibold py-1.5 px-4 rounded-lg text-sm flex items-center transition-colors"><PlusCircle size={16} className="mr-1" /> Look For Group</button></div>
                             <div className="bg-dark-900 p-4 rounded-lg flex justify-between items-center border border-dark-600 hover:border-green-500/50 transition-colors"><div><p className="text-base font-semibold text-white">Ranked Trios Grind</p><p className="text-sm text-gray-400 flex items-center"><Calendar size={14} className="mr-1" /> Urzikstan - Diamond+</p></div><div className="text-right"><p className="text-xl font-bold text-green-400 leading-none">2/3</p><p className="text-sm text-gray-500 leading-none">Players</p></div></div>
                         </AnimatedSection>
-                        <AnimatedSection delay={400} className="card bg-dark-800 p-6 rounded-xl shadow-lg border border-dark-700">
+
+                        <AnimatedSection delay={500} className="card bg-dark-800 p-6 rounded-xl shadow-lg border border-dark-700">
                             <h3 className="text-2xl font-bold text-primary-400 mb-6">RECENT RESULTS</h3><div className="space-y-4"><div className="border border-dark-700 p-3 rounded-lg bg-dark-900"><div className="flex items-center justify-between mb-1 text-sm"><div className="flex items-center"><img src={recentMatchesRundown[0].loserLogo} alt="loser" className="w-6 h-6 rounded-full mr-2 opacity-70"/> <span className="text-gray-400 line-through">{recentMatchesRundown[0].loser}</span></div><span className="font-semibold text-red-500">{recentMatchesRundown[0].loserScore}</span></div><div className="flex items-center justify-between text-sm"><div className="flex items-center"><img src={recentMatchesRundown[0].winnerLogo} alt="winner" className="w-6 h-6 rounded-full mr-2 border-2 border-green-500"/> <span className="font-bold text-white">{recentMatchesRundown[0].winner}</span></div><span className="font-bold text-green-400">{recentMatchesRundown[0].winnerScore}</span></div></div>{[recentMatchesRundown[1], recentMatchesRundown[2]].map((match, idx) => (<div key={idx} className="flex flex-wrap gap-2 p-3 bg-dark-700 rounded-lg border border-dark-600">{match.teams.map((logo, index) => (<img key={index} src={logo} alt={`Team ${index}`} className="w-6 h-6 rounded-full object-cover border border-dark-900" title={`Team ${index+1}`} />))}</div>))}</div><button className="w-full mt-6 text-center text-sm text-primary-400 hover:text-primary-300 transition-colors font-medium">View Match History</button>
                         </AnimatedSection>
                     </div>
@@ -189,7 +223,6 @@ export default function CODPage() {
         <div className="bg-dark-900 text-white min-h-screen">
             <div className="max-w-full mx-auto space-y-10 pb-10">
                 <AnimatedSection delay={0} className="relative h-64 sm:h-80 w-full overflow-hidden shadow-xl">
-                    {/* COD Banner Image */}
                     <img src="/images/action_3.jpg" alt="COD Warzone Banner" className="absolute inset-0 w-full h-full object-cover object-center scale-105 blur-sm opacity-40"/>
                     <div className="absolute inset-0 bg-gradient-to-t from-dark-900 via-dark-900/70 to-transparent"></div>
                     <div className="relative z-10 h-full flex flex-col justify-end max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-8 sm:pb-12">

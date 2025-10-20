@@ -1,7 +1,7 @@
 // src/pages/Farlight84Page.jsx
 
 import { Link } from 'react-router-dom';
-import { Trophy, Users, ArrowRight, PlusCircle, Calendar, Gamepad2, Hash, Clock, BarChart } from 'lucide-react';
+import { Trophy, Users, ArrowRight, PlusCircle, Calendar, Gamepad2, Hash, Clock, BarChart, ListChecks } from 'lucide-react'; // Added ListChecks
 import { useState } from 'react';
 import AnimatedSection from '../components/AnimatedSection';
 
@@ -28,6 +28,13 @@ const allTeams = [
     { name: 'Tech Titans', members: 4, logo: '/images/team_r.png' },
     { name: 'Quantum Force', members: 4, logo: '/images/team_o.png' },
 ];
+
+// --- Placeholder Data for User's Joined Farlight 84 Tournaments ---
+const myJoinedFarlightTournaments = [
+    { id: 401, title: 'Farlight 84 Sunset City Showdown', date: '01 Nov', status: 'Upcoming', nextMatch: 'Match 1 - Group Stage - 17:00' },
+    // Add more joined Farlight 84 tournaments here
+];
+// -----------------------------------------------------------------
 
 // --- Enhanced Cup List Item (Reused) ---
 const CupListItem = ({ cup, isPast = false }) => (
@@ -169,11 +176,37 @@ export default function Farlight84Page() {
                     </div>
                     {/* Right Column */}
                     <div className="lg:w-1/3 space-y-10">
+                         {/* --- NEW: My Tournaments Section --- */}
                         <AnimatedSection delay={300} className="card bg-dark-800 p-6 rounded-xl shadow-lg border border-dark-700">
+                             <h3 className="text-2xl font-bold text-primary-400 mb-6 flex items-center"><ListChecks size={20} className="mr-2"/> My Tournaments</h3>
+                             {myJoinedFarlightTournaments.length > 0 ? (
+                                <div className="space-y-4">
+                                    {myJoinedFarlightTournaments.map((tournament, index) => (
+                                         <AnimatedSection key={tournament.id} delay={350 + index * 50} className="bg-dark-700/50 rounded-lg p-4 border-l-4 border-primary-500/60">
+                                            <div className="flex justify-between items-start mb-1">
+                                                <Link to={`/tournament/${tournament.id}`} className="font-semibold text-white hover:text-primary-300 text-base leading-tight">{tournament.title}</Link>
+                                                <span className={`text-xs px-2 py-0.5 rounded ${tournament.status === 'Upcoming' ? 'bg-blue-600/70 text-blue-100' : 'bg-gray-600/70 text-gray-200'}`}>{tournament.status}</span>
+                                            </div>
+                                            <p className="text-sm text-gray-400 mb-2"><Calendar size={12} className="inline mr-1"/> Starts: {tournament.date}</p>
+                                            <p className="text-sm text-gray-300"><Clock size={12} className="inline mr-1"/> Next: {tournament.nextMatch}</p>
+                                        </AnimatedSection>
+                                    ))}
+                                </div>
+                             ) : (
+                                <p className="text-gray-500 text-center py-4">You haven't joined any Farlight 84 tournaments yet.</p>
+                             )}
+                              <button className="w-full mt-6 text-center text-sm text-primary-400 hover:text-primary-300 transition-colors font-medium" onClick={() => setActiveTab('cups')}>
+                                Find Tournaments to Join
+                             </button>
+                        </AnimatedSection>
+                        {/* ---------------------------------- */}
+
+                        <AnimatedSection delay={400} className="card bg-dark-800 p-6 rounded-xl shadow-lg border border-dark-700">
                              <div className="flex justify-between items-center mb-4"><h3 className="text-2xl font-bold text-green-400">FIND SQUAD</h3><button className="bg-green-600/30 text-green-300 hover:bg-green-600/50 font-semibold py-1.5 px-4 rounded-lg text-sm flex items-center transition-colors"><PlusCircle size={16} className="mr-1" /> Look For Group</button></div>
                             <div className="bg-dark-900 p-4 rounded-lg flex justify-between items-center border border-dark-600 hover:border-green-500/50 transition-colors"><div><p className="text-base font-semibold text-white">Sunset City Grind</p><p className="text-sm text-gray-400 flex items-center"><Calendar size={14} className="mr-1" /> BR Squads - Platinum+</p></div><div className="text-right"><p className="text-xl font-bold text-green-400 leading-none">3/4</p><p className="text-sm text-gray-500 leading-none">Players</p></div></div>
                         </AnimatedSection>
-                        <AnimatedSection delay={400} className="card bg-dark-800 p-6 rounded-xl shadow-lg border border-dark-700">
+
+                        <AnimatedSection delay={500} className="card bg-dark-800 p-6 rounded-xl shadow-lg border border-dark-700">
                             <h3 className="text-2xl font-bold text-primary-400 mb-6">RECENT RESULTS</h3><div className="space-y-4"><div className="border border-dark-700 p-3 rounded-lg bg-dark-900"><div className="flex items-center justify-between mb-1 text-sm"><div className="flex items-center"><img src={recentMatchesRundown[0].loserLogo} alt="loser" className="w-6 h-6 rounded-full mr-2 opacity-70"/> <span className="text-gray-400 line-through">{recentMatchesRundown[0].loser}</span></div><span className="font-semibold text-red-500">{recentMatchesRundown[0].loserScore}</span></div><div className="flex items-center justify-between text-sm"><div className="flex items-center"><img src={recentMatchesRundown[0].winnerLogo} alt="winner" className="w-6 h-6 rounded-full mr-2 border-2 border-green-500"/> <span className="font-bold text-white">{recentMatchesRundown[0].winner}</span></div><span className="font-bold text-green-400">{recentMatchesRundown[0].winnerScore}</span></div></div>{[recentMatchesRundown[1], recentMatchesRundown[2]].map((match, idx) => (<div key={idx} className="flex flex-wrap gap-2 p-3 bg-dark-700 rounded-lg border border-dark-600">{match.teams.map((logo, index) => (<img key={index} src={logo} alt={`Team ${index}`} className="w-6 h-6 rounded-full object-cover border border-dark-900" title={`Team ${index+1}`} />))}</div>))}</div><button className="w-full mt-6 text-center text-sm text-primary-400 hover:text-primary-300 transition-colors font-medium">View Match History</button>
                         </AnimatedSection>
                     </div>
@@ -186,7 +219,6 @@ export default function Farlight84Page() {
         <div className="bg-dark-900 text-white min-h-screen">
             <div className="max-w-full mx-auto space-y-10 pb-10">
                 <AnimatedSection delay={0} className="relative h-64 sm:h-80 w-full overflow-hidden shadow-xl">
-                    {/* Farlight 84 Banner Image */}
                     <img src="/images/lan_7.jpg" alt="Farlight 84 Banner" className="absolute inset-0 w-full h-full object-cover object-center scale-105 blur-sm opacity-40"/>
                     <div className="absolute inset-0 bg-gradient-to-t from-dark-900 via-dark-900/70 to-transparent"></div>
                     <div className="relative z-10 h-full flex flex-col justify-end max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-8 sm:pb-12">

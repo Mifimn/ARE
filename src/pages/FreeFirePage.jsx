@@ -1,7 +1,7 @@
 // src/pages/FreeFirePage.jsx
 
 import { Link, useParams } from 'react-router-dom';
-import { Trophy, Users, ArrowRight, PlusCircle, Calendar, Gamepad2, Hash, Clock, BarChart } from 'lucide-react';
+import { Trophy, Users, ArrowRight, PlusCircle, Calendar, Gamepad2, Hash, Clock, BarChart, ListChecks } from 'lucide-react'; // Added ListChecks
 import { useState, useEffect } from 'react';
 import AnimatedSection from '../components/AnimatedSection';
 
@@ -34,11 +34,18 @@ const allTeams = [
     { name: 'Kigali Kings', members: 5, logo: '/images/team_o.png' },
 ];
 
+// --- Placeholder Data for User's Joined Tournaments ---
+const myJoinedTournaments = [
+    { id: 1, title: 'Free Fire Clash Squads - MYTHIC\'25', date: '20 Oct', status: 'Upcoming', nextMatch: 'vs Team Alpha - 18:00' },
+    { id: 3, title: 'Free Fire Solo Royale - MYTHIC\'25', date: '27 Oct', status: 'Upcoming', nextMatch: 'Check-in required' },
+    // Add more joined tournaments here
+];
+// --------------------------------------------------------
+
 // --- Enhanced Cup List Item ---
-// UPDATED: Link target changed
 const CupListItem = ({ cup, isPast = false }) => (
     <Link
-        to="/tournament" // CHANGED: Link points to the generic /tournament route
+        to={`/tournament/${cup.id}`} // Changed to dynamic route
         className="block relative group overflow-hidden rounded-xl shadow-lg border border-dark-700 hover:border-primary-500/50 transition-all duration-300"
     >
         <img
@@ -107,7 +114,6 @@ const CupsContent = () => (
     </AnimatedSection>
 );
 
-// --- LeaderboardContent and TeamsContent remain unchanged ---
 const LeaderboardContent = () => (
     <AnimatedSection delay={0} className="space-y-8">
         <h2 className="text-3xl font-bold text-primary-400 border-b-2 border-primary-500/30 pb-3 flex items-center">
@@ -176,6 +182,7 @@ export default function FreeFirePage() {
             case 'teams': return <TeamsContent />;
             case 'rundown': default: return (
                 <div className="flex flex-col lg:flex-row gap-8 lg:gap-12 px-4 sm:px-6 lg:px-8">
+                    {/* Left Column */}
                     <div className="lg:w-2/3 space-y-10">
                         <AnimatedSection delay={100} className="relative group overflow-hidden bg-gradient-to-br from-purple-700 via-indigo-800 to-purple-900 p-6 sm:p-8 rounded-2xl shadow-xl border-2 border-purple-500/50">
                              <div className="absolute inset-0 bg-[url('/images/lan_6.jpg')] bg-repeat opacity-[0.03] mix-blend-overlay"></div>
@@ -183,15 +190,42 @@ export default function FreeFirePage() {
                         </AnimatedSection>
                         <AnimatedSection delay={200}>
                             <div className="flex justify-between items-center mb-6"><h3 className="text-2xl font-bold text-primary-400 flex items-center"><Clock size={20} className="mr-2"/> UPCOMING CUPS</h3><button onClick={() => setActiveTab('cups')} className="text-sm text-gray-400 hover:text-white transition-colors flex items-center">View All <ArrowRight size={16} className="ml-1" /></button></div>
-                            <div className="space-y-4">{upcomingCups.map((cup, index) => (<AnimatedSection key={cup.id} delay={250 + index * 50}><CupListItem cup={cup} /></AnimatedSection>))}</div>
+                            <div className="space-y-4">{upcomingCups.slice(0, 3).map((cup, index) => (<AnimatedSection key={cup.id} delay={250 + index * 50}><CupListItem cup={cup} /></AnimatedSection>))}</div>
                         </AnimatedSection>
                     </div>
+                    {/* Right Column */}
                     <div className="lg:w-1/3 space-y-10">
+                        {/* --- NEW: My Tournaments Section --- */}
                         <AnimatedSection delay={300} className="card bg-dark-800 p-6 rounded-xl shadow-lg border border-dark-700">
+                             <h3 className="text-2xl font-bold text-primary-400 mb-6 flex items-center"><ListChecks size={20} className="mr-2"/> My Tournaments</h3>
+                             {myJoinedTournaments.length > 0 ? (
+                                <div className="space-y-4">
+                                    {myJoinedTournaments.map((tournament, index) => (
+                                         <AnimatedSection key={tournament.id} delay={350 + index * 50} className="bg-dark-700/50 rounded-lg p-4 border-l-4 border-primary-500/60">
+                                            <div className="flex justify-between items-start mb-1">
+                                                <Link to={`/tournament/${tournament.id}`} className="font-semibold text-white hover:text-primary-300 text-base leading-tight">{tournament.title}</Link>
+                                                <span className={`text-xs px-2 py-0.5 rounded ${tournament.status === 'Upcoming' ? 'bg-blue-600/70 text-blue-100' : 'bg-gray-600/70 text-gray-200'}`}>{tournament.status}</span>
+                                            </div>
+                                            <p className="text-sm text-gray-400 mb-2"><Calendar size={12} className="inline mr-1"/> Starts: {tournament.date}</p>
+                                            <p className="text-sm text-gray-300"><Clock size={12} className="inline mr-1"/> Next: {tournament.nextMatch}</p>
+                                        </AnimatedSection>
+                                    ))}
+                                </div>
+                             ) : (
+                                <p className="text-gray-500 text-center py-4">You haven't joined any Free Fire tournaments yet.</p>
+                             )}
+                              <button className="w-full mt-6 text-center text-sm text-primary-400 hover:text-primary-300 transition-colors font-medium" onClick={() => setActiveTab('cups')}>
+                                Find Tournaments to Join
+                             </button>
+                        </AnimatedSection>
+                        {/* ---------------------------------- */}
+
+                        <AnimatedSection delay={400} className="card bg-dark-800 p-6 rounded-xl shadow-lg border border-dark-700">
                              <div className="flex justify-between items-center mb-4"><h3 className="text-2xl font-bold text-green-400">SCRIMS</h3><button className="bg-green-600/30 text-green-300 hover:bg-green-600/50 font-semibold py-1.5 px-4 rounded-lg text-sm flex items-center transition-colors"><PlusCircle size={16} className="mr-1" /> Activate Scrim</button></div>
                             <div className="bg-dark-900 p-4 rounded-lg flex justify-between items-center border border-dark-600 hover:border-green-500/50 transition-colors"><div><p className="text-base font-semibold text-white">Daily Fire Scrim</p><p className="text-sm text-gray-400 flex items-center"><Calendar size={14} className="mr-1" /> Best of 1 - Free Entry</p></div><div className="text-right"><p className="text-xl font-bold text-green-400 leading-none">18:00</p><p className="text-sm text-gray-500 leading-none">Today</p></div></div>
                         </AnimatedSection>
-                        <AnimatedSection delay={400} className="card bg-dark-800 p-6 rounded-xl shadow-lg border border-dark-700">
+
+                        <AnimatedSection delay={500} className="card bg-dark-800 p-6 rounded-xl shadow-lg border border-dark-700">
                             <h3 className="text-2xl font-bold text-primary-400 mb-6">RECENT MATCHES</h3><div className="space-y-4"><div className="border border-dark-700 p-3 rounded-lg bg-dark-900"><div className="flex items-center justify-between mb-1 text-sm"><div className="flex items-center"><img src={recentMatchesRundown[0].loserLogo} alt="loser" className="w-6 h-6 rounded-full mr-2 opacity-70"/> <span className="text-gray-400 line-through">{recentMatchesRundown[0].loser}</span></div><span className="font-semibold text-red-500">{recentMatchesRundown[0].loserScore}</span></div><div className="flex items-center justify-between text-sm"><div className="flex items-center"><img src={recentMatchesRundown[0].winnerLogo} alt="winner" className="w-6 h-6 rounded-full mr-2 border-2 border-green-500"/> <span className="font-bold text-white">{recentMatchesRundown[0].winner}</span></div><span className="font-bold text-green-400">{recentMatchesRundown[0].winnerScore}</span></div></div>{[recentMatchesRundown[1], recentMatchesRundown[2]].map((match, idx) => (<div key={idx} className="flex flex-wrap gap-2 p-3 bg-dark-700 rounded-lg border border-dark-600">{match.teams.map((logo, index) => (<img key={index} src={logo} alt={`Team ${index}`} className="w-6 h-6 rounded-full object-cover border border-dark-900" title={`Team ${index+1}`} />))}</div>))}</div><button className="w-full mt-6 text-center text-sm text-primary-400 hover:text-primary-300 transition-colors font-medium">View Match History</button>
                         </AnimatedSection>
                     </div>
