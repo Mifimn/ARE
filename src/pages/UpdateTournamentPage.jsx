@@ -2106,7 +2106,7 @@ export default function UpdateTournamentPage() {
                                 })} 
                             </div>
                         ) : ( <p className="text-gray-500 text-center py-6">You haven't created any tournaments yet.</p> )}
-                        <div className="text-center mt-8 border-t border-dark-700 pt-6"> <Link to="/create-tournament" className="btn-primary"> Create New Tournament </Link> This</div>
+                        <div className="text-center mt-8 border-t border-dark-700 pt-6"> <Link to="/create-tournament" className="btn-primary"> Create New Tournament </Link> </div>
                     </AnimatedSection>
                 ) : renderView()}
 

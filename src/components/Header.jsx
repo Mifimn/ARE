@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react'; // Added React import
 import { Link, useLocation } from 'react-router-dom';
-import { Menu, X, LogOut, User, Settings } from 'lucide-react';
+import { Menu, X, LogOut, User, Settings, Trophy } from 'lucide-react'; // --- ADDED Trophy icon ---
 import { useAuth } from '../contexts/AuthContext.jsx'; // Import useAuth
 import { supabase } from '../lib/supabaseClient'; // Import supabase client
 
@@ -77,6 +77,9 @@ export default function Header() {
     { name: 'Games', href: '/tournaments' },
     { name: 'News', href: '/news' },
     { name: 'Create Tournament', href: '/create-tournament' },
+    // --- ADDED ---
+    { name: 'Manage Tournaments', href: '/update-tournament/manage' }, // Links to the list view
+    // --- END ADD ---
   ];
   const navigation = isAuthenticated ? authenticatedNavigation : publicNavigation;
 
@@ -108,7 +111,7 @@ export default function Header() {
                 key={item.name}
                 to={item.href}
                 className={`px-3 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap ${
-                  (location.pathname === item.href || (item.name === 'Games' && location.pathname.startsWith('/tournaments')))
+                  (location.pathname === item.href || (item.name === 'Games' && location.pathname.startsWith('/tournaments')) || (item.name === 'Manage Tournaments' && location.pathname.startsWith('/update-tournament'))) // --- ADDED HIGHLIGHT LOGIC ---
                     ? 'text-primary-500 bg-dark-700'
                     : 'text-gray-300 hover:text-white hover:bg-dark-700'
                 }`}
@@ -159,6 +162,15 @@ export default function Header() {
                     >
                       <Settings className="mr-2" size={16} /> Settings
                     </Link>
+                    {/* --- ADDED --- */}
+                    <Link
+                      to="/update-tournament/manage"
+                      className="flex items-center px-4 py-2 text-sm text-gray-300 hover:text-white hover:bg-dark-700"
+                      onClick={() => setIsUserMenuOpen(false)}
+                    >
+                      <Trophy className="mr-2" size={16} /> Manage Tournaments
+                    </Link>
+                    {/* --- END ADD --- */}
                     {/* Updated Logout Button */}
                     <button
                       onClick={async () => {
@@ -213,7 +225,13 @@ export default function Header() {
                 {navigation.map((item) => (
                     <Link
                         key={item.name} to={item.href}
-                        className={`block px-3 py-2 rounded-md text-base font-medium ${ (location.pathname === item.href || (item.name === 'Games' && location.pathname.startsWith('/tournaments'))) ? 'text-primary-500 bg-dark-700' : 'text-gray-300 hover:text-white hover:bg-dark-700' }`}
+                        className={`block px-3 py-2 rounded-md text-base font-medium ${ 
+                          (location.pathname === item.href || 
+                           (item.name === 'Games' && location.pathname.startsWith('/tournaments')) ||
+                           (item.name === 'Manage Tournaments' && location.pathname.startsWith('/update-tournament'))) // --- ADDED HIGHLIGHT LOGIC ---
+                           ? 'text-primary-500 bg-dark-700' 
+                           : 'text-gray-300 hover:text-white hover:bg-dark-700' 
+                        }`}
                         onClick={() => setIsMenuOpen(false)}
                     > {item.name} </Link>
                 ))}
@@ -228,6 +246,9 @@ export default function Header() {
                             </div>
                             <Link to="/profile" className="block px-3 py-2 rounded-md text-base font-medium text-gray-300 hover:text-white hover:bg-dark-700" onClick={() => setIsMenuOpen(false)}>Profile</Link>
                             <Link to="/edit-profile" className="block px-3 py-2 rounded-md text-base font-medium text-gray-300 hover:text-white hover:bg-dark-700" onClick={() => setIsMenuOpen(false)}>Settings</Link>
+                            {/* --- ADDED --- */}
+                            <Link to="/update-tournament/manage" className="block px-3 py-2 rounded-md text-base font-medium text-gray-300 hover:text-white hover:bg-dark-700" onClick={() => setIsMenuOpen(false)}>Manage Tournaments</Link>
+                            {/* --- END ADD --- */}
                             <button onClick={async () => { setIsMenuOpen(false); await supabase.auth.signOut(); }} className="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-gray-300 hover:text-white hover:bg-dark-700">Logout</button>
                         </>
                     ) : (
