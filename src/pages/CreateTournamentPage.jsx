@@ -1,35 +1,47 @@
 // src/pages/CreateTournamentPage.jsx
 
 import { useState } from 'react';
-import { PlusCircle, Calendar, Trophy, Users, MapPin, Save, X, AlertCircle, Info, Settings, Eye, FileText, Gamepad2, Layers } from 'lucide-react'; // IMPORTED: Layers icon
+import { PlusCircle, Calendar, Trophy, Users, Save, X, AlertCircle, Info, Settings, Eye, FileText, Gamepad2, Layers, DollarSign, Gem, ListChecks } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import AnimatedSection from '../components/AnimatedSection';
 
-// --- UPDATED Game Lists ---
+// --- UPDATED Game Lists (Simplified to the 3 demo formats) ---
 const availableGames = [
     'Free Fire',
     'Mobile Legends',
-    'COD Warzone',
-    'Bloodstrike',
     'Farlight 84',
 ].sort();
 
+// --- UPDATED Game Details ---
 const defaultGameRules = {
-    'Free Fire': `1. Game Mode: TBD (Set Below).\n2. Map: TBD (Set Below).\n3. Squad Size: TBD (Set Below).\n4. Reporting: Submit final screenshots.\n5. Fair Play: No hacks, exploits, or teaming (in solos).`,
-    'Mobile Legends': `1. Game Mode: Draft Pick.\n2. Map: Land of Dawn.\n3. Format: Best of 3 (BO3) standard, Best of 5 (BO5) Finals.\n4. Team Size: 5v5.\n5. Hero Bans: Follow current official tournament ban rules.\n6. Pausing: Technical pauses allowed (max 5 mins per team per game).\n7. Fair Play: Exploits/Bugs strictly prohibited.`,
-    'COD Warzone': `1. Game Mode: TBD (Set Below).\n2. Map: TBD (Set Below).\n3. Squad Size: TBD (Set Below).\n4. Lobbies: Custom lobbies hosted by ARE Admins.\n5. Restrictions: May apply (check detailed rules).\n6. Reporting: Submit screenshots of final placement and squad kills.\n7. Cheating/Exploits: Zero tolerance policy.`,
-    'Bloodstrike': `1. Game Mode: TBD (Set Below).\n2. Map: TBD (Set Below).\n3. Squad Size: TBD (Set Below).\n4. Fair Play enforced. Provide specific rules.`,
-    'Farlight 84': `1. Game Mode: TBD (Set Below).\n2. Map: TBD (Set Below).\n3. Squad Size: TBD (Set Below).\n4. Fair Play enforced. Provide specific rules.`
+    'Free Fire': `1. Game Mode: Battle Royale.\n2. Map: TBD (Set by Admin).\n3. Squad Size: Squads (4).\n4. Points: Standard BR points (Placement + Kills).\n5. Fair Play: No hacks, exploits, or teaming.`,
+    'Mobile Legends': `1. Game Mode: Draft Pick.\n2. Map: Land of Dawn.\n3. Format: Round Robin (Bo3) into Single Elimination Playoffs.\n4. Team Size: 5v5.\n5. Fair Play: Exploits/Bugs strictly prohibited.`,
+    'Farlight 84': `1. Game Mode: Battle Royale (Hunt).\n2. Map: TBD (Set by Admin).\n3. Squad Size: Squads (4).\n4. Points: Standard BR points (Placement + Kills).\n5. Fair Play enforced.`
 };
-// --- End Game Lists ---
 
-// --- Game Specific Settings ---
 const gameSpecificSettingOptions = {
-    'Free Fire': { modes: ['Battle Royale', 'Clash Squad'], maps: ['Bermuda', 'Purgatory', 'Kalahari', 'Alpine', 'NeXTerra'], teamSizes: ['Solos', 'Duos', 'Squads (4)'], },
-    'Mobile Legends': { modes: ['Draft Pick', 'Classic'], map: ['Land of Dawn'], teamSize: ['5v5'], }, // Note: single 'map' and 'teamSize' key
-    'COD Warzone': { modes: ['Battle Royale', 'Resurgence', 'Plunder'], maps: ['Urzikstan', "Vondel", "Ashika Island", "Fortune's Keep"], teamSizes: ['Solos', 'Duos', 'Trios', 'Quads'], },
-    'Bloodstrike': { modes: ['Battle Royale', 'Squad Fight', 'Hot Zone'], maps: ['Map A', 'Map B'], teamSizes: ['Solos', 'Duos', 'Trios', 'Squads (4)'], },
-    'Farlight 84': { modes: ['Battle Royale', 'Hunt', 'Deathmatch'], maps: ['Sunset City', 'Lampton'], teamSizes: ['Solos', 'Duos', 'Squads (4)'], }
+    'Free Fire': { modes: ['Battle Royale', 'Clash Squad'], maps: ['Bermuda', 'Purgatory', 'Kalahari', 'Alpine', 'NeXTerra'], teamSizes: ['Squads (4)'] },
+    'Mobile Legends': { modes: ['Draft Pick'], map: ['Land of Dawn'], teamSize: ['5v5'] },
+    'Farlight 84': { modes: ['Battle Royale', 'Hunt'], maps: ['Sunset City', 'Lampton'], teamSizes: ['Squads (4)'] }
+};
+
+// --- NEW: Helper functions to get implicit format ---
+const getTournamentFormat = (gameName) => {
+    switch(gameName) {
+        case 'Free Fire': return 'grouped-multi-stage-br';
+        case 'Farlight 84': return 'multi-stage-br';
+        case 'Mobile Legends': return 'round-robin-to-bracket';
+        default: return 'unknown';
+    }
+};
+
+const getFormatDescription = (gameName) => {
+    switch(gameName) {
+        case 'Free Fire': return 'A multi-stage Battle Royale qualifier format with group draws and advancement.';
+        case 'Farlight 84': return 'A multi-week Battle Royale league where points accumulate over all weeks.';
+        case 'Mobile Legends': return 'A Round Robin league stage that seeds into a final Single Elimination playoff bracket.';
+        default: return 'Select a game to see the format.';
+    }
 };
 
 const getInitialGameSettings = (gameName) => {
@@ -40,14 +52,16 @@ const getInitialGameSettings = (gameName) => {
     if (settings.maps) initial.map = settings.maps[0];
     if (settings.map) initial.map = settings.map[0]; // Handle single map case
     if (settings.teamSizes) initial.teamSize = settings.teamSizes[settings.teamSizes.length -1]; // Default to largest size
+    if (settings.teamSize) initial.teamSize = settings.teamSize[0]; // Handle single team size
     return initial;
 };
-// --- End Game Specific Settings ---
+// --- End Game Details ---
 
 
 export default function CreateTournamentPage() {
     const navigate = useNavigate();
-    const defaultGame = availableGames[0];
+    const defaultGame = availableGames[0]; // 'Farlight 84'
+
     const [formData, setFormData] = useState({
         name: '',
         game: defaultGame,
@@ -55,10 +69,11 @@ export default function CreateTournamentPage() {
         startDate: '',
         endDate: '',
         registrationDeadline: '',
-        maxParticipants: '64',
+        maxParticipants: '20', // Default for Farlight 84
         prizePool: '',
+        prizeType: 'Cash (USD)', // NEW: Prize Type
+        prizeCurrencyName: '', // NEW: For in-game currency
         entryFee: '0',
-        format: 'single-elimination',
         platform: 'mobile',
         region: 'africa',
         rules: defaultGameRules[defaultGame] || '',
@@ -67,9 +82,20 @@ export default function CreateTournamentPage() {
         streamingPlatform: '',
         contactEmail: '',
         isPublic: true,
-        allowTeams: false,
-        // NEW: Setting for the hybrid format
-        teamsToPlayoffs: '8'
+        allowTeams: true, // All 3 formats are team-based
+
+        // --- NEW Simplified Stage Configs ---
+        // Free Fire
+        ff_qualifier_matches_per_group: '3',
+        ff_playoff_matches_per_group: '6',
+        ff_final_matches: '8',
+
+        // Farlight 84
+        fl84_matches_per_week: '5',
+
+        // Mobile Legends
+        mlbb_league_rounds: '5',
+        mlbb_playoff_teams: '8',
     });
 
     const [currentStep, setCurrentStep] = useState(1);
@@ -97,20 +123,15 @@ export default function CreateTournamentPage() {
                 };
             }
 
+            // When game changes, update rules, settings, and participant caps
             if (name === 'game') {
                 newData.rules = defaultGameRules[value] || '';
                 newData.gameSpecificSettings = getInitialGameSettings(value);
-            }
 
-            // NEW: Adjust 'allowTeams' based on the selected game's typical team size
-            if (name === 'game') {
-                const settings = gameSpecificSettingOptions[value];
-                const defaultTeamSize = settings.teamSize || settings.teamSizes?.[settings.teamSizes.length - 1];
-                if (defaultTeamSize && defaultTeamSize.includes('Squads') || defaultTeamSize === '5v5') {
-                    newData.allowTeams = true;
-                } else {
-                    newData.allowTeams = false;
-                }
+                // Set default participant caps based on format
+                if (value === 'Free Fire') newData.maxParticipants = '60';
+                if (value === 'Farlight 84') newData.maxParticipants = '20';
+                if (value === 'Mobile Legends') newData.maxParticipants = '32';
             }
 
             return newData;
@@ -119,19 +140,70 @@ export default function CreateTournamentPage() {
 
 
     const processSave = () => {
-        console.log('Tournament created:', formData);
+        // --- NEW: Build the complex stages object from simple form data ---
+        const format = getTournamentFormat(formData.game);
+        let stages = [];
+        let stageData = {};
+
+        if (format === 'grouped-multi-stage-br') { // Free Fire
+            stages = [
+                { id: 1, name: 'Qualifiers', status: 'Setup', totalTeams: 60, groups: 5, groupSize: 12, matchesPerGroup: parseInt(formData.ff_qualifier_matches_per_group), advanceRule: 'Top 9 per group + 3 Wildcard' },
+                { id: 2, name: 'Playoff to 48', status: 'Pending', totalTeams: 48, groups: 4, groupSize: 12, matchesPerGroup: parseInt(formData.ff_playoff_matches_per_group), advanceRule: 'Top 3 per group' },
+                { id: 3, name: 'Grand Final', status: 'Pending', totalTeams: 12, groups: 1, groupSize: 12, matchesPerGroup: parseInt(formData.ff_final_matches), advanceRule: 'Crown Champion' },
+            ];
+            stageData = {
+                1: { groups: [], schedule: [], results: [], teamsAdvanced: [], status: 'Setup' },
+                2: { groups: [], schedule: [], results: [], teamsAdvanced: [], status: 'Pending' },
+                3: { groups: [], schedule: [], results: [], teamsAdvanced: [], status: 'Pending' },
+            };
+        } else if (format === 'multi-stage-br') { // Farlight 84
+            const matchesPerWeek = parseInt(formData.fl84_matches_per_week);
+            stages = [
+                { id: 1, name: 'Week 1', status: 'Setup', totalTeams: 20, matchesPerWeek: matchesPerWeek, advanceRule: 'Points accumulate' },
+                { id: 2, name: 'Week 2', status: 'Pending', totalTeams: 20, matchesPerWeek: matchesPerWeek, advanceRule: 'Points accumulate' },
+                { id: 3, name: 'Week 3', status: 'Pending', totalTeams: 20, matchesPerWeek: matchesPerWeek, advanceRule: 'Points accumulate' },
+                { id: 4, name: 'Week 4 - Finals', status: 'Pending', totalTeams: 20, matchesPerWeek: matchesPerWeek, advanceRule: 'Final standings determine rewards' },
+            ];
+            stageData = {
+                1: { schedule: [], results: [], teamsAdvanced: [], status: 'Setup' },
+                2: { schedule: [], results: [], teamsAdvanced: [], status: 'Pending' },
+                3: { schedule: [], results: [], teamsAdvanced: [], status: 'Pending' },
+                4: { schedule: [], results: [], teamsAdvanced: [], status: 'Pending' },
+            };
+        } else if (format === 'round-robin-to-bracket') { // Mobile Legends
+            const advancing = parseInt(formData.mlbb_playoff_teams);
+            stages = [
+                { id: 1, name: 'Group Stage (Round Robin)', totalTeams: parseInt(formData.maxParticipants), rounds: parseInt(formData.mlbb_league_rounds), type: 'League', advancementRule: `Top ${advancing} advance to Playoffs` },
+                { id: 2, name: 'Playoff Bracket', totalTeams: advancing, type: 'Single Elimination', advancementRule: `Top ${advancing} seeded into BO3 bracket.` }
+            ];
+            stageData = {
+                1: { schedule: [], results: [], teamsAdvanced: [], status: 'Setup' },
+                2: { bracket: [], teamsSeeded: [], status: 'Pending' },
+            };
+        }
+
+        const finalTournamentData = {
+            ...formData,
+            format: format, // The format string
+            stages: stages, // The generated stages array
+            stageData: stageData // The generated stageData object
+        };
+
+        // Remove the temporary config fields from the final object
+        delete finalTournamentData.ff_qualifier_matches;
+        delete finalTournamentData.ff_playoff_matches;
+        delete finalTournamentData.ff_final_matches;
+        delete finalTournamentData.fl84_matches_per_week;
+        delete finalTournamentData.mlbb_league_rounds;
+        delete finalTournamentData.mlbb_playoff_teams;
+
+        console.log('Tournament created:', finalTournamentData);
         alert('Tournament created successfully! Redirecting to update page...');
 
-        // *** SIMULATED: Get the ID of the newly created tournament ***
-        // In a real Supabase insert, you would get the ID from the response.
         const newTournamentId = 999; // Placeholder ID
-
-        // *** UPDATED REDIRECTION ***
-        // Redirect to the update page for the newly created tournament
         setTimeout(() => {
-            navigate(`/update-tournament/${newTournamentId}`); // Navigate to update page with the new ID
+            navigate(`/update-tournament/${newTournamentId}`); 
         }, 1000);
-        // *** END UPDATED REDIRECTION ***
     };
 
 
@@ -141,7 +213,6 @@ export default function CreateTournamentPage() {
     };
 
     const nextStep = () => { 
-        // Simple validation for required fields before moving on
         if (currentStep === 1) {
             if (!formData.name || !formData.contactEmail || !formData.description) {
                 alert("Please fill in all required fields in Step 1.");
@@ -150,7 +221,7 @@ export default function CreateTournamentPage() {
         }
         if (currentStep < totalSteps) setCurrentStep(currentStep + 1); 
     };
-    const prevStep = () => { if (currentStep > 1) setCurrentStep(currentStep - 1); };
+    const prevStep = () => { if (currentStep > 1) setCurrentStep(currentStep + 1); };
 
     // --- Styling helpers ---
     const stepIconClass = (step) => `w-10 h-10 rounded-full flex items-center justify-center text-lg font-bold border-2 transition-all duration-300 ${ step <= currentStep ? 'bg-primary-600 text-white border-primary-600' : 'bg-dark-700 text-gray-400 border-dark-600' }`;
@@ -158,7 +229,7 @@ export default function CreateTournamentPage() {
     const stepLabelClass = (step) => `transition-colors duration-300 ${ step <= currentStep ? 'text-primary-400 font-semibold' : 'text-gray-400' }`;
 
 
-    // --- Helper Component to Render Game Specific Fields (no change needed here) ---
+    // --- Helper Component to Render Game Specific Fields ---
     const GameSpecificFields = ({ gameName, settings, onChange }) => {
         const options = gameSpecificSettingOptions[gameName];
         if (!options) return null;
@@ -179,16 +250,16 @@ export default function CreateTournamentPage() {
                     )}
                     {options.maps && (
                         <div>
-                            <label className="block text-xs font-medium text-gray-400 mb-1">Map</label>
+                            <label className="block text-xs font-medium text-gray-400 mb-1">Map (Default)</label>
                             <select name="gameSpecificSettings.map" value={settings.map || ''} onChange={onChange} className="input-field text-sm appearance-none">
                                 {options.maps.map(map => <option key={map} value={map}>{map}</option>)}
                             </select>
                         </div>
                     )}
-                    {options.map && !options.maps && (
+                    {options.map && !options.maps && ( // For MLBB
                         <div>
                            <label className="block text-xs font-medium text-gray-400 mb-1">Map</label>
-                           <input type="text" value={options.map[0]} readOnly className="input-field text-sm bg-dark-600 text-gray-400 cursor-not-allowed"/>
+                           <input type="text" value={options.map} readOnly className="input-field text-sm bg-dark-600 text-gray-400 cursor-not-allowed"/>
                         </div>
                        )}
                     {options.teamSizes && (
@@ -199,15 +270,83 @@ export default function CreateTournamentPage() {
                             </select>
                         </div>
                     )}
-                    {options.teamSize && !options.teamSizes && (
+                    {options.teamSize && !options.teamSizes && ( // For MLBB
                         <div>
                            <label className="block text-xs font-medium text-gray-400 mb-1">Team Size</label>
-                           <input type="text" value={options.teamSize[0]} readOnly className="input-field text-sm bg-dark-600 text-gray-400 cursor-not-allowed"/>
+                           <input type="text" value={options.teamSize} readOnly className="input-field text-sm bg-dark-600 text-gray-400 cursor-not-allowed"/>
                         </div>
                        )}
                 </div>
             </div>
         );
+    };
+
+    // --- NEW: Helper Component to Render Stage Config Fields ---
+    const StageConfigFields = ({ gameName, formData, onChange }) => {
+        if (gameName === 'Free Fire') {
+            return (
+                <div className="bg-dark-900/50 p-4 rounded-lg border border-primary-600/50 space-y-4">
+                    <div className="flex items-center mb-3">
+                        <ListChecks size={18} className="mr-2 text-primary-400" />
+                        <h4 className="text-md font-semibold text-primary-300">Free Fire Stage Setup (Matches per Group)</h4>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-300 mb-2">Qualifier Matches</label>
+                            <input type="number" name="ff_qualifier_matches" value={formData.ff_qualifier_matches} onChange={onChange} className="input-field" min="1" required />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-300 mb-2">Playoff Matches</label>
+                            <input type="number" name="ff_playoff_matches" value={formData.ff_playoff_matches} onChange={onChange} className="input-field" min="1" required />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-300 mb-2">Finals Matches</label>
+                            <input type="number" name="ff_final_matches" value={formData.ff_final_matches} onChange={onChange} className="input-field" min="1" required />
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+        if (gameName === 'Farlight 84') {
+             return (
+                <div className="bg-dark-900/50 p-4 rounded-lg border border-primary-600/50 space-y-4">
+                    <div className="flex items-center mb-3">
+                        <ListChecks size={18} className="mr-2 text-primary-400" />
+                        <h4 className="text-md font-semibold text-primary-300">Farlight 84 League Setup</h4>
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-2">Matches per Week</label>
+                        <input type="number" name="fl84_matches_per_week" value={formData.fl84_matches_per_week} onChange={onChange} className="input-field max-w-xs" min="1" required />
+                        <p className="text-xs text-gray-400 mt-1">This number of matches will be played each of the 4 weeks.</p>
+                    </div>
+                </div>
+            );
+        }
+        if (gameName === 'Mobile Legends') {
+             return (
+                <div className="bg-dark-900/50 p-4 rounded-lg border border-primary-600/50 space-y-4">
+                    <div className="flex items-center mb-3">
+                        <ListChecks size={18} className="mr-2 text-primary-400" />
+                        <h4 className="text-md font-semibold text-primary-300">Mobile Legends League Setup</h4>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-300 mb-2">Total League Rounds</label>
+                            <input type="number" name="mlbb_league_rounds" value={formData.mlbb_league_rounds} onChange={onChange} className="input-field" min="1" required />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-300 mb-2">Teams Advancing to Playoffs</label>
+                            <select name="mlbb_playoff_teams" value={formData.mlbb_playoff_teams} onChange={onChange} className="input-field appearance-none" required>
+                                <option value="4">Top 4</option>
+                                <option value="8">Top 8</option>
+                                <option value="16">Top 16</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+        return null;
     };
 
 
@@ -236,8 +375,13 @@ export default function CreateTournamentPage() {
                                 <div className="p-4 bg-dark-700/50 rounded-lg border border-dark-600 space-y-6">
                                     <div><label className="block text-sm font-medium text-gray-300 mb-2">Tournament Name *</label><input type="text" name="name" value={formData.name} onChange={handleChange} className="input-field" placeholder="e.g., Africa Legends Cup Season 1" required /></div>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                        <div><label className="block text-sm font-medium text-gray-300 mb-2">Game *</label><select name="game" value={formData.game} onChange={handleChange} className="input-field appearance-none" required>{availableGames.map(game => (<option key={game} value={game}>{game}</option>))}</select></div>
-                                        <div><label className="block text-sm font-medium text-gray-300 mb-2">Platform *</label><select name="platform" value={formData.platform} onChange={handleChange} className="input-field appearance-none" required><option value="pc">PC</option><option value="console">Console</option><option value="mobile">Mobile</option><option value="cross-platform">Cross Platform</option></select></div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-300 mb-2">Game *</label>
+                                            <select name="game" value={formData.game} onChange={handleChange} className="input-field appearance-none" required>
+                                                {availableGames.map(game => (<option key={game} value={game}>{game}</option>))}
+                                            </select>
+                                        </div>
+                                        <div><label className="block text-sm font-medium text-gray-300 mb-2">Platform *</label><select name="platform" value={formData.platform} onChange={handleChange} className="input-field appearance-none" required><option value="mobile">Mobile</option><option value="pc">PC</option><option value="console">Console</option><option value="cross-platform">Cross Platform</option></select></div>
                                     </div>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                         <div><label className="block text-sm font-medium text-gray-300 mb-2">Region *</label><select name="region" value={formData.region} onChange={handleChange} className="input-field appearance-none" required><option value="africa">Africa</option><option value="west-africa">West Africa</option><option value="east-africa">East Africa</option><option value="north-africa">North Africa</option><option value="south-africa">South Africa</option></select></div>
@@ -255,46 +399,60 @@ export default function CreateTournamentPage() {
                                 <div className="p-4 bg-dark-700/50 rounded-lg border border-dark-600 space-y-6">
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6"><div><label className="block text-sm font-medium text-gray-300 mb-2">Start Date *</label><input type="date" name="startDate" value={formData.startDate} onChange={handleChange} className="input-field" required/></div><div><label className="block text-sm font-medium text-gray-300 mb-2">End Date *</label><input type="date" name="endDate" value={formData.endDate} onChange={handleChange} className="input-field" required/></div><div><label className="block text-sm font-medium text-gray-300 mb-2">Registration Deadline *</label><input type="date" name="registrationDeadline" value={formData.registrationDeadline} onChange={handleChange} className="input-field" required/></div></div>
 
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                        <div><label className="block text-sm font-medium text-gray-300 mb-2">Max Participants *</label><select name="maxParticipants" value={formData.maxParticipants} onChange={handleChange} className="input-field appearance-none" required><option value="8">8</option> <option value="16">16</option> <option value="32">32</option> <option value="64">64</option> <option value="128">128</option> <option value="256">256</option></select></div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-300 mb-2">Tournament Format</label>
+                                        <div className="p-3 bg-dark-800 rounded-md border border-dark-600">
+                                            <p className="font-semibold text-lg text-primary-300 capitalize">{getTournamentFormat(formData.game).replace(/-/g, ' ')}</p>
+                                            <p className="text-xs text-gray-400">{getFormatDescription(formData.game)}</p>
+                                        </div>
+                                    </div>
 
-                                        
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                        <div><label className="block text-sm font-medium text-gray-300 mb-2">Prize Pool</label><input type="number" name="prizePool" value={formData.prizePool} onChange={handleChange} className="input-field" min="0" placeholder="e.g., 1000"/></div>
                                         <div>
-                                            <label className="block text-sm font-medium text-gray-300 mb-2">Format *</label>
-                                            <select name="format" value={formData.format} onChange={handleChange} className="input-field appearance-none" required>
-                                                <option value="single-elimination">Single Elimination</option>
-                                                <option value="double-elimination">Double Elimination</option>
-                                                <option value="round-robin">Round Robin</option>
-                                                <option value="round-robin-playoffs">Round Robin into Playoffs</option>
-                                                <option value="swiss">Swiss System</option>
+                                            <label className="block text-sm font-medium text-gray-300 mb-2">Prize Type</label>
+                                            <select name="prizeType" value={formData.prizeType} onChange={handleChange} className="input-field appearance-none">
+                                                <option value="Cash (USD)">Cash (USD)</option>
+                                                <option value="In-Game Currency">In-Game Currency</option>
                                             </select>
                                         </div>
+                                        {formData.prizeType === 'In-Game Currency' && (
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-300 mb-2 flex items-center"><Gem size={14} className="mr-1.5"/>Currency Name</label>
+                                                <input type="text" name="prizeCurrencyName" value={formData.prizeCurrencyName} onChange={handleChange} className="input-field" placeholder="e.g., Diamonds" />
+                                            </div>
+                                        )}
+                                    </div>
 
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-300 mb-2">Max Participants *</label>
+                                            <select name="maxParticipants" value={formData.maxParticipants} onChange={handleChange} className="input-field appearance-none" required>
+                                                <option value="16">16</option>
+                                                <option value="20">20 (Farlight 84 League)</option>
+                                                <option value="32">32 (MLBB Default)</option>
+                                                <option value="48">48</option>
+                                                <option value="60">60 (Free Fire Qualifiers)</option>
+                                                <option value="64">64</option>
+                                                <option value="128">128</option>
+                                            </select>
+                                        </div>
                                         <div><label className="block text-sm font-medium text-gray-300 mb-2">Entry Fee ($)</label><input type="number" name="entryFee" value={formData.entryFee} onChange={handleChange} className="input-field" min="0" placeholder="0"/></div>
                                     </div>
 
-                                    
-                                    {formData.format === 'round-robin-playoffs' && (
-                                        <div className="bg-dark-900/50 p-4 rounded-lg border border-primary-600/50">
-                                            <div className="flex items-center mb-3">
-                                                <Layers size={18} className="mr-2 text-primary-400" />
-                                                <h4 className="text-md font-semibold text-primary-300">Playoff Qualification Settings</h4>
-                                            </div>
-                                            <label className="block text-sm font-medium text-gray-300 mb-2">Number of Teams Advancing to Playoffs (Single Elimination) *</label>
-                                            <select name="teamsToPlayoffs" value={formData.teamsToPlayoffs} onChange={handleChange} className="input-field appearance-none max-w-xs" required>
-                                                <option value="2">Top 2</option>
-                                                <option value="4">Top 4</option>
-                                                <option value="6">Top 6</option>
-                                                <option value="8">Top 8</option>
-                                                <option value="12">Top 12 (as per AML)</option>
-                                                <option value="16">Top 16</option>
-                                            </select>
-                                            <p className="text-xs text-gray-400 mt-1">This will be the size of your Single Elimination bracket after the Round Robin phase.</p>
-                                        </div>
-                                    )}
 
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6"><div><label className="block text-sm font-medium text-gray-300 mb-2">Prize Pool ($)</label><input type="number" name="prizePool" value={formData.prizePool} onChange={handleChange} className="input-field" min="0" placeholder="e.g., 1000"/></div><div className="md:col-span-2"><label className="block text-sm font-medium text-gray-300 mb-2">Streaming Platform URL</label><input type="url" name="streamingPlatform" value={formData.streamingPlatform} onChange={handleChange} className="input-field" placeholder="https://twitch.tv/your-channel"/></div></div>
-                                    <div className="space-y-4 pt-4 border-t border-dark-600"><label className="flex items-center"><input id="isPublic" name="isPublic" type="checkbox" checked={formData.isPublic} onChange={handleChange} className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-500 rounded mr-2 bg-dark-600"/><span className="text-sm text-gray-300">Make tournament public</span></label><label className="flex items-center"><input id="allowTeams" name="allowTeams" type="checkbox" checked={formData.allowTeams} onChange={handleChange} className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-500 rounded mr-2 bg-dark-600"/><span className="text-sm text-gray-300">Allow team registration</span></label></div>
+                                    {/* --- NEW: Conditional Stage Config --- */}
+                                    <StageConfigFields
+                                        gameName={formData.game}
+                                        formData={formData}
+                                        onChange={handleChange}
+                                    />
+
+                                    <div><label className="block text-sm font-medium text-gray-300 mb-2">Streaming Platform URL</label><input type="url" name="streamingPlatform" value={formData.streamingPlatform} onChange={handleChange} className="input-field" placeholder="https://twitch.tv/your-channel"/></div>
+                                    <div className="space-y-4 pt-4 border-t border-dark-600">
+                                        <label className="flex items-center"><input id="isPublic" name="isPublic" type="checkbox" checked={formData.isPublic} onChange={handleChange} className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-500 rounded mr-2 bg-dark-600"/><span className="text-sm text-gray-300">Make tournament public</span></label>
+                                    </div>
+
                                     <GameSpecificFields
                                         gameName={formData.game}
                                         settings={formData.gameSpecificSettings}
@@ -317,18 +475,42 @@ export default function CreateTournamentPage() {
                                     <div className="pb-4 border-b border-dark-600">
                                         <h3 className="font-semibold text-primary-400 mb-3 text-lg">Settings</h3>
                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
-                                            <p><span className="text-gray-400 font-medium">Format:</span> {formData.format === 'round-robin-playoffs' ? 'Round Robin into Playoffs' : formData.format.replace('-', ' ')}</p>
-                                            
-                                            {formData.format === 'round-robin-playoffs' && (
-                                                <p className="col-span-1"><span className="text-gray-400 font-medium">Playoff Teams:</span> {formData.teamsToPlayoffs}</p>
-                                            )}
+                                            <p className="capitalize"><span className="text-gray-400 font-medium">Format:</span> {getTournamentFormat(formData.game).replace(/-/g, ' ')}</p>
                                             <p><span className="text-gray-400 font-medium">Max Participants:</span> {formData.maxParticipants}</p>
-                                            <p><span className="text-gray-400 font-medium">Prize Pool:</span> ${formData.prizePool || '0'}</p>
+                                            <p>
+                                                <span className="text-gray-400 font-medium">Prize Pool: </span> 
+                                                {formData.prizeType === 'Cash (USD)' 
+                                                    ? `$${formData.prizePool || '0'}` 
+                                                    : `${formData.prizePool || '0'} ${formData.prizeCurrencyName || 'In-Game Coins'}`}
+                                            </p>
                                             <p><span className="text-gray-400 font-medium">Entry Fee:</span> ${formData.entryFee}</p>
                                             <p><span className="text-gray-400 font-medium">Public:</span> {formData.isPublic ? 'Yes' : 'No'}</p>
-                                            <p><span className="text-gray-400 font-medium">Allow Teams:</span> {formData.allowTeams ? 'Yes' : 'No'}</p>
                                         </div>
                                     </div>
+
+                                    {/* --- NEW: Stage Config Review --- */}
+                                    <div className="pb-4 border-b border-dark-600">
+                                        <h3 className="font-semibold text-primary-400 mb-3 text-lg">Stage Configuration</h3>
+                                        {formData.game === 'Free Fire' && (
+                                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-6 gap-y-2 text-sm">
+                                                <p><span className="text-gray-400 font-medium">Qualifier Matches:</span> {formData.ff_qualifier_matches}</p>
+                                                <p><span className="text-gray-400 font-medium">Playoff Matches:</span> {formData.ff_playoff_matches}</p>
+                                                <p><span className="text-gray-400 font-medium">Finals Matches:</span> {formData.ff_final_matches}</p>
+                                            </div>
+                                        )}
+                                        {formData.game === 'Farlight 84' && (
+                                            <div className="text-sm">
+                                                <p><span className="text-gray-400 font-medium">Matches per Week:</span> {formData.fl84_matches_per_week}</p>
+                                            </div>
+                                        )}
+                                        {formData.game === 'Mobile Legends' && (
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
+                                                <p><span className="text-gray-400 font-medium">League Rounds:</span> {formData.mlbb_league_rounds}</p>
+                                                <p><span className="text-gray-400 font-medium">Playoff Teams:</span> {formData.mlbb_playoff_teams}</p>
+                                            </div>
+                                        )}
+                                    </div>
+
                                     {/* Game Specific Settings */}
                                     <div className="pb-4 border-b border-dark-600">
                                         <h3 className="font-semibold text-primary-400 mb-3 text-lg">{formData.game} Settings</h3>
@@ -336,7 +518,6 @@ export default function CreateTournamentPage() {
                                             {Object.entries(formData.gameSpecificSettings).map(([key, value]) => (
                                                 <p key={key}><span className="text-gray-400 font-medium capitalize">{key.replace(/([A-Z])/g, ' $1')}:</span> {value || 'N/A'}</p>
                                             ))}
-                                            {Object.keys(formData.gameSpecificSettings).length === 0 && <p className="text-gray-500 text-xs">No game-specific settings defined.</p>}
                                         </div>
                                     </div>
                                     {/* Schedule */}
@@ -348,7 +529,7 @@ export default function CreateTournamentPage() {
                                         {formData.extraRules && (<><h3 className="font-semibold text-primary-400 mt-4 mb-2 text-lg">Extra Rules / Notes</h3><pre className="text-sm text-gray-300 whitespace-pre-wrap bg-dark-800 p-3 rounded font-mono border border-dark-600 max-h-40 overflow-y-auto">{formData.extraRules}</pre></>)}
                                     </div>
                                 </div>
-                                <div className="bg-yellow-900/30 border border-yellow-700/50 rounded-lg p-4 mt-6"><div className="flex items-start"><AlertCircle className="w-5 h-5 text-yellow-400 mr-3 mt-0.5 flex-shrink-0" /><div><h4 className="font-medium text-yellow-400 mb-1">Final Check</h4><p className="text-sm text-yellow-300">Review all details. Some settings cannot be changed after creation. Ensure rules and prize info are accurate.</p></div></div></div>
+                                <div className="bg-yellow-900/30 border border-yellow-700/50 rounded-lg p-4 mt-6"><div className="flex items-start"><AlertCircle className="w-5 h-5 text-yellow-400 mr-3 mt-0.5 flex-shrink-0" /><div><h4 className="font-medium text-yellow-400 mb-1">Final Check</h4><p className="text-sm text-yellow-300">Review all details. The **Tournament Format** and **Stage Settings** will be used to generate the tournament structure. These settings cannot be changed after creation.</p></div></div></div>
                             </AnimatedSection>
                         )}
 
