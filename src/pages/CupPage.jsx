@@ -1,121 +1,60 @@
 // src/pages/CupPage.jsx
 
 import { useState, useEffect, useMemo } from 'react';
-import { useParams, Link } from 'react-router-dom';
-import { Trophy, Calendar, Clock, Users, Crown, ListChecks, BarChart, Hash, Info, DollarSign, TrendingUp, CheckCircle, Loader2, AlertCircle, Eye, X } from 'lucide-react';
+import { useParams, Link, useNavigate } from 'react-router-dom';
+import { Trophy, Calendar, Clock, Users, Crown, ListChecks, BarChart, Hash, Info, DollarSign, TrendingUp, CheckCircle, Loader2, AlertCircle, Eye, X, Swords, Shuffle } from 'lucide-react';
 import AnimatedSection from '../components/AnimatedSection';
+import { supabase } from '../lib/supabaseClient'; // --- IMPORT SUPABASE ---
 
-// --- SCORING ENGINE (Copied from UpdateTournamentPage) ---
+// --- SCORING ENGINE (BR - Free Fire Standard) ---
 const calculatePlacementPoints = (placement) => {
     if (placement < 1 || placement > 12) return 0;
-    return 39 - (3 * (placement - 1)); // 1st=39, 2nd=36, 3rd=33...
+    return 39 - (3 * (placement - 1)); 
 };
 const calculateKillPoints = (kills) => {
     return kills * 2;
 };
 
-// --- DEMO DATA SETUP (Based on UpdateTournamentPage) ---
-const teamTemplate = (id, name, logo) => ({ 
-    id, name, logo, 
-    score: 0, kills: 0, placement: 0, 
-    group: null, advanced: false 
-});
+// --- Custom Modal (for errors) ---
+const CustomModal = ({ isOpen, onClose, title, children }) => {
+    if (!isOpen) return null;
+    const Icon = (title && title.toLowerCase().includes('error')) ? AlertCircle : Info;
+    const iconColor = (title && title.toLowerCase().includes('error')) ? 'text-red-400' : 'text-primary-400';
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={onClose}>
+            <div className="bg-dark-800 rounded-xl shadow-2xl w-full max-w-md border border-dark-600 relative animate-fade-in" onClick={(e) => e.stopPropagation()}>
+                <div className="flex items-center justify-between p-4 border-b border-dark-700">
+                    <div className="flex items-center"> <Icon className={`w-5 h-5 mr-3 ${iconColor}`} /> <h3 className="text-lg font-semibold text-white">{title}</h3> </div>
+                    <button onClick={onClose} className="text-gray-400 hover:text-white rounded-full p-1 transition-colors"> <X size={20} /> </button>
+                </div>
+                <div className="p-6"><div className="text-gray-300 text-sm">{children}</div></div>
+                <div className="flex justify-end gap-3 p-4 bg-dark-700/50 border-t border-dark-700 rounded-b-xl">
+                    <button onClick={onClose} className="btn-primary text-sm">OK</button>
+                </div>
+            </div>
+        </div>
+    );
+};
 
-const freeFireTeams = Array.from({ length: 60 }, (_, i) => teamTemplate(2000 + i, `FF Team ${i + 1}`, `https://via.placeholder.com/30x30/FFA500/000000?text=F${i+1}`));
-
-// --- SIMULATED GROUP DRAW & SCHEDULE ---
-// Manually create groups for the demo
-const simulatedGroups = Array.from({ length: 5 }, (_, i) => 
-    freeFireTeams.slice(i * 12, (i + 1) * 12)
-        .map(t => ({...t, group: `Group ${String.fromCharCode(65 + i)}`}))
-);
-// Manually create schedule for the demo
-const simulatedSchedule = [];
-simulatedGroups.forEach((group, gIndex) => {
-    const groupId = String.fromCharCode(65 + gIndex);
-    for (let i = 0; i < 3; i++) { // 3 maps per group
-        simulatedSchedule.push({
-            id: `1_M${i + 1}_G${groupId}`,
-            stage: 'Qualifiers',
-            mapNumber: i + 1,
-            groupId: groupId,
-            teams: group.map(t => ({ id: t.id, name: t.name })),
-            status: (i === 0) ? 'Completed' : 'Scheduled', // Mark Map 1 as Completed
-            dateTime: `2025-10-2${i + 1}T18:00`,
-            results: [] // This will be populated by simulatedResults
-        });
-    }
-});
-
-// --- SIMULATED RESULTS (for Map 1 of each group) ---
-const simulatedResults = [];
-simulatedGroups.forEach((group, gIndex) => {
-    const groupId = String.fromCharCode(65 + gIndex);
-    const matchId = `1_M1_G${groupId}`;
-    // Find the corresponding schedule entry and update its results
-    const scheduleMatch = simulatedSchedule.find(m => m.id === matchId);
-    if (scheduleMatch) {
-        const shuffledTeams = [...group].sort(() => 0.5 - Math.random());
-        const matchResults = shuffledTeams.map((team, index) => ({
-            teamId: team.id,
-            teamName: team.name,
-            placement: index + 1,
-            kills: Math.floor(Math.random() * 10)
-        }));
-        scheduleMatch.results = matchResults; // Add results to schedule
-        // Add to main results list for standings
-        simulatedResults.push({
-            id: matchId,
-            matchResults: matchResults.map(r => ({
-                teamId: r.teamId, placement: r.placement, kills: r.kills
-            }))
-        });
-    }
-});
-// --- END SIMULATED DATA ---
-
-
-const allTournamentsData = [
-    {
-        id: 1, name: "Free Fire Clash Squads - MYTHIC'25", game: 'Free Fire', 
-        prizePool: 5000,
-        startDate: '2025-10-20', status: 'In Progress - Qualifiers',
-        image: '/images/FF_ban.jpg',
-        format: 'grouped-multi-stage-br',
-        participantsList: freeFireTeams,
-        stages: [
-            { id: 1, name: 'Qualifiers', status: 'In Progress', totalTeams: 60, groups: 5, groupSize: 12, mapsPerGroup: 3, advanceRule: 'Top 9 per group + 3 Wildcard' },
-            { id: 2, name: 'Playoff to 48', status: 'Pending', totalTeams: 48, groups: 4, groupSize: 12, mapsPerGroup: 6, advanceRule: 'Top 3 per group' },
-            { id: 3, name: 'Grand Final', status: 'Pending', totalTeams: 12, groups: 1, groupSize: 12, mapsPerGroup: 8, advanceRule: 'Crown Champion' },
-        ],
-        currentStage: 1,
-        stageData: {
-            1: { groups: simulatedGroups, schedule: simulatedSchedule, results: simulatedResults, teamsAdvanced: [], status: 'Schedule Set' },
-            2: { groups: [], schedule: [], results: [], teamsAdvanced: [], status: 'Pending' },
-            3: { groups: [], schedule: [], results: [], teamsAdvanced: [], status: 'Pending' },
-        }
-    },
-    // Add other tournament objects here if needed for testing different IDs
-];
-// --- END DEMO DATA SETUP ---
-
-
-// --- Match Results Modal Component ---
-const MatchResultsModal = ({ isOpen, onClose, match }) => {
+// --- Match Results Modal (Re-usable) ---
+const MatchResultsModal = ({ isOpen, onClose, match, results, participants }) => {
     if (!isOpen || !match) return null;
 
-    const resultsWithPoints = match.results.map(r => {
-        const pPoints = calculatePlacementPoints(r.placement);
-        const kPoints = calculateKillPoints(r.kills);
-        const tPoints = pPoints + kPoints;
-        return { ...r, pPoints, kPoints, tPoints };
-    }).sort((a, b) => a.placement - b.placement); // Sort by placement
+    const resultsWithPoints = results
+        .filter(r => r.match_id === match.id)
+        .map(r => {
+            const pPoints = calculatePlacementPoints(r.placement);
+            const kPoints = calculateKillPoints(r.kills);
+            const tPoints = pPoints + kPoints;
+            const team = participants.find(p => p.id === r.participant_id);
+            return { ...r, pPoints, kPoints, tPoints, teamName: team?.team_name || 'Unknown' };
+        }).sort((a, b) => a.placement - b.placement); // Sort by placement
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={onClose}>
             <div className="bg-dark-800 rounded-xl shadow-2xl w-full max-w-2xl border border-dark-600 relative animate-fade-in" onClick={(e) => e.stopPropagation()}>
                 <div className="flex items-center justify-between p-4 border-b border-dark-700">
-                    <h3 className="text-lg font-semibold text-white">Match Results: {match.id}</h3>
+                    <h3 className="text-lg font-semibold text-white">Match Results: {match.group_name} - Match {match.match_number}</h3>
                     <button onClick={onClose} className="text-gray-400 hover:text-white rounded-full p-1 transition-colors" aria-label="Close modal"> <X size={20} /> </button>
                 </div>
                 <div className="p-4 max-h-[70vh] overflow-y-auto">
@@ -133,7 +72,7 @@ const MatchResultsModal = ({ isOpen, onClose, match }) => {
                             </thead>
                             <tbody className="divide-y divide-dark-700 text-sm">
                                 {resultsWithPoints.map((r, index) => (
-                                    <tr key={r.teamId} className="hover:bg-dark-700/50 transition-colors">
+                                    <tr key={r.id} className="hover:bg-dark-700/50 transition-colors">
                                         <td className="px-3 py-2 text-center font-bold text-white">{r.placement}</td>
                                         <td className="px-3 py-2 font-medium text-white">{r.teamName}</td>
                                         <td className="px-3 py-2 text-center text-gray-300">{r.kills}</td>
@@ -154,23 +93,22 @@ const MatchResultsModal = ({ isOpen, onClose, match }) => {
     );
 };
 
-
-// --- Match Card Component (Adapted for BR) ---
+// --- Re-usable Match Card Component ---
 const MatchCard = ({ match, delay = 0, onViewResults }) => (
     <AnimatedSection delay={delay} className={`bg-dark-800 rounded-lg p-4 border border-dark-700 ${match.status === 'Completed' ? 'opacity-80' : 'hover:border-primary-500/50'}`}>
          <div className="flex justify-between items-center mb-2">
-            <div className="text-sm font-medium text-primary-400">{match.id}</div>
+            <div className="text-sm font-medium text-primary-400">{match.group_name} - Match {match.match_number}</div>
             <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${match.status === 'Completed' ? 'bg-green-600/20 text-green-300' : 'bg-yellow-600/20 text-yellow-300'}`}>
                 {match.status}
             </span>
          </div>
          <h4 className="text-lg font-semibold text-white">
-            Group {match.groupId} - Map {match.mapNumber}
+            {match.stage_name}
          </h4>
-         <p className="text-xs text-gray-400 mb-2">{match.teams.length} Teams</p>
+         <p className="text-xs text-gray-400 mb-2">ID: {match.id.slice(0,8)}...</p>
          <div className="text-sm text-gray-300 flex items-center mb-3">
             <Clock size={14} className="mr-1.5"/>
-            {new Date(match.dateTime).toLocaleString()}
+            {new Date(match.scheduled_time).toLocaleString()}
          </div>
          {match.status === 'Completed' && (
              <button onClick={() => onViewResults(match)} className="btn-secondary btn-xs w-full flex items-center justify-center">
@@ -181,80 +119,78 @@ const MatchCard = ({ match, delay = 0, onViewResults }) => (
      </AnimatedSection>
  );
 
-
 // --- Content Components for Tabs ---
 
-const RundownContent = ({ cup, currentStageDetails }) => {
-    // Re-create a simple prize distribution for this demo
-    const prizeDistribution = [
-        { position: 'Winner', prize: '$2,500', icon: Crown, color: 'text-yellow-400' },
-        { position: 'Runner-up', prize: '$1,000', icon: Trophy, color: 'text-gray-300' },
-        { position: '3rd Place', prize: '$500', icon: Trophy, color: 'text-amber-600' },
-        { position: '4th - 12th', prize: '$100', icon: DollarSign, color: 'text-gray-500' },
-    ];
+// --- UPDATED RUNDOWN CONTENT ---
+const RundownContent = ({ tournament, currentStageDetails, participants }) => {
+    const prize = tournament.prize_type === 'Cash (USD)'
+        ? `$${tournament.prize_pool_amount.toLocaleString()}`
+        : `${tournament.prize_pool_amount.toLocaleString()} ${tournament.prize_currency || 'Coins'}`;
 
     return (
         <AnimatedSection delay={0} className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            {/* Prize Pool */}
             <div className="card bg-dark-800 p-6 rounded-xl shadow-lg">
                 <h2 className="text-xl font-bold mb-4 flex items-center text-yellow-400"><Trophy className="mr-2"/> Prize Distribution</h2>
-                <div className="text-center mb-4"><div className="text-3xl font-extrabold text-yellow-300">${cup.prizePool.toLocaleString()}</div><div className="text-gray-400 text-sm">Total Prize Pool</div></div>
-                <div className="space-y-3">
-                    {prizeDistribution.map((prize, index) => {
-                    const IconComponent = prize.icon;
-                    return (
-                        <div key={index} className="flex items-center justify-between">
-                            <div className="flex items-center">
-                                <IconComponent className={`w-5 h-5 mr-2 ${prize.color}`} />
-                                <span className="text-sm">{prize.position}</span>
-                            </div>
-                            <span className="font-semibold">{prize.prize}</span>
-                        </div>
-                    );
-                    })}
-                </div>
+                <div className="text-center mb-4"><div className="text-3xl font-extrabold text-yellow-300">{prize}</div><div className="text-gray-400 text-sm">{tournament.prize_type === 'Cash (USD)' ? 'Total Cash Prize' : 'In-Game Currency'}</div></div>
+                {/* Prize distribution placeholder */}
             </div>
-
-             {/* Key Info */}
              <div className="card bg-dark-800 p-6 rounded-xl shadow-lg">
                 <h2 className="text-xl font-bold mb-4 flex items-center"><Info className="mr-2 text-primary-400"/> Key Info</h2>
                 <div className="space-y-3 text-sm">
                     <div className="flex justify-between">
                         <span className="text-gray-400">Format:</span>
-                        <span className="font-semibold text-white">Grouped Multi-Stage BR</span>
+                        <span className="font-semibold text-white capitalize">{tournament.format.replace(/-/g, ' ')}</span>
                     </div>
-                    {/* --- MODIFIED LINE --- */}
                     <div className="flex justify-between">
-                        <span className="text-gray-400 flex items-center"><Users size={14} className="mr-1.5"/> Participants:</span>
-                        <span className="font-semibold text-white">{cup.participantsList.length} Teams</span>
+                        <span className="text-gray-400 flex items-center"><Users size={14} className="mr-1.5"/> Max Participants:</span>
+                        <span className="font-semibold text-white">{tournament.max_participants} Teams</span>
                     </div>
-                    {/* --- END MODIFICATION --- */}
                     <div className="flex justify-between">
                         <span className="text-gray-400">Current Stage:</span>
                         <span className="text-primary-400 font-semibold">{currentStageDetails.name}</span>
                     </div>
-                    <div className="flex justify-between">
-                        <span className="text-gray-400">Platform:</span>
-                        <span className="font-semibold text-white">Mobile</span> {/* Placeholder */}
-                    </div>
                      <div className="flex justify-between">
                         <span className="text-gray-400">Start Date:</span>
-                        <span className="font-semibold text-white">{new Date(cup.startDate).toLocaleDateString()}</span>
-                    </div>
-                     <div className="flex justify-between">
-                        <span className="text-gray-400">Total Prize:</span>
-                        <span className="text-yellow-400 font-semibold">${cup.prizePool.toLocaleString()}</span>
+                        <span className="font-semibold text-white">{new Date(tournament.start_date).toLocaleDateString()}</span>
                     </div>
                 </div>
+            </div>
+
+            {/* --- UPDATED PARTICIPANTS CARD --- */}
+            <div className="md:col-span-2 card bg-dark-800 p-6 rounded-xl shadow-lg">
+                <h2 className="text-xl font-bold mb-4 flex items-center text-primary-400">
+                    <Users className="mr-2"/> 
+                    Registered Teams ({participants.length} / {tournament.max_participants})
+                </h2>
+                {participants.length > 0 ? (
+                    <div className="max-h-60 overflow-y-auto pr-2 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {participants.map(team => (
+                            <Link 
+                                to={`/team/${team.team_id}`} // --- LINK TO TEAM PAGE ---
+                                key={team.id} 
+                                className="flex items-center bg-dark-700/50 p-2 rounded-lg hover:bg-dark-700 transition-colors"
+                            >
+                                <img 
+                                    src={team.team_logo_url || `https://via.placeholder.com/30x30/FFA500/000000?text=${team.team_name.charAt(0)}`} 
+                                    alt={team.team_name}
+                                    className="w-8 h-8 rounded-full mr-3 object-cover"
+                                />
+                                <span className="text-white font-medium truncate">{team.team_name}</span>
+                            </Link>
+                        ))}
+                    </div>
+                ) : (
+                    <p className="text-gray-500 text-center py-4">No teams have joined this tournament yet.</p>
+                )}
             </div>
         </AnimatedSection>
     );
 };
+// --- END UPDATED RUNDOWN CONTENT ---
 
-const MatchesContent = ({ currentStageState, onViewResults }) => {
-    const allMatches = currentStageState.schedule.sort((a, b) => new Date(a.dateTime) - new Date(b.dateTime));
-    const upcoming = allMatches.filter(m => m.status !== 'Completed');
-    const completed = allMatches.filter(m => m.status === 'Completed');
+const MatchesContent = ({ matches, onViewResults }) => {
+    const upcoming = matches.filter(m => m.status !== 'Completed').sort((a, b) => new Date(a.scheduled_time) - new Date(b.scheduled_time));
+    const completed = matches.filter(m => m.status === 'Completed').sort((a, b) => new Date(b.scheduled_time) - new Date(a.scheduled_time));
 
     return (
         <AnimatedSection delay={0} className="space-y-10">
@@ -289,43 +225,39 @@ const MatchesContent = ({ currentStageState, onViewResults }) => {
     );
 };
 
-// --- Updated Rank Content Component ---
-const RankContent = ({ currentStageState, currentStageDetails }) => {
+// --- UPDATED RANK CONTENT ---
+const RankContent = ({ participants, results, currentStageDetails }) => {
 
-    // --- Logic copied from GroupedBRStageView ---
+    // --- Live Grouped Standings Logic ---
     const groupedStandings = useMemo(() => {
-        if (!currentStageState.results || currentStageState.groups.length === 0) return {};
-
         const standings = {};
-        const allTeamsInStage = currentStageState.groups.flat();
+        const allTeamsInStage = participants.filter(p => p.current_group); // Only teams that are grouped
 
         allTeamsInStage.forEach(team => {
-            const groupName = team.group;
+            const groupName = team.current_group;
             if (!standings[groupName]) { standings[groupName] = []; }
             standings[groupName].push({
                 team: team, mapsPlayed: 0, placementPoints: 0, killPoints: 0, totalPoints: 0, wins: 0,
             });
         });
 
-        currentStageState.results.forEach(match => {
-            match.matchResults.forEach(result => {
-                const teamInfo = allTeamsInStage.find(t => t.id === result.teamId);
-                const groupName = teamInfo?.group;
-                if (groupName) {
-                    const teamStatIndex = standings[groupName]?.findIndex(s => s.team.id === result.teamId);
-                    if (teamStatIndex !== -1) {
-                        const stats = standings[groupName][teamStatIndex];
-                        stats.mapsPlayed += 1;
-                        const pPoints = calculatePlacementPoints(result.placement);
-                        const kPoints = calculateKillPoints(result.kills);
-                        const tPoints = pPoints + kPoints;
-                        stats.placementPoints += pPoints;
-                        stats.killPoints += kPoints;
-                        stats.totalPoints += tPoints;
-                        if (result.placement === 1) stats.wins += 1;
-                    }
+        results.forEach(result => {
+            const teamInfo = allTeamsInStage.find(t => t.id === result.participant_id);
+            const groupName = teamInfo?.current_group;
+            if (groupName) {
+                const teamStatIndex = standings[groupName]?.findIndex(s => s.team.id === result.participant_id);
+                if (teamStatIndex !== -1) {
+                    const stats = standings[groupName][teamStatIndex];
+                    stats.mapsPlayed += 1;
+                    const pPoints = calculatePlacementPoints(result.placement);
+                    const kPoints = calculateKillPoints(result.kills);
+                    const tPoints = pPoints + kPoints;
+                    stats.placementPoints += pPoints;
+                    stats.killPoints += kPoints;
+                    stats.totalPoints += tPoints;
+                    if (result.placement === 1) stats.wins += 1;
                 }
-            });
+            }
         });
 
         Object.keys(standings).forEach(groupName => {
@@ -336,30 +268,20 @@ const RankContent = ({ currentStageState, currentStageDetails }) => {
             });
         });
         return standings;
-    }, [currentStageState.results, currentStageState.groups]);
-    // --- End copied logic ---
+    }, [results, participants]);
 
     const groupNames = useMemo(() => Object.keys(groupedStandings).sort(), [groupedStandings]);
     const [selectedGroup, setSelectedGroup] = useState(groupNames[0] || null);
 
     useEffect(() => {
-        // Set default selected group when group names load
         if (!selectedGroup && groupNames.length > 0) {
             setSelectedGroup(groupNames[0]);
         }
     }, [groupNames, selectedGroup]);
 
     const currentGroupRankings = groupedStandings[selectedGroup] || [];
-
-    // Determine advancement cutoff based on stage
-    const getAdvancementCutoff = () => {
-        if (currentStageDetails.id === 1) return 9; // Top 9 from Qualifiers
-        if (currentStageDetails.id === 2) return 3; // Top 3 from Playoff
-        return 0; // No cutoff for final stage
-    };
-    const advancingCutoff = getAdvancementCutoff();
-    const isFinalStage = currentStageDetails.id === 3;
-
+    const advancingCutoff = currentStageDetails?.advanceRule?.match(/Top (\d+)/)?.[1] || 0;
+    const isFinalStage = currentStageDetails.id === 3; // Example
 
     return (
         <AnimatedSection delay={0} className="space-y-8">
@@ -367,18 +289,10 @@ const RankContent = ({ currentStageState, currentStageDetails }) => {
                  <h2 className="text-3xl font-bold text-primary-400 flex items-center mb-4 sm:mb-0">
                     <BarChart size={28} className="mr-3" /> {currentStageDetails.name} Rankings
                 </h2>
-                {/* Group Selector Buttons */}
                 <div className="flex flex-wrap gap-2 bg-dark-700 p-1 rounded-lg">
                     {groupNames.map((groupKey) => (
-                        <button
-                            key={groupKey}
-                            onClick={() => setSelectedGroup(groupKey)}
-                            className={`px-3 py-1.5 rounded-md text-sm font-semibold transition-colors ${
-                                selectedGroup === groupKey
-                                    ? 'bg-primary-600 text-white shadow'
-                                    : 'text-gray-300 hover:bg-dark-600'
-                            }`}
-                        >
+                        <button key={groupKey} onClick={() => setSelectedGroup(groupKey)}
+                            className={`px-3 py-1.5 rounded-md text-sm font-semibold transition-colors ${ selectedGroup === groupKey ? 'bg-primary-600 text-white shadow' : 'text-gray-300 hover:bg-dark-600' }`}>
                             {groupKey}
                         </button>
                     ))}
@@ -388,7 +302,6 @@ const RankContent = ({ currentStageState, currentStageDetails }) => {
             <p className="text-gray-300 text-lg">
                 Live standings for <span className="font-semibold text-primary-300">{selectedGroup}</span>.
                 {!isFinalStage && ` The top ${advancingCutoff} teams from this group will advance.`}
-                {currentStageDetails.id === 1 && " An additional 3 Wildcard teams advance."}
             </p>
 
             <div className="bg-dark-800 p-4 sm:p-6 rounded-xl shadow-inner border border-dark-700">
@@ -408,18 +321,18 @@ const RankContent = ({ currentStageState, currentStageDetails }) => {
                         <tbody className="divide-y divide-dark-700">
                             {currentGroupRankings.length > 0 ? currentGroupRankings.map((stat, index) => {
                                 const isAdvancing = index < advancingCutoff && !isFinalStage;
-                                const isWildcard = currentStageDetails.id === 1 && index >= 9 && index < 12; // For Stage 1
-
                                 let statusClass = 'hover:bg-dark-700';
                                 if (isAdvancing) statusClass = 'bg-green-900/20 hover:bg-green-900/30 border-l-4 border-green-500';
-                                else if (isWildcard) statusClass = 'bg-blue-900/20 hover:bg-blue-900/30 border-l-4 border-blue-500';
 
                                 return (
                                     <tr key={stat.team.id} className={`transition-colors ${statusClass}`}>
                                         <td className="px-4 py-3 whitespace-nowrap text-sm font-semibold text-primary-400">{index + 1}</td>
-                                        <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-white flex items-center">
-                                            <img src={stat.team.logo} alt={stat.team.name} className="w-6 h-6 rounded-full mr-2" />
-                                            {stat.team.name}
+                                        <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-white">
+                                            {/* --- LINK TO TEAM PAGE --- */}
+                                            <Link to={`/team/${stat.team.team_id}`} className="flex items-center hover:text-primary-300 transition-colors">
+                                                <img src={stat.team.team_logo_url || `https://via.placeholder.com/30x30/FFA500/000000?text=${stat.team.team_name.charAt(0)}`} alt={stat.team.team_name} className="w-6 h-6 rounded-full mr-2" />
+                                                {stat.team.team_name}
+                                            </Link>
                                         </td>
                                         <td className="px-4 py-3 whitespace-nowrap text-sm text-center text-gray-300">{stat.mapsPlayed}</td>
                                         <td className="px-4 py-3 whitespace-nowrap text-sm text-center font-bold text-yellow-300">{stat.placementPoints}</td>
@@ -440,89 +353,172 @@ const RankContent = ({ currentStageState, currentStageDetails }) => {
         </AnimatedSection>
     );
 };
-// --- End Updated Rank Component ---
+// --- END UPDATED RANK CONTENT ---
 
 
 export default function CupPage() {
     const { cupId } = useParams();
-    const [cup, setCup] = useState(null);
+    const navigate = useNavigate();
+
+    // --- NEW: Data States ---
+    const [tournament, setTournament] = useState(null);
+    const [participants, setParticipants] = useState([]);
+    const [matches, setMatches] = useState([]);
+    const [results, setResults] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+
     const [activeTab, setActiveTab] = useState('rundown');
-
-    // --- NEW MODAL STATE ---
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [selectedMatchResults, setSelectedMatchResults] = useState(null);
+    const [selectedMatch, setSelectedMatch] = useState(null);
+    const [alertModal, setAlertModal] = useState({ isOpen: false, title: '', message: '' });
 
-    // --- NEW MODAL HANDLERS ---
+    // --- NEW: Data Fetching ---
+    useEffect(() => {
+        const fetchAllTournamentData = async () => {
+            if (!cupId) {
+                setError("No tournament ID provided.");
+                setLoading(false);
+                return;
+            }
+
+            setLoading(true);
+            setError(null);
+
+            try {
+                // 1. Fetch main tournament record
+                const { data: tournamentData, error: tournamentError } = await supabase
+                    .from('tournaments')
+                    .select('*')
+                    .eq('id', cupId)
+                    .single();
+
+                if (tournamentError) throw new Error(`Tournament not found: ${tournamentError.message}`);
+                setTournament(tournamentData);
+
+                // 2. Fetch participants and matches in parallel
+                // --- UPDATED to select * to get team_id ---
+                const [partRes, matchRes] = await Promise.all([
+                    supabase.from('tournament_participants').select('*').eq('tournament_id', cupId),
+                    supabase.from('tournament_matches').select('*').eq('tournament_id', cupId).order('scheduled_time', { ascending: true })
+                ]);
+
+                if (partRes.error) throw new Error(`Failed to fetch participants: ${partRes.error.message}`);
+                if (matchRes.error) throw new Error(`Failed to fetch matches: ${matchRes.error.message}`);
+
+                const partData = partRes.data || [];
+                const matchData = matchRes.data || [];
+                setParticipants(partData);
+                setMatches(matchData);
+
+                // 3. Fetch results based on the matches
+                let resultsData = [];
+                const matchIds = matchData.map(m => m.id);
+                if (matchIds.length > 0) {
+                    const { data: resData, error: resError } = await supabase
+                        .from('match_results')
+                        .select('*')
+                        .in('match_id', matchIds);
+
+                    if (resError) throw new Error(`Failed to fetch results: ${resError.message}`);
+                    resultsData = resData || [];
+                }
+                setResults(resultsData);
+
+            } catch (err) {
+                console.error(err);
+                setError(err.message);
+                setAlertModal({ isOpen: true, title: "Error Loading Data", message: err.message });
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchAllTournamentData();
+    }, [cupId]);
+
+
+    // --- Modal Handlers ---
     const handleViewResults = (match) => {
-        setSelectedMatchResults(match);
+        setSelectedMatch(match);
         setIsModalOpen(true);
     };
     const handleCloseModal = () => {
         setIsModalOpen(false);
-        setSelectedMatchResults(null);
+        setSelectedMatch(null);
     };
-    // --- END NEW MODAL HANDLERS ---
 
-    useEffect(() => {
-        setLoading(true);
-        setError(null);
-        // Simulate fetching the specific cup
-        const numericId = parseInt(cupId, 10);
-        // Find the FF tournament (ID 1)
-        const data = allTournamentsData.find(t => t.id === 1); 
+    // --- Dynamic Nav Tabs ---
+    const navTabs = useMemo(() => {
+        if (!tournament) return [];
 
-        setTimeout(() => {
-            if (data) {
-                setCup(data);
-            } else {
-                setError("Tournament not found. This demo only supports the Free Fire Cup (ID 1).");
-            }
-            setLoading(false);
-        }, 300); // Simulate network delay
-    }, [cupId]);
+        const tabs = [{ name: 'RUNDOWN', path: 'rundown', icon: Hash }];
 
+        if (tournament.format === 'grouped-multi-stage-br' || tournament.format === 'multi-stage-br') {
+            tabs.push({ name: 'MATCHES', path: 'matches', icon: ListChecks });
+            tabs.push({ name: 'RANK', path: 'rank', icon: BarChart });
+        }
 
-    const navTabs = [
-        { name: 'RUNDOWN', path: 'rundown', icon: Hash },
-        { name: 'MATCHES', path: 'matches', icon: ListChecks },
-        { name: 'RANK', path: 'rank', icon: BarChart },
-    ];
+        if (tournament.format === 'round-robin-to-bracket') {
+            tabs.push({ name: 'MATCHES', path: 'matches', icon: ListChecks });
+            tabs.push({ name: 'RANK', path: 'rank', icon: BarChart });
+            tabs.push({ name: 'BRACKET', path: 'bracket', icon: Shuffle });
+        }
+
+        return tabs;
+    }, [tournament]);
 
     const renderContent = () => {
-        if (!cup) return null;
+        if (!tournament) return null; // Handled by loading/error
 
-        const currentStageDetails = cup.stages.find(s => s.id === cup.currentStage);
-        const currentStageState = cup.stageData[cup.currentStage];
+        const currentStageDetails = tournament.stages.find(s => s.id === tournament.current_stage);
+        const matchesForStage = matches.filter(m => m.stage_id === tournament.current_stage);
 
         switch (activeTab) {
-            case 'matches': return <MatchesContent currentStageState={currentStageState} onViewResults={handleViewResults} />;
-            case 'rank': return <RankContent currentStageState={currentStageState} currentStageDetails={currentStageDetails} />;
-            case 'rundown': default: return <RundownContent cup={cup} currentStageDetails={currentStageDetails} />;
+            case 'matches': 
+                return <MatchesContent matches={matchesForStage} onViewResults={handleViewResults} />;
+            case 'rank': 
+                if (tournament.format === 'grouped-multi-stage-br' || tournament.format === 'multi-stage-br') {
+                    return <RankContent participants={participants} results={results} currentStageDetails={currentStageDetails} />;
+                }
+                return <AnimatedSection><h2 className="text-2xl font-bold text-white">Ranking for this format coming soon...</h2></AnimatedSection>;
+            case 'bracket':
+                return <AnimatedSection><h2 className="text-2xl font-bold text-white">Bracket view coming soon...</h2></AnimatedSection>;
+            case 'rundown': 
+            default: 
+                return <RundownContent 
+                            tournament={tournament} 
+                            currentStageDetails={currentStageDetails} 
+                            participants={participants}
+                       />;
         }
     };
 
     if (loading) {
-        return ( <div className="flex justify-center items-center min-h-[calc(100vh-10rem)]"> <Loader2 className="w-16 h-16 text-primary-500 animate-spin" /> <p className="ml-4 text-xl">Loading Cup Details...</p> </div> );
+        return ( <div className="flex justify-center items-center min-h-[calc(100vh-10rem)]"><Loader2 className="w-16 h-16 text-primary-500 animate-spin" /><p className="ml-4 text-xl">Loading Cup Details...</p></div> );
     }
 
     if (error) {
-        return ( <div className="flex flex-col justify-center items-center min-h-[calc(100vh-10rem)] text-center px-4"> <AlertCircle className="w-16 h-16 text-red-500 mb-4" /> <h2 className="text-2xl font-semibold text-red-400 mb-2">Error</h2> <p className="text-gray-400">{error}</p> <Link to="/tournaments" className="mt-6 btn-secondary"> Back to Tournaments </Link> </div> );
+        return ( <div className="flex flex-col justify-center items-center min-h-[calc(100vh-10rem)] text-center px-4"><AlertCircle className="w-16 h-16 text-red-500 mb-4" /><h2 className="text-2xl font-semibold text-red-400 mb-2">Error</h2><p className="text-gray-400">{error}</p><Link to="/tournaments" className="mt-6 btn-secondary"> Back to Tournaments </Link></div> );
     }
 
-    if (!cup) return null; // Should be covered by error state
+    if (!tournament) return null; // Should be covered by error state
+
+    // --- Format Prize ---
+    const prize = tournament.prize_type === 'Cash (USD)'
+        ? `$${tournament.prize_pool_amount.toLocaleString()}`
+        : `${tournament.prize_pool_amount.toLocaleString()} ${tournament.prize_currency || 'Coins'}`;
 
     return (
         <div className="bg-dark-900 text-white min-h-screen">
              <div className="max-w-full mx-auto space-y-10 pb-10">
                 {/* Header / Banner */}
                  <AnimatedSection delay={0} className="relative h-64 sm:h-72 w-full overflow-hidden shadow-xl">
-                    <img src={cup.image || '/images/lan_6.jpg'} alt={`${cup.name} Banner`} className="absolute inset-0 w-full h-full object-cover object-center scale-105 blur-sm opacity-40"/>
+                    <img src={tournament.image || '/images/lan_6.jpg'} alt={`${tournament.name} Banner`} className="absolute inset-0 w-full h-full object-cover object-center scale-105 blur-sm opacity-40"/>
                     <div className="absolute inset-0 bg-gradient-to-t from-dark-900 via-dark-900/70 to-transparent"></div>
                     <div className="relative z-10 h-full flex flex-col justify-end max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-8 sm:pb-12">
-                         <div className="flex items-center mb-4"><Trophy className="w-10 h-10 sm:w-12 sm:h-12 mr-4 text-primary-400 bg-dark-800/50 p-2 rounded-lg border border-primary-500/30" /><h1 className="text-4xl md:text-5xl font-extrabold text-white drop-shadow-md">{cup.name}</h1></div>
-                         <p className="text-lg sm:text-xl text-gray-300">{cup.game} - {cup.status}</p>
+                         <div className="flex items-center mb-4"><Trophy className="w-10 h-10 sm:w-12 sm:h-12 mr-4 text-primary-400 bg-dark-800/50 p-2 rounded-lg border border-primary-500/30" /><h1 className="text-4xl md:text-5xl font-extrabold text-white drop-shadow-md">{tournament.name}</h1></div>
+                         <p className="text-lg sm:text-xl text-gray-300">{tournament.game} - {tournament.status}</p>
                     </div>
                 </AnimatedSection>
 
@@ -550,11 +546,21 @@ export default function CupPage() {
                     {renderContent()}
                 </div>
 
-                {/* --- RENDER THE MODAL --- */}
+                {/* --- Modals --- */}
+                <CustomModal
+                    isOpen={alertModal.isOpen}
+                    onClose={() => setAlertModal({ isOpen: false })}
+                    title={alertModal.title}
+                >
+                    {alertModal.message}
+                </CustomModal>
+
                 <MatchResultsModal
                     isOpen={isModalOpen}
                     onClose={handleCloseModal}
-                    match={selectedMatchResults}
+                    match={selectedMatch}
+                    results={results}
+                    participants={participants}
                 />
             </div>
         </div>

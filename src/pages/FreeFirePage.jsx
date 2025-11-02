@@ -1,151 +1,153 @@
 // src/pages/FreeFirePage.jsx
 
-import { Link, useParams } from 'react-router-dom';
-import { Trophy, Users, ArrowRight, PlusCircle, Calendar, Gamepad2, Hash, Clock, BarChart, ListChecks } from 'lucide-react'; // Added ListChecks
+import { Link } from 'react-router-dom';
+import { Trophy, Users, ArrowRight, PlusCircle, Calendar, Gamepad2, Hash, Clock, BarChart, ListChecks, Loader2, AlertCircle } from 'lucide-react'; // Added Loader2, AlertCircle
 import { useState, useEffect } from 'react';
 import AnimatedSection from '../components/AnimatedSection';
+import { supabase } from '../lib/supabaseClient'; // --- IMPORT SUPABASE ---
 
-// --- Placeholder Data & Components ---
-
-const upcomingCups = [
-    { id: 1, title: 'Free Fire Clash Squads - MYTHIC\'25', format: '4v4', entries: 47, date: '20 Oct', prize: 'R1000+', image: '/images/action_1.jpg' },
-    { id: 2, title: 'Free Fire Royale Squads - MYTHIC\'25', format: 'Quads', entries: 36, date: '22 Oct', prize: 'R1000+', image: '/images/action_4.jpg' },
-    { id: 3, title: 'Free Fire Solo Royale - MYTHIC\'25', format: 'Solos', entries: 67, date: '27 Oct', prize: 'R1000+', image: '/images/action_3.jpg' },
-];
-
-const pastCups = [
-    { id: 101, title: 'Free Fire Legends Series - Season 1', format: '4v4', entries: 128, date: '15 Aug', prize: 'R5000', image: '/images/action_2.jpg', winner: 'Team Zeus'},
-    { id: 102, title: 'Solo Survival Challenge - Aug', format: 'Solos', entries: 200, date: '01 Aug', prize: 'R500', image: '/images/action_1.jpg', winner: 'SniperAce'},
-];
-
-
-const topTeams = [
-    { rank: 1, name: 'Team Zeus', points: 1500, members: 5, logo: '/images/team_z.png' },
-    { rank: 2, name: 'Elite Force', points: 1450, members: 4, logo: '/images/team_a.png' },
-    { rank: 3, name: 'Phoenix Rising', points: 1390, members: 5, logo: '/images/team_o.png' },
-    { rank: 4, name: 'Shadow Squad', points: 1210, members: 4, logo: '/images/team_l.png' },
-];
-
-const allTeams = [
-    { name: 'Gamer Legion', members: 5, logo: '/images/team_d.png' },
-    { name: 'Raging Bulls', members: 4, logo: '/images/team_r.png' },
-    { name: 'Lagos Lions', members: 5, logo: '/images/team_s.png' },
-    { name: 'Accra Apex', members: 3, logo: '/images/team_c.png' },
-    { name: 'Kigali Kings', members: 5, logo: '/images/team_o.png' },
-];
-
-// --- Placeholder Data for User's Joined Tournaments ---
+// --- Placeholder Data for User's Joined Tournaments (Kept as placeholder) ---
 const myJoinedTournaments = [
     { id: 1, title: 'Free Fire Clash Squads - MYTHIC\'25', date: '20 Oct', status: 'Upcoming', nextMatch: 'vs Team Alpha - 18:00' },
     { id: 3, title: 'Free Fire Solo Royale - MYTHIC\'25', date: '27 Oct', status: 'Upcoming', nextMatch: 'Check-in required' },
-    // Add more joined tournaments here
 ];
 // --------------------------------------------------------
 
-// --- Enhanced Cup List Item ---
-const CupListItem = ({ cup, isPast = false }) => (
-    <Link
-        to={`/tournament/${cup.id}`} // Changed to dynamic route
-        className="block relative group overflow-hidden rounded-xl shadow-lg border border-dark-700 hover:border-primary-500/50 transition-all duration-300"
-    >
-        <img
-            src={cup.image || '/images/ff_cup_thumb.jpg'}
-            alt="Cup Background"
-            className={`absolute inset-0 w-full h-full object-cover transition-all duration-500 group-hover:scale-110 ${isPast ? 'opacity-20 group-hover:opacity-30' : 'opacity-30 group-hover:opacity-40'}`}
-        />
-        <div className="relative z-10 p-5 bg-gradient-to-r from-dark-800/90 via-dark-800/80 to-transparent flex items-center justify-between">
-            <div className="flex-grow pr-4">
-                <h4 className={`text-lg font-bold mb-1 transition-colors ${isPast ? 'text-gray-400 group-hover:text-gray-300' : 'text-white group-hover:text-primary-300'}`}>
-                    {cup.title}
-                </h4>
-                <p className="text-sm text-gray-400">{cup.format} &bull; {cup.entries} Entries</p>
-                {isPast && cup.winner && <p className="text-xs text-yellow-500 mt-1">Winner: {cup.winner}</p>}
+// --- Enhanced Cup List Item (Uses Supabase data) ---
+const CupListItem = ({ cup, isPast = false }) => {
+    // Format the prize
+    const prize = cup.prize_type === 'Cash (USD)'
+        ? `$${cup.prize_pool_amount.toLocaleString()}`
+        : `${cup.prize_pool_amount.toLocaleString()} ${cup.prize_currency || 'Coins'}`;
+
+    // Format the date
+    const date = cup.start_date ? new Date(cup.start_date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : 'TBD';
+
+    return (
+        <Link
+            to={`/tournament/${cup.id}`} // This is the correct link
+            className="block relative group overflow-hidden rounded-xl shadow-lg border border-dark-700 hover:border-primary-500/50 transition-all duration-300"
+        >
+            <img
+                src={cup.image || '/images/ff_cup_thumb.jpg'}
+                alt="Cup Background"
+                className={`absolute inset-0 w-full h-full object-cover transition-all duration-500 group-hover:scale-110 ${isPast ? 'opacity-20 group-hover:opacity-30' : 'opacity-30 group-hover:opacity-40'}`}
+            />
+            <div className="relative z-10 p-5 bg-gradient-to-r from-dark-800/90 via-dark-800/80 to-transparent flex items-center justify-between">
+                <div className="flex-grow pr-4">
+                    <h4 className={`text-lg font-bold mb-1 transition-colors ${isPast ? 'text-gray-400 group-hover:text-gray-300' : 'text-white group-hover:text-primary-300'}`}>
+                        {cup.name} {/* Use name from DB */}
+                    </h4>
+                    <p className="text-sm text-gray-400 capitalize">{cup.format.replace(/-/g, ' ')} &bull; {cup.max_participants} Entries</p>
+                    {isPast && cup.winner && <p className="text-xs text-yellow-500 mt-1">Winner: {cup.winner}</p>}
+                </div>
+                <div className="text-right flex-shrink-0">
+                    <p className={`text-2xl font-extrabold leading-none mb-1 ${isPast ? 'text-yellow-600' :'text-yellow-400'}`}>{prize}</p>
+                    <p className="text-xs text-gray-500 uppercase tracking-wider">{date}</p>
+                </div>
             </div>
-            <div className="text-right flex-shrink-0">
-                <p className={`text-2xl font-extrabold leading-none mb-1 ${isPast ? 'text-yellow-600' :'text-yellow-400'}`}>{cup.prize}</p>
-                <p className="text-xs text-gray-500 uppercase tracking-wider">{cup.date}</p>
+            <div className="absolute top-4 right-4 text-primary-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                <ArrowRight size={20} />
             </div>
-        </div>
-         <div className="absolute top-4 right-4 text-primary-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-             <ArrowRight size={20} />
-         </div>
-    </Link>
-);
+        </Link>
+    );
+};
 
 
 // --- Content Components ---
 
-const CupsContent = () => (
-    <AnimatedSection delay={0} className="space-y-10">
-        <h2 className="text-3xl font-bold text-primary-400 border-b-2 border-primary-500/30 pb-3 flex items-center">
-            <Trophy size={28} className="mr-3" /> Cups & Tournaments
-        </h2>
-        <p className="text-gray-300 text-lg">Browse upcoming competitions or look back at past glories in the Free Fire arena.</p>
-
-        <div className="space-y-6">
-            <h3 className="text-2xl font-semibold text-white flex items-center"><Clock size={20} className="mr-3 text-green-400" /> Upcoming Cups</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {upcomingCups.map((cup, index) => (
-                    <AnimatedSection key={cup.id} delay={100 + index * 100}>
-                        <CupListItem cup={cup} />
-                    </AnimatedSection>
-                ))}
-                 {upcomingCups.length === 0 && <p className="text-gray-500 md:col-span-2">No upcoming cups scheduled right now.</p>}
+const CupsContent = ({ cups, loading, error, isPast = false }) => (
+    <AnimatedSection delay={0} className="space-y-6">
+        {loading && (
+            <div className="flex justify-center items-center h-40">
+                <Loader2 className="w-8 h-8 text-primary-500 animate-spin" />
             </div>
-        </div>
-
-        <div className="space-y-6 pt-8 border-t border-dark-700">
-            <h3 className="text-2xl font-semibold text-white flex items-center"><Calendar size={20} className="mr-3 text-yellow-400" /> Past Events Archive</h3>
-            {pastCups.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {pastCups.map((cup, index) => (
-                        <AnimatedSection key={cup.id} delay={300 + index * 100}>
-                            <CupListItem cup={cup} isPast={true} />
-                        </AnimatedSection>
-                    ))}
-                </div>
-            ) : (
-                <div className="p-8 bg-dark-800 rounded-xl text-center text-gray-500 border border-dark-700">
-                    <Trophy size={40} className="mx-auto mb-4 opacity-50"/>
-                    <p>No past tournament data available yet.</p>
-                </div>
-            )}
-        </div>
+        )}
+        {error && (
+            <div className="flex flex-col items-center justify-center h-40 bg-dark-800 p-4 rounded-lg">
+                <AlertCircle className="w-8 h-8 text-red-500 mb-2" />
+                <p className="text-red-400">Failed to load {isPast ? 'past' : 'upcoming'} cups.</p>
+                <p className="text-xs text-gray-500">{error}</p>
+            </div>
+        )}
+        {!loading && !error && (
+            <>
+                {cups.length > 0 ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {cups.map((cup, index) => (
+                            <AnimatedSection key={cup.id} delay={100 + index * 100}>
+                                <CupListItem cup={cup} isPast={isPast} />
+                            </AnimatedSection>
+                        ))}
+                    </div>
+                ) : (
+                    <p className="text-gray-500 md:col-span-2 text-center py-10">
+                        No {isPast ? 'past' : 'upcoming'} cups found.
+                    </p>
+                )}
+            </>
+        )}
     </AnimatedSection>
 );
 
-const LeaderboardContent = () => (
+const LeaderboardContent = ({ teams, loading, error }) => (
     <AnimatedSection delay={0} className="space-y-8">
         <h2 className="text-3xl font-bold text-primary-400 border-b-2 border-primary-500/30 pb-3 flex items-center">
             <BarChart size={28} className="mr-3" /> Team Leaderboard
         </h2>
-        <p className="text-gray-300 text-lg">Top teams battle for supremacy. Rankings based on official ARE tournament points.</p>
+        <p className="text-gray-300 text-lg">
+            Top teams battle for supremacy. Rankings based on official ARE tournament points.
+            <br/>
+            <span className="text-sm text-gray-500">(Note: Points/Members columns are placeholders until stats tracking is implemented)</span>
+        </p>
 
         <div className="bg-dark-800 p-4 sm:p-6 rounded-xl shadow-inner border border-dark-700">
             <div className="hidden sm:flex justify-between items-center text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4 pb-3 border-b border-dark-700">
-                <span className="w-1/12 text-center">Rank</span> <span className="w-5/12 pl-4">Team</span> <span className="w-3/12 text-center">Members</span> <span className="w-3/12 text-right pr-4">Points</span>
+                <span className="w-1/12 text-center">Rank</span> 
+                <span className="w-5/12 pl-4">Team</span> 
+                <span className="w-3/12 text-center">Members</span> 
+                <span className="w-3/12 text-right pr-4">Points</span>
             </div>
             <div className="space-y-3">
-                {topTeams.map((team, index) => (
-                    <AnimatedSection key={team.rank} delay={100 + index * 50} className={`flex flex-wrap sm:flex-nowrap items-center p-3 rounded-lg transition-all duration-300 border-l-4 ${ index === 0 ? 'bg-yellow-500/10 border-yellow-400 hover:bg-yellow-500/20' : index === 1 ? 'bg-gray-500/10 border-gray-400 hover:bg-gray-500/20' : index === 2 ? 'bg-amber-600/10 border-amber-500 hover:bg-amber-600/20' : 'bg-dark-700 hover:bg-dark-600 border-transparent hover:border-primary-500/50' }`} >
-                        <div className="flex items-center space-x-3 w-full sm:w-6/12 pb-2 sm:pb-0">
-                            <span className={`text-center font-extrabold text-xl w-8 flex-shrink-0 ${index < 3 ? 'text-white' : 'text-gray-400'}`}>{team.rank}</span>
-                            <img src={team.logo || '/images/team_placeholder.png'} alt={team.name} className="w-10 h-10 rounded-full object-cover border-2 border-dark-600 flex-shrink-0" />
-                            <div className="flex-grow"><p className={`font-semibold text-base leading-tight ${index < 3 ? 'text-white' : 'text-gray-200'}`}>{team.name}</p><Link to={`/team/${team.name.toLowerCase().replace(/\s/g, '-')}`} className="text-xs text-primary-400 hover:text-primary-300">View Team</Link></div>
-                        </div>
-                        <div className="flex justify-between sm:justify-end space-x-4 sm:space-x-0 w-full sm:w-6/12 text-sm pl-12 sm:pl-0">
-                            <div className="w-auto sm:w-3/12 text-left sm:text-center text-gray-400 flex items-center justify-start sm:justify-center"><Users size={16} className="mr-1 sm:mr-2" /> <span>{team.members}</span></div>
-                            <span className={`w-auto sm:w-3/12 text-right font-bold text-base sm:text-lg ${index < 3 ? 'text-white' : 'text-yellow-400'}`}>{team.points.toLocaleString()}</span>
-                        </div>
-                    </AnimatedSection>
-                ))}
-                <p className="text-center text-sm text-gray-500 pt-4">... View Full Leaderboard (Top 100)</p>
+                {loading && (
+                    <div className="flex justify-center items-center py-10">
+                        <Loader2 className="w-8 h-8 text-primary-500 animate-spin" />
+                    </div>
+                )}
+                {error && (
+                    <div className="flex flex-col items-center justify-center py-10">
+                        <AlertCircle className="w-8 h-8 text-red-500 mb-2" />
+                        <p className="text-red-400">Failed to load leaderboard.</p>
+                        <p className="text-xs text-gray-500">{error}</p>
+                    </div>
+                )}
+                {!loading && !error && teams.length > 0 && (
+                    teams.map((team, index) => (
+                        <AnimatedSection key={index} delay={100 + index * 50} className={`flex flex-wrap sm:flex-nowrap items-center p-3 rounded-lg transition-all duration-300 border-l-4 ${ index === 0 ? 'bg-yellow-500/10 border-yellow-400 hover:bg-yellow-500/20' : index === 1 ? 'bg-gray-500/10 border-gray-400 hover:bg-gray-500/20' : index === 2 ? 'bg-amber-600/10 border-amber-500 hover:bg-amber-600/20' : 'bg-dark-700 hover:bg-dark-600 border-transparent hover:border-primary-500/50' }`} >
+                            <div className="flex items-center space-x-3 w-full sm:w-6/12 pb-2 sm:pb-0">
+                                <span className={`text-center font-extrabold text-xl w-8 flex-shrink-0 ${index < 3 ? 'text-white' : 'text-gray-400'}`}>{index + 1}</span>
+                                <img src={team.team_logo_url || '/images/team_placeholder.png'} alt={team.team_name} className="w-10 h-10 rounded-full object-cover border-2 border-dark-600 flex-shrink-0" />
+                                <div className="flex-grow">
+                                    <p className={`font-semibold text-base leading-tight ${index < 3 ? 'text-white' : 'text-gray-200'}`}>{team.team_name}</p>
+                                    <Link to={`/team/${team.team_name.toLowerCase().replace(/\s/g, '-')}`} className="text-xs text-primary-400 hover:text-primary-300">View Team</Link>
+                                </div>
+                            </div>
+                            <div className="flex justify-between sm:justify-end space-x-4 sm:space-x-0 w-full sm:w-6/12 text-sm pl-12 sm:pl-0">
+                                <div className="w-auto sm:w-3/12 text-left sm:text-center text-gray-400 flex items-center justify-start sm:justify-center"><Users size={16} className="mr-1 sm:mr-2" /> <span>N/A</span></div>
+                                <span className={`w-auto sm:w-3/12 text-right font-bold text-base sm:text-lg ${index < 3 ? 'text-white' : 'text-yellow-400'}`}>N/A</span>
+                            </div>
+                        </AnimatedSection>
+                    ))
+                )}
+                {!loading && !error && teams.length === 0 && (
+                     <p className="text-center text-sm text-gray-500 py-10">No teams found for Free Fire.</p>
+                )}
             </div>
         </div>
     </AnimatedSection>
 );
 
-const TeamsContent = () => (
+const TeamsContent = ({ teams, loading, error }) => (
     <AnimatedSection delay={0} className="space-y-8">
         <h2 className="text-3xl font-bold text-primary-400 border-b-2 border-primary-500/30 pb-3 flex items-center"><Users size={28} className="mr-3" /> Team Directory</h2>
         <p className="text-gray-300 text-lg">Find registered Free Fire teams or create your own squad.</p>
@@ -154,17 +156,35 @@ const TeamsContent = () => (
             <Link to="/my-teams" className="btn-primary bg-green-600 hover:bg-green-700 flex items-center flex-shrink-0"><PlusCircle size={18} className="mr-2"/> Create Team</Link>
         </AnimatedSection>
         <AnimatedSection delay={200} className="space-y-6 pt-6">
-            <h3 className="text-2xl font-semibold text-white">Registered Teams ({allTeams.length})</h3>
+            <h3 className="text-2xl font-semibold text-white">Registered Teams ({teams.length})</h3>
             <div className="p-4 bg-dark-700 rounded-lg flex items-center border border-dark-600"><input type="text" placeholder="Search teams..." className="w-full bg-transparent text-white placeholder-gray-500 focus:outline-none text-lg"/></div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {allTeams.map((team, index) => (
-                    <AnimatedSection key={index} delay={250 + index * 50} className="flex items-center p-4 bg-dark-800 rounded-xl hover:bg-dark-700 transition-colors shadow-lg border border-dark-700 hover:border-primary-500/50">
-                         <img src={team.logo || '/images/team_placeholder.png'} alt={team.name} className="w-12 h-12 rounded-full object-cover border-2 border-dark-600 mr-4" />
-                         <div className="flex-grow"><p className="font-bold text-white text-lg">{team.name}</p><span className="text-gray-400 text-sm flex items-center"><Users size={14} className="mr-1"/> {team.members} Members</span></div>
-                         <Link to={`/team/${team.name.toLowerCase().replace(/\s/g, '-')}`} className="btn-secondary text-sm px-3 py-1.5 transition-transform hover:scale-105"> View </Link>
-                    </AnimatedSection>
-                ))}
-            </div>
+            
+            {loading && (
+                <div className="flex justify-center items-center py-10">
+                    <Loader2 className="w-8 h-8 text-primary-500 animate-spin" />
+                </div>
+            )}
+            {error && (
+                <div className="flex flex-col items-center justify-center py-10">
+                    <AlertCircle className="w-8 h-8 text-red-500 mb-2" />
+                    <p className="text-red-400">Failed to load teams.</p>
+                    <p className="text-xs text-gray-500">{error}</p>
+                </div>
+            )}
+            {!loading && !error && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {teams.map((team, index) => (
+                        <AnimatedSection key={index} delay={250 + index * 50} className="flex items-center p-4 bg-dark-800 rounded-xl hover:bg-dark-700 transition-colors shadow-lg border border-dark-700 hover:border-primary-500/50">
+                            <img src={team.team_logo_url || '/images/team_placeholder.png'} alt={team.team_name} className="w-12 h-12 rounded-full object-cover border-2 border-dark-600 mr-4" />
+                            <div className="flex-grow">
+                                <p className="font-bold text-white text-lg">{team.team_name}</p>
+                                <span className="text-gray-400 text-sm flex items-center"><Users size={14} className="mr-1"/> N/A Members</span>
+                            </div>
+                            <Link to={`/team/${team.team_name.toLowerCase().replace(/\s/g, '-')}`} className="btn-secondary text-sm px-3 py-1.5 transition-transform hover:scale-105"> View </Link>
+                        </AnimatedSection>
+                    ))}
+                </div>
+            )}
         </AnimatedSection>
     </AnimatedSection>
 );
@@ -172,15 +192,85 @@ const TeamsContent = () => (
 // --- Main Page Component ---
 export default function FreeFirePage() {
     const [activeTab, setActiveTab] = useState('rundown');
+    
+    // --- NEW: Data states ---
+    const [upcomingCups, setUpcomingCups] = useState([]);
+    const [pastCups, setPastCups] = useState([]);
+    const [allTeams, setAllTeams] = useState([]);
+    const [loadingCups, setLoadingCups] = useState(true);
+    const [cupsError, setCupsError] = useState(null);
+    const [loadingTeams, setLoadingTeams] = useState(true);
+    const [teamsError, setTeamsError] = useState(null);
+
+    // --- NEW: useEffect to fetch all data ---
+    useEffect(() => {
+        const fetchAllData = async () => {
+            // --- Fetch Cups ---
+            setLoadingCups(true);
+            const { data: cupData, error: cupError } = await supabase
+                .from('tournaments')
+                .select('id, name, format, max_participants, start_date, prize_pool_amount, prize_type, prize_currency, status')
+                .eq('game', 'Free Fire') // --- FETCH FREE FIRE ---
+                .eq('is_public', true)
+                .order('start_date', { ascending: false });
+
+            if (cupError) {
+                console.error("Error fetching tournaments:", cupError);
+                setCupsError(cupError.message);
+            } else {
+                const now = new Date();
+                setUpcomingCups(cupData.filter(t => t.status === 'Draft' || t.status === 'In Progress' || new Date(t.start_date) > now));
+                setPastCups(cupData.filter(t => t.status === 'Completed' || new Date(t.start_date) <= now));
+            }
+            setLoadingCups(false);
+
+            // --- Fetch Teams ---
+            setLoadingTeams(true);
+            const { data: teamData, error: teamError } = await supabase
+                .from('tournament_participants')
+                .select('team_name, team_logo_url, tournaments ( game )')
+                .eq('tournaments.game', 'Free Fire'); // --- FETCH FREE FIRE ---
+            
+            if (teamError) {
+                console.error("Error fetching teams:", teamError);
+                setTeamsError(teamError.message);
+            } else {
+                const uniqueTeams = Array.from(new Map(teamData.map(t => [t.team_name, t])).values());
+                setAllTeams(uniqueTeams);
+            }
+            setLoadingTeams(false);
+        };
+
+        fetchAllData();
+    }, []);
+
     const navTabs = [ { name: 'RUNDOWN', path: 'rundown', icon: Hash }, { name: 'CUPS', path: 'cups', icon: Trophy }, { name: 'LEADERBOARD', path: 'leaderboard', icon: BarChart }, { name: 'TEAMS', path: 'teams', icon: Users }, ];
     const recentMatchesRundown = [ { winner: 'Mr._Jostrice', loser: '94GAMER', winnerScore: 1, loserScore: 0, winnerLogo: '/images/player_j.png', loserLogo: '/images/player_94.png' }, { teams: ['/images/team_a.png', '/images/team_d.png', '/images/team_c.png', '/images/team_l.png', '/images/team_r.png', '/images/team_s.png'] }, { teams: ['/images/team_w.png', '/images/team_o.png', '/images/team_z.png', '/images/team_x.png', '/images/team_y.png', '/images/team_kk.png'] }, ];
 
     const renderContent = () => {
         switch (activeTab) {
-            case 'cups': return <CupsContent />;
-            case 'leaderboard': return <LeaderboardContent />;
-            case 'teams': return <TeamsContent />;
-            case 'rundown': default: return (
+            case 'cups': 
+                return (
+                    <div className="space-y-10 px-4 sm:px-6 lg:px-8">
+                        <h2 className="text-3xl font-bold text-primary-400 border-b-2 border-primary-500/30 pb-3 flex items-center">
+                            <Trophy size={28} className="mr-3" /> Cups & Tournaments
+                        </h2>
+                        <div className="space-y-6">
+                            <h3 className="text-2xl font-semibold text-white flex items-center"><Clock size={20} className="mr-3 text-green-400" /> Upcoming Cups</h3>
+                            <CupsContent cups={upcomingCups} loading={loadingCups} error={cupsError} isPast={false} />
+                        </div>
+                        <div className="space-y-6 pt-8 border-t border-dark-700">
+                            <h3 className="text-2xl font-semibold text-white flex items-center"><Calendar size={20} className="mr-3 text-yellow-400" /> Past Events Archive</h3>
+                            <CupsContent cups={pastCups} loading={loadingCups} error={cupsError} isPast={true} />
+                        </div>
+                    </div>
+                );
+            case 'leaderboard': 
+                return <LeaderboardContent teams={allTeams.slice(0, 10)} loading={loadingTeams} error={teamsError} />; // Show top 10
+            case 'teams': 
+                return <TeamsContent teams={allTeams} loading={loadingTeams} error={teamsError} />;
+            case 'rundown': 
+            default: return (
                 <div className="flex flex-col lg:flex-row gap-8 lg:gap-12 px-4 sm:px-6 lg:px-8">
                     {/* Left Column */}
                     <div className="lg:w-2/3 space-y-10">
@@ -190,12 +280,19 @@ export default function FreeFirePage() {
                         </AnimatedSection>
                         <AnimatedSection delay={200}>
                             <div className="flex justify-between items-center mb-6"><h3 className="text-2xl font-bold text-primary-400 flex items-center"><Clock size={20} className="mr-2"/> UPCOMING CUPS</h3><button onClick={() => setActiveTab('cups')} className="text-sm text-gray-400 hover:text-white transition-colors flex items-center">View All <ArrowRight size={16} className="ml-1" /></button></div>
-                            <div className="space-y-4">{upcomingCups.slice(0, 3).map((cup, index) => (<AnimatedSection key={cup.id} delay={250 + index * 50}><CupListItem cup={cup} /></AnimatedSection>))}</div>
+                            {/* --- Rundown Upcoming Cups (NOW DYNAMIC) --- */}
+                            {loadingCups && <div className="flex justify-center p-4"><Loader2 className="w-6 h-6 text-primary-500 animate-spin" /></div>}
+                            {cupsError && <p className="text-red-400 text-sm p-4 text-center">{cupsError}</p>}
+                            {!loadingCups && !cupsError && (
+                                <div className="space-y-4">
+                                    {upcomingCups.slice(0, 3).map((cup, index) => (<AnimatedSection key={cup.id} delay={250 + index * 50}><CupListItem cup={cup} /></AnimatedSection>))}
+                                    {upcomingCups.length === 0 && <p className="text-gray-500 text-center py-4">No upcoming cups scheduled.</p>}
+                                </div>
+                            )}
                         </AnimatedSection>
                     </div>
-                    {/* Right Column */}
+                    {/* Right Column (Keeping placeholder data for 'My Tournaments' and 'Recent Matches') */}
                     <div className="lg:w-1/3 space-y-10">
-                        {/* --- NEW: My Tournaments Section --- */}
                         <AnimatedSection delay={300} className="card bg-dark-800 p-6 rounded-xl shadow-lg border border-dark-700">
                              <h3 className="text-2xl font-bold text-primary-400 mb-6 flex items-center"><ListChecks size={20} className="mr-2"/> My Tournaments</h3>
                              {myJoinedTournaments.length > 0 ? (
@@ -218,13 +315,10 @@ export default function FreeFirePage() {
                                 Find Tournaments to Join
                              </button>
                         </AnimatedSection>
-                        {/* ---------------------------------- */}
-
                         <AnimatedSection delay={400} className="card bg-dark-800 p-6 rounded-xl shadow-lg border border-dark-700">
                              <div className="flex justify-between items-center mb-4"><h3 className="text-2xl font-bold text-green-400">SCRIMS</h3><button className="bg-green-600/30 text-green-300 hover:bg-green-600/50 font-semibold py-1.5 px-4 rounded-lg text-sm flex items-center transition-colors"><PlusCircle size={16} className="mr-1" /> Activate Scrim</button></div>
                             <div className="bg-dark-900 p-4 rounded-lg flex justify-between items-center border border-dark-600 hover:border-green-500/50 transition-colors"><div><p className="text-base font-semibold text-white">Daily Fire Scrim</p><p className="text-sm text-gray-400 flex items-center"><Calendar size={14} className="mr-1" /> Best of 1 - Free Entry</p></div><div className="text-right"><p className="text-xl font-bold text-green-400 leading-none">18:00</p><p className="text-sm text-gray-500 leading-none">Today</p></div></div>
                         </AnimatedSection>
-
                         <AnimatedSection delay={500} className="card bg-dark-800 p-6 rounded-xl shadow-lg border border-dark-700">
                             <h3 className="text-2xl font-bold text-primary-400 mb-6">RECENT MATCHES</h3><div className="space-y-4"><div className="border border-dark-700 p-3 rounded-lg bg-dark-900"><div className="flex items-center justify-between mb-1 text-sm"><div className="flex items-center"><img src={recentMatchesRundown[0].loserLogo} alt="loser" className="w-6 h-6 rounded-full mr-2 opacity-70"/> <span className="text-gray-400 line-through">{recentMatchesRundown[0].loser}</span></div><span className="font-semibold text-red-500">{recentMatchesRundown[0].loserScore}</span></div><div className="flex items-center justify-between text-sm"><div className="flex items-center"><img src={recentMatchesRundown[0].winnerLogo} alt="winner" className="w-6 h-6 rounded-full mr-2 border-2 border-green-500"/> <span className="font-bold text-white">{recentMatchesRundown[0].winner}</span></div><span className="font-bold text-green-400">{recentMatchesRundown[0].winnerScore}</span></div></div>{[recentMatchesRundown[1], recentMatchesRundown[2]].map((match, idx) => (<div key={idx} className="flex flex-wrap gap-2 p-3 bg-dark-700 rounded-lg border border-dark-600">{match.teams.map((logo, index) => (<img key={index} src={logo} alt={`Team ${index}`} className="w-6 h-6 rounded-full object-cover border border-dark-900" title={`Team ${index+1}`} />))}</div>))}</div><button className="w-full mt-6 text-center text-sm text-primary-400 hover:text-primary-300 transition-colors font-medium">View Match History</button>
                         </AnimatedSection>
@@ -256,4 +350,4 @@ export default function FreeFirePage() {
             </div>
         </div>
     );
-}
+} 

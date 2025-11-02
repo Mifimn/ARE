@@ -1,18 +1,20 @@
 // src/pages/CreateTournamentPage.jsx
 
-import { useState } from 'react';
-import { PlusCircle, Calendar, Trophy, Users, Save, X, AlertCircle, Info, Settings, Eye, FileText, Gamepad2, Layers, DollarSign, Gem, ListChecks } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { PlusCircle, Calendar, Trophy, Users, Save, X, AlertCircle, Info, Settings, Eye, FileText, Gamepad2, Layers, DollarSign, Gem, ListChecks, Loader2, HelpCircle } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import AnimatedSection from '../components/AnimatedSection';
+import { useAuth } from '../contexts/AuthContext'; 
+import { supabase } from '../lib/supabaseClient'; 
 
-// --- UPDATED Game Lists (Simplified to the 3 demo formats) ---
+// --- Game Lists (Simplified to the 3 demo formats) ---
 const availableGames = [
     'Free Fire',
     'Mobile Legends',
     'Farlight 84',
 ].sort();
 
-// --- UPDATED Game Details ---
+// --- Game Details ---
 const defaultGameRules = {
     'Free Fire': `1. Game Mode: Battle Royale.\n2. Map: TBD (Set by Admin).\n3. Squad Size: Squads (4).\n4. Points: Standard BR points (Placement + Kills).\n5. Fair Play: No hacks, exploits, or teaming.`,
     'Mobile Legends': `1. Game Mode: Draft Pick.\n2. Map: Land of Dawn.\n3. Format: Round Robin (Bo3) into Single Elimination Playoffs.\n4. Team Size: 5v5.\n5. Fair Play: Exploits/Bugs strictly prohibited.`,
@@ -25,7 +27,7 @@ const gameSpecificSettingOptions = {
     'Farlight 84': { modes: ['Battle Royale', 'Hunt'], maps: ['Sunset City', 'Lampton'], teamSizes: ['Squads (4)'] }
 };
 
-// --- NEW: Helper functions to get implicit format ---
+// --- Helper functions to get implicit format ---
 const getTournamentFormat = (gameName) => {
     switch(gameName) {
         case 'Free Fire': return 'grouped-multi-stage-br';
@@ -58,10 +60,59 @@ const getInitialGameSettings = (gameName) => {
 // --- End Game Details ---
 
 
+// --- Custom Modal Component ---
+const CustomModal = ({ isOpen, onClose, title, children, promptLabel, onPromptSubmit, showCancel = true, confirmText = 'OK', onConfirm, customBody, large = false }) => {
+    const [inputValue, setInputValue] = useState('');
+    useEffect(() => { if (isOpen) setInputValue(''); }, [isOpen, promptLabel]);
+    if (!isOpen) return null;
+    const isPrompt = !!promptLabel;
+    
+    // This function now handles the confirm action *and* closing the modal
+    const handleConfirm = () => {
+        if (isPrompt && onPromptSubmit) {
+            onPromptSubmit(inputValue);
+        } else if (onConfirm) {
+            onConfirm();
+        }
+        
+        // Only close if onConfirm is NOT defined (e.g. simple error alert)
+        // If onConfirm IS defined, it is responsible for closing the modal
+        if (!onConfirm) {
+            onClose();
+        }
+    };
+    
+    const Icon = isPrompt ? HelpCircle : (title && title.toLowerCase().includes('error')) ? AlertCircle : Info;
+    const iconColor = (title && title.toLowerCase().includes('error')) ? 'text-red-400' : 'text-primary-400';
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={onClose}>
+            <div className={`bg-dark-800 rounded-xl shadow-2xl w-full ${large ? 'max-w-4xl' : 'max-w-md'} border border-dark-600 relative animate-fade-in`} onClick={(e) => e.stopPropagation()}>
+                <div className="flex items-center justify-between p-4 border-b border-dark-700">
+                    <div className="flex items-center"> <Icon className={`w-5 h-5 mr-3 ${iconColor}`} /> <h3 className="text-lg font-semibold text-white">{title || (isPrompt ? 'Input Required' : 'Alert')}</h3> </div>
+                    <button onClick={onClose} className="text-gray-400 hover:text-white rounded-full p-1 transition-colors" aria-label="Close modal"> <X size={20} /> </button>
+                </div>
+                {customBody ? customBody : (
+                    <div className="p-6 space-y-4">
+                        {children && <div className="text-gray-300 text-sm">{children}</div>}
+                        {isPrompt && ( <div> <label htmlFor="promptInput" className="block text-sm font-medium text-gray-300 mb-2">{promptLabel}</label> <input id="promptInput" type="number" min="2" value={inputValue} onChange={(e) => setInputValue(e.target.value)} className="input-field w-full" autoFocus /> </div> )}
+                    </div>
+                )}
+                <div className="flex justify-end gap-3 p-4 bg-dark-700/50 border-t border-dark-700 rounded-b-xl">
+                    {showCancel && (<button onClick={onClose} className="btn-secondary text-sm">Cancel</button>)}
+                    <button onClick={handleConfirm} className="btn-primary text-sm">{isPrompt ? 'Submit' : confirmText}</button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+
 export default function CreateTournamentPage() {
     const navigate = useNavigate();
-    const defaultGame = availableGames[0]; // 'Farlight 84'
-
+    const { user } = useAuth(); 
+    const defaultGame = availableGames[0];
+    
     const [formData, setFormData] = useState({
         name: '',
         game: defaultGame,
@@ -69,10 +120,10 @@ export default function CreateTournamentPage() {
         startDate: '',
         endDate: '',
         registrationDeadline: '',
-        maxParticipants: '20', // Default for Farlight 84
+        maxParticipants: '20',
         prizePool: '',
-        prizeType: 'Cash (USD)', // NEW: Prize Type
-        prizeCurrencyName: '', // NEW: For in-game currency
+        prizeType: 'Cash (USD)',
+        prizeCurrencyName: '',
         entryFee: '0',
         platform: 'mobile',
         region: 'africa',
@@ -82,23 +133,31 @@ export default function CreateTournamentPage() {
         streamingPlatform: '',
         contactEmail: '',
         isPublic: true,
-        allowTeams: true, // All 3 formats are team-based
-
-        // --- NEW Simplified Stage Configs ---
-        // Free Fire
+        allowTeams: true,
+        
+        // Simplified Stage Configs
         ff_qualifier_matches_per_group: '3',
         ff_playoff_matches_per_group: '6',
         ff_final_matches: '8',
-
-        // Farlight 84
         fl84_matches_per_week: '5',
-
-        // Mobile Legends
         mlbb_league_rounds: '5',
         mlbb_playoff_teams: '8',
     });
 
     const [currentStep, setCurrentStep] = useState(1);
+    const [isLoading, setIsLoading] = useState(false); 
+    const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
+    
+    // --- NEW: Replaced error state with a general alert modal state ---
+    const [alertModal, setAlertModal] = useState({
+        isOpen: false,
+        title: '',
+        message: '',
+        onConfirm: null,
+        confirmText: 'OK',
+        showCancel: false
+    });
+    
     const totalSteps = 3;
 
     const handleChange = (e) => {
@@ -123,12 +182,10 @@ export default function CreateTournamentPage() {
                 };
             }
 
-            // When game changes, update rules, settings, and participant caps
             if (name === 'game') {
                 newData.rules = defaultGameRules[value] || '';
                 newData.gameSpecificSettings = getInitialGameSettings(value);
-
-                // Set default participant caps based on format
+                
                 if (value === 'Free Fire') newData.maxParticipants = '60';
                 if (value === 'Farlight 84') newData.maxParticipants = '20';
                 if (value === 'Mobile Legends') newData.maxParticipants = '32';
@@ -138,12 +195,18 @@ export default function CreateTournamentPage() {
         });
     };
 
+    const processSave = async () => {
+        setIsLoading(true);
 
-    const processSave = () => {
-        // --- NEW: Build the complex stages object from simple form data ---
+        if (!user) {
+            setAlertModal({ isOpen: true, title: 'Authentication Error', message: 'You must be logged in to create a tournament.' });
+            setIsLoading(false);
+            setIsConfirmModalOpen(false); // Close the confirmation modal
+            return;
+        }
+        
         const format = getTournamentFormat(formData.game);
         let stages = [];
-        let stageData = {};
 
         if (format === 'grouped-multi-stage-br') { // Free Fire
             stages = [
@@ -151,11 +214,6 @@ export default function CreateTournamentPage() {
                 { id: 2, name: 'Playoff to 48', status: 'Pending', totalTeams: 48, groups: 4, groupSize: 12, matchesPerGroup: parseInt(formData.ff_playoff_matches_per_group), advanceRule: 'Top 3 per group' },
                 { id: 3, name: 'Grand Final', status: 'Pending', totalTeams: 12, groups: 1, groupSize: 12, matchesPerGroup: parseInt(formData.ff_final_matches), advanceRule: 'Crown Champion' },
             ];
-            stageData = {
-                1: { groups: [], schedule: [], results: [], teamsAdvanced: [], status: 'Setup' },
-                2: { groups: [], schedule: [], results: [], teamsAdvanced: [], status: 'Pending' },
-                3: { groups: [], schedule: [], results: [], teamsAdvanced: [], status: 'Pending' },
-            };
         } else if (format === 'multi-stage-br') { // Farlight 84
             const matchesPerWeek = parseInt(formData.fl84_matches_per_week);
             stages = [
@@ -164,64 +222,103 @@ export default function CreateTournamentPage() {
                 { id: 3, name: 'Week 3', status: 'Pending', totalTeams: 20, matchesPerWeek: matchesPerWeek, advanceRule: 'Points accumulate' },
                 { id: 4, name: 'Week 4 - Finals', status: 'Pending', totalTeams: 20, matchesPerWeek: matchesPerWeek, advanceRule: 'Final standings determine rewards' },
             ];
-            stageData = {
-                1: { schedule: [], results: [], teamsAdvanced: [], status: 'Setup' },
-                2: { schedule: [], results: [], teamsAdvanced: [], status: 'Pending' },
-                3: { schedule: [], results: [], teamsAdvanced: [], status: 'Pending' },
-                4: { schedule: [], results: [], teamsAdvanced: [], status: 'Pending' },
-            };
         } else if (format === 'round-robin-to-bracket') { // Mobile Legends
             const advancing = parseInt(formData.mlbb_playoff_teams);
+            const maxParticipants = parseInt(formData.maxParticipants);
             stages = [
-                { id: 1, name: 'Group Stage (Round Robin)', totalTeams: parseInt(formData.maxParticipants), rounds: parseInt(formData.mlbb_league_rounds), type: 'League', advancementRule: `Top ${advancing} advance to Playoffs` },
+                { id: 1, name: 'Group Stage (Round Robin)', totalTeams: maxParticipants, rounds: parseInt(formData.mlbb_league_rounds), type: 'League', advancementRule: `Top ${advancing} advance to Playoffs` },
                 { id: 2, name: 'Playoff Bracket', totalTeams: advancing, type: 'Single Elimination', advancementRule: `Top ${advancing} seeded into BO3 bracket.` }
             ];
-            stageData = {
-                1: { schedule: [], results: [], teamsAdvanced: [], status: 'Setup' },
-                2: { bracket: [], teamsSeeded: [], status: 'Pending' },
-            };
         }
 
-        const finalTournamentData = {
-            ...formData,
-            format: format, // The format string
-            stages: stages, // The generated stages array
-            stageData: stageData // The generated stageData object
+        const newTournamentData = {
+            organizer_id: user.id,
+            name: formData.name,
+            game: formData.game,
+            description: formData.description,
+            platform: formData.platform,
+            region: formData.region,
+            contact_email: formData.contactEmail,
+            start_date: formData.startDate,
+            end_date: formData.endDate,
+            registration_deadline: formData.registrationDeadline,
+            max_participants: parseInt(formData.maxParticipants),
+            prize_pool_amount: parseInt(formData.prizePool || 0),
+            prize_type: formData.prizeType,
+            prize_currency: formData.prizeType === 'In-Game Currency' ? formData.prizeCurrencyName : null,
+            entry_fee: parseInt(formData.entryFee || 0),
+            format: format,
+            stages: stages,
+            stream_url: formData.streamingPlatform,
+            rules: formData.rules,
+            extra_rules: formData.extraRules,
+            game_settings: formData.gameSpecificSettings,
+            is_public: formData.isPublic,
+            status: 'Draft',
+            current_stage: 1 
         };
 
-        // Remove the temporary config fields from the final object
-        delete finalTournamentData.ff_qualifier_matches;
-        delete finalTournamentData.ff_playoff_matches;
-        delete finalTournamentData.ff_final_matches;
-        delete finalTournamentData.fl84_matches_per_week;
-        delete finalTournamentData.mlbb_league_rounds;
-        delete finalTournamentData.mlbb_playoff_teams;
+        const { data, error: insertError } = await supabase
+            .from('tournaments')
+            .insert(newTournamentData)
+            .select()
+            .single(); 
 
-        console.log('Tournament created:', finalTournamentData);
-        alert('Tournament created successfully! Redirecting to update page...');
+        setIsLoading(false);
+        setIsConfirmModalOpen(false); // Close the confirmation modal
 
-        const newTournamentId = 999; // Placeholder ID
-        setTimeout(() => {
-            navigate(`/update-tournament/${newTournamentId}`); 
-        }, 1000);
+        if (insertError) {
+            console.error('Supabase Insert Error:', insertError.message);
+            // --- UPDATED: Use alert modal for error ---
+            setAlertModal({ 
+                isOpen: true, 
+                title: 'Error Creating Tournament', 
+                message: `Failed to create tournament: ${insertError.message}` 
+            });
+        } else if (data) {
+            console.log('Tournament created:', data);
+            // --- UPDATED: Use alert modal for success ---
+            setAlertModal({
+                isOpen: true,
+                title: 'Success!',
+                message: 'Tournament created successfully. You will now be redirected to the management page.',
+                onConfirm: () => {
+                    setAlertModal({ isOpen: false }); // Close this modal
+                    navigate(`/update-tournament/${data.id}`); // Navigate
+                },
+                confirmText: 'Go to Manager',
+                showCancel: false
+            });
+        }
+    };
+    
+    // Opens the confirmation modal
+    const handleConfirmAndSubmit = () => {
+        setIsConfirmModalOpen(true);
     };
 
-
-    const handleConfirmAndSubmit = () => {
-        const isConfirmed = window.confirm("Review the details carefully. Create this tournament?");
-        if (isConfirmed) { processSave(); }
+    // --- *** THIS IS THE FIX for the blank page *** ---
+    // The syntax `()_ =>` was corrected to `() =>`
+    const handleFinalSubmit = () => {
+        // processSave will handle loading, errors, and closing the modal
+        processSave();
     };
 
     const nextStep = () => { 
         if (currentStep === 1) {
             if (!formData.name || !formData.contactEmail || !formData.description) {
-                alert("Please fill in all required fields in Step 1.");
+                // --- UPDATED: Use alert modal instead of browser alert ---
+                setAlertModal({ 
+                    isOpen: true, 
+                    title: 'Missing Information', 
+                    message: 'Please fill in all required fields in Step 1: Tournament Name, Contact Email, and Description.' 
+                });
                 return;
             }
         }
         if (currentStep < totalSteps) setCurrentStep(currentStep + 1); 
     };
-    const prevStep = () => { if (currentStep > 1) setCurrentStep(currentStep + 1); };
+    const prevStep = () => { if (currentStep > 1) setCurrentStep(currentStep - 1); };
 
     // --- Styling helpers ---
     const stepIconClass = (step) => `w-10 h-10 rounded-full flex items-center justify-center text-lg font-bold border-2 transition-all duration-300 ${ step <= currentStep ? 'bg-primary-600 text-white border-primary-600' : 'bg-dark-700 text-gray-400 border-dark-600' }`;
@@ -280,8 +377,8 @@ export default function CreateTournamentPage() {
             </div>
         );
     };
-
-    // --- NEW: Helper Component to Render Stage Config Fields ---
+    
+    // --- Helper Component to Render Stage Config Fields ---
     const StageConfigFields = ({ gameName, formData, onChange }) => {
         if (gameName === 'Free Fire') {
             return (
@@ -293,11 +390,11 @@ export default function CreateTournamentPage() {
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div>
                             <label className="block text-sm font-medium text-gray-300 mb-2">Qualifier Matches</label>
-                            <input type="number" name="ff_qualifier_matches" value={formData.ff_qualifier_matches} onChange={onChange} className="input-field" min="1" required />
+                            <input type="number" name="ff_qualifier_matches_per_group" value={formData.ff_qualifier_matches_per_group} onChange={onChange} className="input-field" min="1" required />
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-gray-300 mb-2">Playoff Matches</label>
-                            <input type="number" name="ff_playoff_matches" value={formData.ff_playoff_matches} onChange={onChange} className="input-field" min="1" required />
+                            <input type="number" name="ff_playoff_matches_per_group" value={formData.ff_playoff_matches_per_group} onChange={onChange} className="input-field" min="1" required />
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-gray-300 mb-2">Finals Matches</label>
@@ -423,7 +520,7 @@ export default function CreateTournamentPage() {
                                             </div>
                                         )}
                                     </div>
-
+                                    
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                         <div>
                                             <label className="block text-sm font-medium text-gray-300 mb-2">Max Participants *</label>
@@ -440,8 +537,7 @@ export default function CreateTournamentPage() {
                                         <div><label className="block text-sm font-medium text-gray-300 mb-2">Entry Fee ($)</label><input type="number" name="entryFee" value={formData.entryFee} onChange={handleChange} className="input-field" min="0" placeholder="0"/></div>
                                     </div>
 
-
-                                    {/* --- NEW: Conditional Stage Config --- */}
+                                    
                                     <StageConfigFields
                                         gameName={formData.game}
                                         formData={formData}
@@ -452,7 +548,7 @@ export default function CreateTournamentPage() {
                                     <div className="space-y-4 pt-4 border-t border-dark-600">
                                         <label className="flex items-center"><input id="isPublic" name="isPublic" type="checkbox" checked={formData.isPublic} onChange={handleChange} className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-500 rounded mr-2 bg-dark-600"/><span className="text-sm text-gray-300">Make tournament public</span></label>
                                     </div>
-
+                                    
                                     <GameSpecificFields
                                         gameName={formData.game}
                                         settings={formData.gameSpecificSettings}
@@ -487,14 +583,13 @@ export default function CreateTournamentPage() {
                                             <p><span className="text-gray-400 font-medium">Public:</span> {formData.isPublic ? 'Yes' : 'No'}</p>
                                         </div>
                                     </div>
-
-                                    {/* --- NEW: Stage Config Review --- */}
+                                    
                                     <div className="pb-4 border-b border-dark-600">
                                         <h3 className="font-semibold text-primary-400 mb-3 text-lg">Stage Configuration</h3>
                                         {formData.game === 'Free Fire' && (
                                             <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-6 gap-y-2 text-sm">
-                                                <p><span className="text-gray-400 font-medium">Qualifier Matches:</span> {formData.ff_qualifier_matches}</p>
-                                                <p><span className="text-gray-400 font-medium">Playoff Matches:</span> {formData.ff_playoff_matches}</p>
+                                                <p><span className="text-gray-400 font-medium">Qualifier Matches:</span> {formData.ff_qualifier_matches_per_group}</p>
+                                                <p><span className="text-gray-400 font-medium">Playoff Matches:</span> {formData.ff_playoff_matches_per_group}</p>
                                                 <p><span className="text-gray-400 font-medium">Finals Matches:</span> {formData.ff_final_matches}</p>
                                             </div>
                                         )}
@@ -511,7 +606,6 @@ export default function CreateTournamentPage() {
                                         )}
                                     </div>
 
-                                    {/* Game Specific Settings */}
                                     <div className="pb-4 border-b border-dark-600">
                                         <h3 className="font-semibold text-primary-400 mb-3 text-lg">{formData.game} Settings</h3>
                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
@@ -520,9 +614,7 @@ export default function CreateTournamentPage() {
                                             ))}
                                         </div>
                                     </div>
-                                    {/* Schedule */}
                                     <div className="pb-4 border-b border-dark-600"><h3 className="font-semibold text-primary-400 mb-3 text-lg">Schedule</h3><div className="grid grid-cols-1 sm:grid-cols-3 gap-x-6 gap-y-2 text-sm"><p><span className="text-gray-400 font-medium">Start:</span> {formData.startDate || 'N/A'}</p><p><span className="text-gray-400 font-medium">End:</span> {formData.endDate || 'N/A'}</p><p><span className="text-gray-400 font-medium">Reg. Deadline:</span> {formData.registrationDeadline || 'N/A'}</p></div></div>
-                                    {/* Description, Rules, Extra Rules */}
                                     <div>
                                         <h3 className="font-semibold text-primary-400 mb-2 text-lg">Description</h3><p className="text-sm text-gray-300 mb-4">{formData.description || 'N/A'}</p>
                                         <h3 className="font-semibold text-primary-400 mb-2 text-lg">Default Rules</h3><pre className="text-sm text-gray-300 whitespace-pre-wrap bg-dark-800 p-3 rounded font-mono border border-dark-600 max-h-40 overflow-y-auto">{formData.rules || 'N/A'}</pre>
@@ -535,15 +627,52 @@ export default function CreateTournamentPage() {
 
                         {/* Navigation Buttons */}
                         <AnimatedSection delay={100} className="flex justify-between items-center pt-8 border-t border-dark-700">
-                            <button type="button" onClick={prevStep} className={`btn-secondary text-sm ${currentStep === 1 ? 'invisible' : ''}`}>Previous</button>
+                            <button type="button" onClick={prevStep} disabled={isLoading} className={`btn-secondary text-sm ${currentStep === 1 ? 'invisible' : ''} disabled:opacity-50`}>Previous</button>
                             {currentStep < totalSteps ? (
                                 <button type="button" onClick={nextStep} className="btn-primary text-sm">Next Step</button>
                             ) : (
-                                <button type="button" onClick={handleConfirmAndSubmit} className="btn-primary flex items-center text-sm"><Save className="mr-1.5" size={16} /> Confirm & Create</button>
+                                <button 
+                                    type="button" 
+                                    onClick={handleConfirmAndSubmit} 
+                                    disabled={isLoading}
+                                    className="btn-primary flex items-center text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    {isLoading ? (
+                                        <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                                    ) : (
+                                        <Save className="mr-1.5" size={16} />
+                                    )}
+                                    {isLoading ? 'Creating...' : 'Confirm & Create'}
+                                </button>
                             )}
                         </AnimatedSection>
                     </div> {/* End Form Content */}
                 </AnimatedSection>
+
+                {/* --- Confirmation Modal --- */}
+                <CustomModal
+                    isOpen={isConfirmModalOpen}
+                    onClose={() => !isLoading && setIsConfirmModalOpen(false)} // Prevent closing while loading
+                    title="Confirm Tournament Creation"
+                    onConfirm={handleFinalSubmit}
+                    confirmText={isLoading ? "Creating..." : "Create Tournament"}
+                >
+                    Please review all details. The tournament format and stage settings 
+                    will be locked after creation. Are you sure you want to proceed?
+                </CustomModal>
+
+                {/* --- NEW: General Alert Modal (for errors, success, etc.) --- */}
+                <CustomModal
+                    isOpen={alertModal.isOpen}
+                    onClose={() => setAlertModal({ isOpen: false })}
+                    title={alertModal.title}
+                    onConfirm={alertModal.onConfirm ? alertModal.onConfirm : () => setAlertModal({ isOpen: false })}
+                    confirmText={alertModal.confirmText || 'OK'}
+                    showCancel={alertModal.showCancel || false}
+                >
+                    {alertModal.message}
+                </CustomModal>
+
             </div>
         </div>
     );
