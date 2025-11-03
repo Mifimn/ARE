@@ -7,11 +7,12 @@ import { useAuth } from '../contexts/AuthContext.jsx';
 // Icons needed for this version
 import {
     Settings, Users, Edit3, Trash2, Shield, PlusCircle, ArrowLeft, Save, XCircle, UserX, UserCheck,
-    Loader2, AlertCircle, MapPin, Image, UploadCloud, Check, ChevronDown, ImagePlus
+    Loader2, AlertCircle, MapPin, Image, UploadCloud, Check, ChevronDown, ImagePlus, Mail
 } from 'lucide-react';
 import AnimatedSection from '../components/AnimatedSection';
 
 // --- Constants ---
+const MAX_TEAM_MEMBERS = 6; // Set the team limit
 const africanCountries = [
   "Algeria", "Angola", "Benin", "Botswana", "Burkina Faso", "Burundi",
   "Cabo Verde", "Cameroon", "Central African Republic", "Chad", "Comoros",
@@ -77,6 +78,48 @@ const RosterItem = ({ member, isOwner, onKick, onChangeRole, authUser }) => {
     );
 };
 
+// --- Helper: Join Request Item ---
+const JoinRequestItem = ({ request, onAccept, onDecline, isProcessing, isTeamFull }) => {
+    const handleAccept = () => onAccept(request);
+    const handleDecline = () => onDecline(request.id);
+    const processingThis = isProcessing === request.id;
+
+    return (
+        <div className="bg-dark-700 rounded-lg p-4 flex flex-col sm:flex-row items-center justify-between gap-3 border border-dark-600">
+            <div className="flex items-center flex-grow w-full sm:w-auto">
+                <img
+                    src={request.profiles?.avatar_url || '/images/placeholder_player.png'}
+                    alt={request.profiles?.username || 'User Avatar'}
+                    className="w-10 h-10 rounded-full mr-3 border border-dark-500 flex-shrink-0 object-cover"
+                />
+                <div>
+                    <p className="font-semibold text-white">{request.profiles?.username || 'Loading...'}</p>
+                    <p className="text-xs text-gray-500">Requested: {new Date(request.created_at).toLocaleDateString()}</p>
+                </div>
+            </div>
+            <div className="flex gap-2 flex-shrink-0 w-full sm:w-auto justify-end">
+                <button 
+                    onClick={handleDecline} 
+                    disabled={processingThis} 
+                    className="btn-danger btn-xs flex items-center" 
+                    title="Decline Request"
+                >
+                    {processingThis ? <Loader2 size={14} className="animate-spin" /> : <XCircle size={14} />}
+                </button>
+                <button
+                    onClick={handleAccept}
+                    disabled={processingThis || isTeamFull}
+                    className="btn-success btn-xs flex items-center disabled:opacity-50 disabled:cursor-not-allowed"
+                    title={isTeamFull ? "Team is full" : "Accept Request"}
+                >
+                    {processingThis ? <Loader2 size={14} className="animate-spin" /> : <UserCheck size={14} />}
+                </button>
+            </div>
+        </div>
+    );
+};
+
+
 // --- ManageTeamPage Component ---
 export default function ManageTeamPage() {
     const { teamId } = useParams(); // Get team ID from URL
@@ -102,7 +145,14 @@ export default function ManageTeamPage() {
     const [inviteUsername, setInviteUsername] = useState('');
     const [inviteLoading, setInviteLoading] = useState(false);
 
-    // --- Fetch Team Data and Members useEffect ---
+    // --- NEW: State for Join Requests ---
+    const [joinRequests, setJoinRequests] = useState([]);
+    const [loadingRequests, setLoadingRequests] = useState(true);
+    const [requestError, setRequestError] = useState(null);
+    const [processingId, setProcessingId] = useState(null); // For accept/decline buttons
+    // ---
+
+    // --- Fetch Team Data, Members, and Requests useEffect ---
     useEffect(() => {
         let isMounted = true;
         const fetchData = async () => {
@@ -111,8 +161,8 @@ export default function ManageTeamPage() {
             if (!authUser && !authLoading) { if(isMounted) { setLoading(false); navigate('/login'); } return; }
             if (!numericTeamId || authLoading) return;
 
-            if(isMounted) { setLoading(true); setError(null); }
-            console.log(`ManageTeamPage: Fetching team ${numericTeamId} & members for user ${authUser.id}`);
+            if(isMounted) { setLoading(true); setError(null); setRequestError(null); }
+            console.log(`ManageTeamPage: Fetching team ${numericTeamId}, members, and requests for user ${authUser.id}`);
 
             try {
                 // Fetch team details
@@ -148,6 +198,53 @@ export default function ManageTeamPage() {
                     .from('team_members').select(`*, profiles!user_id ( username, avatar_url )`).eq('team_id', numericTeamId).order('joined_at'); // Use explicit join hint
                 if (membersError) throw membersError;
                 if (isMounted) setMembers(membersResult || []);
+
+                // --- *** THIS IS THE FIX *** ---
+                // --- NEW: Fetch Join Requests (Manual Join) ---
+                setLoadingRequests(true);
+                
+                // 1. Fetch the requests
+                const { data: requestsResult, error: requestsError } = await supabase
+                    .from('team_join_requests')
+                    .select('id, user_id, created_at, team_id') // Select only what's in this table
+                    .eq('team_id', numericTeamId)
+                    .eq('status', 'pending');
+
+                if (requestsError) {
+                    console.error("Error fetching requests:", requestsError);
+                    if(isMounted) setRequestError(requestsError.message);
+                } else if (requestsResult && requestsResult.length > 0) {
+                    // 2. Get all the user IDs from the requests
+                    const userIds = requestsResult.map(req => req.user_id);
+
+                    // 3. Fetch the profiles for those user IDs
+                    const { data: profilesData, error: profilesError } = await supabase
+                        .from('profiles')
+                        .select('id, username, avatar_url')
+                        .in('id', userIds);
+
+                    if (profilesError) {
+                        console.error("Error fetching profiles for requests:", profilesError);
+                        if(isMounted) setRequestError(profilesError.message);
+                    } else {
+                        // 4. Manually join them
+                        const combinedRequests = requestsResult.map(req => ({
+                            ...req,
+                            // Find the profile that matches the request's user_id
+                            profiles: profilesData.find(p => p.id === req.user_id) || null
+                        }));
+                        
+                        if (isMounted) {
+                            console.log("Fetched and combined join requests:", combinedRequests);
+                            setJoinRequests(combinedRequests);
+                        }
+                    }
+                } else {
+                     if (isMounted) setJoinRequests([]); // No requests found
+                }
+                if (isMounted) setLoadingRequests(false);
+                // --- *** END OF FIX *** ---
+
 
             } catch (err) {
                 console.error("Error fetching data:", err.message);
@@ -322,12 +419,25 @@ export default function ManageTeamPage() {
     };
     // --- *** END CORRECTION *** ---
 
+    // --- Team Full Check ---
+    const isTeamFull = members.length >= MAX_TEAM_MEMBERS;
+
 
     const handleInviteMember = async (e) => {
-         e.preventDefault(); if (!isOwner || !inviteUsername.trim() || !authUser || !teamData) return;
+         e.preventDefault(); 
+         setError(null); setRequestError(null);
+         if (!isOwner || !inviteUsername.trim() || !authUser || !teamData) return;
+
+         // --- NEW: Check team limit ---
+         if (isTeamFull) {
+            setError(`Team is full (${MAX_TEAM_MEMBERS} members max). Cannot send invite.`);
+            return;
+         }
+         // ---
+
          const numericTeamId = parseInt(teamId, 10); // Use numeric ID
          console.log(`Inviting user "${inviteUsername}" to team ${numericTeamId}`);
-         setInviteLoading(true); setError(null);
+         setInviteLoading(true);
          try {
             const { data: profileData, error: profileError } = await supabase.from('profiles').select('id').eq('username', inviteUsername.trim()).single();
             if (profileError || !profileData) throw new Error(`User "${inviteUsername.trim()}" not found.`);
@@ -343,6 +453,94 @@ export default function ManageTeamPage() {
              setInviteUsername('');
          } catch (err) { setError(`${err.message}`); } finally { setInviteLoading(false); }
     };
+
+    // --- NEW: Join Request Handlers ---
+    const handleAcceptRequest = async (request) => {
+        setError(null); setRequestError(null);
+        if (!isOwner || !teamData) return;
+
+        // --- NEW: Check team limit ---
+        if (isTeamFull) {
+            setRequestError(`Team is full (${MAX_TEAM_MEMBERS} members max). Cannot accept request.`);
+            return;
+        }
+        // ---
+
+        setProcessingId(request.id);
+        const numericTeamId = parseInt(teamId, 10);
+
+        try {
+            // Step 1: Insert into team_members
+            const { data: newMember, error: insertError } = await supabase
+                .from('team_members')
+                .insert({
+                    team_id: numericTeamId,
+                    user_id: request.user_id,
+                    role: 'Member'
+                })
+                .select()
+                .single();
+
+            if (insertError) {
+                 if (insertError.message.includes('unique constraint')) {
+                     // User is already a member, just delete the request
+                 } else {
+                     throw insertError;
+                 }
+            }
+
+            // Step 2: Delete the join request
+            const { error: deleteError } = await supabase
+                .from('team_join_requests')
+                .delete()
+                .eq('id', request.id);
+
+            if (deleteError) {
+                // This is problematic (user is a member, but request still shows)
+                // Log it, but proceed with UI update
+                console.error("Failed to delete join request after accepting:", deleteError);
+                setRequestError("Failed to delete request, but user was added. Please refresh.");
+            }
+
+            // Step 3: Update UI state
+            setJoinRequests(prev => prev.filter(r => r.id !== request.id));
+            // Add member to list *only if* they weren't already there
+            if (!members.some(m => m.user_id === request.user_id)) {
+                setMembers(prev => [...prev, { ...newMember, profiles: request.profiles }]); // Add new member to list
+            }
+            setSuccessMessage(`Accepted ${request.profiles.username} into the team!`);
+
+        } catch (err) {
+            console.error("Error accepting request:", err);
+            setRequestError(`Failed to accept: ${err.message}`);
+        } finally {
+            setProcessingId(null);
+        }
+    };
+
+    const handleDeclineRequest = async (requestId) => {
+        setError(null); setRequestError(null);
+        if (!isOwner) return;
+
+        setProcessingId(requestId);
+        try {
+            const { error } = await supabase
+                .from('team_join_requests')
+                .delete()
+                .eq('id', requestId);
+
+            if (error) throw error;
+            
+            // Update UI
+            setJoinRequests(prev => prev.filter(r => r.id !== requestId));
+        } catch (err) {
+            console.error("Error declining request:", err);
+            setRequestError(`Failed to decline: ${err.message}`);
+        } finally {
+            setProcessingId(null);
+        }
+    };
+    // --- End Join Request Handlers ---
 
 
     // --- Loading/Error/Permission Render ---
@@ -372,6 +570,11 @@ export default function ManageTeamPage() {
                  {error && !error.includes('permission') && (
                      <AnimatedSection delay={50} className="p-4 bg-red-900/30 border border-red-700 text-red-300 rounded-lg text-sm flex items-start">
                          <AlertCircle size={18} className="mr-3 mt-0.5"/> <span>{error}</span>
+                     </AnimatedSection>
+                 )}
+                 {requestError && (
+                     <AnimatedSection delay={50} className="p-4 bg-red-900/30 border border-red-700 text-red-300 rounded-lg text-sm flex items-start">
+                         <AlertCircle size={18} className="mr-3 mt-0.5"/> <span>{requestError}</span>
                      </AnimatedSection>
                  )}
                  {successMessage && (
@@ -420,14 +623,53 @@ export default function ManageTeamPage() {
                 {/* Roster Management Section */}
                  {isOwner && (
                      <AnimatedSection tag="div" className="card bg-dark-800 p-6 md:p-8 rounded-xl shadow-lg" delay={200}>
-                        <h2 className="text-2xl font-bold mb-4 text-primary-300 flex items-center"><Users className="mr-3" /> Team Roster ({members.length})</h2>
+                        <h2 className="text-2xl font-bold mb-4 text-primary-300 flex items-center">
+                            <Users className="mr-3" /> Team Roster ({members.length} / {MAX_TEAM_MEMBERS})
+                        </h2>
+                        {isTeamFull && (
+                            <div className="mb-6 p-3 bg-red-900/30 border border-red-700 text-red-300 rounded-lg text-sm flex items-center">
+                                <AlertCircle size={18} className="mr-2"/> Team is full. You cannot invite or accept new members.
+                            </div>
+                        )}
                         {/* Invite Form */}
                         <form onSubmit={handleInviteMember} className="mb-6 p-4 bg-dark-700/50 rounded-lg border border-dark-600 flex flex-col sm:flex-row gap-3 items-end">
-                            <div className="flex-grow w-full"> <label htmlFor="inviteUsername" className="block text-sm font-medium text-gray-300 mb-1.5">Invite by Username</label> <input type="text" id="inviteUsername" value={inviteUsername} onChange={(e) => setInviteUsername(e.target.value)} className="input-field w-full" placeholder="Enter exact username" disabled={inviteLoading} required /> </div>
-                            <button type="submit" className="btn-primary flex items-center w-full sm:w-auto flex-shrink-0" disabled={inviteLoading || !inviteUsername.trim()}> {inviteLoading ? <Loader2 className="animate-spin h-4 w-4 mr-2"/> : <PlusCircle size={16} className="mr-2"/>} {inviteLoading ? 'Sending...' : 'Send Invite'} </button>
+                            <div className="flex-grow w-full"> <label htmlFor="inviteUsername" className="block text-sm font-medium text-gray-300 mb-1.5">Invite by Username</label> <input type="text" id="inviteUsername" value={inviteUsername} onChange={(e) => setInviteUsername(e.target.value)} className="input-field w-full" placeholder="Enter exact username" disabled={inviteLoading || isTeamFull} required /> </div>
+                            <button type="submit" className="btn-primary flex items-center w-full sm:w-auto flex-shrink-0" disabled={inviteLoading || !inviteUsername.trim() || isTeamFull}> {inviteLoading ? <Loader2 className="animate-spin h-4 w-4 mr-2"/> : <PlusCircle size={16} className="mr-2"/>} {inviteLoading ? 'Sending...' : 'Send Invite'} </button>
                         </form>
+                        
+                        {/* --- NEW: Pending Join Requests --- */}
+                        <div className="mb-6">
+                            <h3 className="text-xl font-semibold mb-3 text-yellow-400 flex items-center">
+                                <Mail size={18} className="mr-2" />
+                                Pending Join Requests ({loadingRequests ? '...' : joinRequests.length})
+                            </h3>
+                            {loadingRequests ? (
+                                <div className="flex justify-center items-center py-4"> <Loader2 className="w-6 h-6 text-gray-400 animate-spin" /> </div>
+                            ) : requestError ? (
+                                <div className="text-red-400 text-sm">{requestError}</div>
+                            ) : joinRequests.length > 0 ? (
+                                <div className="space-y-3">
+                                    {joinRequests.map(req => (
+                                        <JoinRequestItem
+                                            key={req.id}
+                                            request={req}
+                                            onAccept={handleAcceptRequest}
+                                            onDecline={handleDeclineRequest}
+                                            isProcessing={processingId}
+                                            isTeamFull={isTeamFull}
+                                        />
+                                    ))}
+                                </div>
+                            ) : (
+                                <p className="text-gray-500 italic text-sm">No pending join requests.</p>
+                            )}
+                        </div>
+                        {/* --- End Join Requests --- */}
+
                         {/* Error display for roster/invite actions */}
                         {error && !requestError && <div className="mb-4 text-red-400 text-sm">{error}</div>}
+
+                         <h3 className="text-xl font-semibold mb-3 text-gray-200 border-t border-dark-700 pt-6">Active Members</h3>
                          <div className="space-y-3">
                              {members.length > 0 ? ( members.map((member, index) => (
                                   <AnimatedSection key={member.user_id || index} delay={index * 50}>
@@ -458,9 +700,3 @@ export default function ManageTeamPage() {
         </div>
     );
 }
-
-// Helper function definitions needed if used in JSX directly (e.g., input-label, input-file-style)
-// Add these if they were defined elsewhere, otherwise integrate Tailwind classes directly
-
-// Example: Replace className="input-label" with className="block text-sm font-medium text-gray-300 mb-1.5"
-// Example: Replace className="input-file-style" with appropriate Tailwind classes for file inputs

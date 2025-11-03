@@ -29,7 +29,7 @@ import UpdateTournamentPage from './pages/UpdateTournamentPage';
 import LeaguePage from './pages/LeaguePage';
 import CupPage from './pages/CupPage';
 import PlayersDirectoryPage from './pages/PlayersDirectoryPage';
-import TeamPage from './pages/TeamPage';
+import TeamPage from './pages/TeamPage.jsx'; // <-- *** THIS IS THE FIX ***
 import AboutPage from './pages/AboutPage.jsx';
 
 // --- Component Imports ---
@@ -37,6 +37,7 @@ import Header from './components/Header';
 import Footer from './components/Footer';
 import GamesSidebar from './components/GamesSidebar';
 import PrivateRoute from './components/PrivateRoute';
+import PublicOnlyRoute from './components/PublicOnlyRoute'; // <-- Import for public routes
 
 import './App.css';
 
@@ -83,38 +84,55 @@ export default function App() {
         <Header />
         <LayoutWrapper> {/* Use the wrapper */}
           <Routes>
-            {/* --- Public Routes --- */}
-            <Route path="/" element={<LandingPage />} />
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/signup" element={<SignUpPage />} />
+            {/* --- Public-Only Routes (Redirects if logged in) --- */}
+            <Route 
+              path="/" 
+              element={
+                <PublicOnlyRoute>
+                  <LandingPage />
+                </PublicOnlyRoute>
+              } 
+            />
+            <Route 
+              path="/login" 
+              element={
+                <PublicOnlyRoute>
+                  <LoginPage />
+                </PublicOnlyRoute>
+              } 
+            />
+            <Route 
+              path="/signup" 
+              element={
+                <PublicOnlyRoute>
+                  <SignUpPage />
+                </PublicOnlyRoute>
+              } 
+            />
+            
+            {/* --- Other Public Routes --- */}
             <Route path="/about" element={<AboutPage />} />
             <Route path="/contact" element={<ContactPage />} />
             <Route path="/rules" element={<RulesPage />} />
             <Route path="/terms" element={<TermsPage />} />
             <Route path="/privacy" element={<PrivacyPage />} />
             <Route path="/news" element={<NewsPage />} />
-            {/* Game Hubs are Public */}
             <Route path="/freefire" element={<FreeFirePage />} />
             <Route path="/cod" element={<CODPage />} />
             <Route path="/farlight84" element={<Farlight84Page />} />
             <Route path="/mobilelegends" element={<MobileLegendsPage />} />
             <Route path="/bloodstrike" element={<BloodstrikePage />} />
-            {/* Main Games/Tournaments Page */}
-            <Route path="/tournaments" element={<TournamentsPage />} /> {/* Changed this to be potentially public */}
-            {/* Public view of player and team profiles */}
+            <Route path="/tournaments" element={<TournamentsPage />} />
             <Route path="/profile/:username" element={<ProfilePage />} />
             <Route path="/team/:teamId" element={<TeamPage />} />
-            {/* Public view of tournament details, cups, leagues */}
             <Route path="/tournament/:tournamentId" element={<TournamentDetailsPage />} />
             <Route path="/cup/:cupId" element={<CupPage />} />
             <Route path="/league/:leagueId" element={<LeaguePage />} />
-            {/* Player Directory potentially public */}
             <Route path="/players" element={<PlayersDirectoryPage />} />
 
 
             {/* --- Private Routes --- */}
             <Route path="/dashboard" element={<PrivateRoute><DashboardPage /></PrivateRoute>} />
-            {/* Route for logged-in user's own profile */}
             <Route path="/profile" element={<PrivateRoute><ProfilePage /></PrivateRoute>} />
             <Route path="/edit-profile" element={<PrivateRoute><EditProfilePage /></PrivateRoute>} />
             <Route path="/my-teams" element={<PrivateRoute><TeamsManagementPage /></PrivateRoute>} />

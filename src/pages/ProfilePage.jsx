@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { useAuth } from '../contexts/AuthContext.jsx';
 // Import Heart icon and ThumbsUp (optional alternative)
-import { User, Edit3, Trophy, Users, Calendar, MapPin, Star, Mail, Phone, Clock, Coins, Percent, Gamepad2, FileText, Eye, Search, ArrowRight, Loader2, AlertCircle, Heart } from 'lucide-react';
+import { User, Edit3, Trophy, Users, Calendar, MapPin, Star, Mail, Phone, Clock, Coins, Percent, Gamepad2, FileText, Eye, Search, ArrowRight, Loader2, AlertCircle, Heart, BarChart, Crosshair } from 'lucide-react'; // Added BarChart, Crosshair
 import { Link, Navigate, useParams } from 'react-router-dom';
 import AnimatedSection from '../components/AnimatedSection';
 
@@ -15,6 +15,129 @@ const normalizeUrl = (url) => {
     }
     return url;
 };
+
+// --- NEW: Helper function to fetch user's teams (owned & member) ---
+const fetchUserTeams = async (userId) => {
+    try {
+        // 1. Get teams user owns
+        const { data: ownedTeamsData, error: ownedError } = await supabase
+            .from('teams')
+            .select('*')
+            .eq('owner_id', userId);
+
+        if (ownedError) console.error('Error fetching owned teams:', ownedError.message);
+
+        // 2. Get teams user is a member of
+        const { data: memberTeamsData, error: memberError } = await supabase
+            .from('team_members')
+            .select('role, teams(*)') // Fetches role and all team data
+            .eq('user_id', userId);
+        
+        if (memberError) console.error('Error fetching member teams:', memberError.message);
+
+        // 3. Combine and deduplicate
+        const ownedTeams = (ownedTeamsData || []).map(t => ({ ...t, role: 'Owner' }));
+        const memberTeams = (memberTeamsData || []).map(m => ({ ...m.teams, role: m.role }));
+
+        const teamMap = new Map();
+        // Add member teams first
+        memberTeams.forEach(t => t && teamMap.set(t.id, t));
+        // Add owned teams (will overwrite member entry if user is both, prioritizing Owner role)
+        ownedTeams.forEach(t => t && teamMap.set(t.id, t));
+
+        return Array.from(teamMap.values()).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+    } catch (error) {
+        console.error("Error in fetchUserTeams:", error.message);
+        return [];
+    }
+};
+
+// --- NEW: Helper function to fetch all tournament stats & matches ---
+const fetchUserStats = async (userId) => {
+    try {
+        // 1. Get all team IDs for the user
+        const { data: teamsAsMember } = await supabase.from('team_members').select('team_id').eq('user_id', userId);
+        const { data: teamsAsOwner } = await supabase.from('teams').select('id').eq('owner_id', userId);
+        
+        const allTeamIds = [
+            ...(teamsAsMember ? teamsAsMember.map(t => t.team_id) : []),
+            ...(teamsAsOwner ? teamsAsOwner.map(t => t.id) : [])
+        ];
+        const uniqueTeamIds = [...new Set(allTeamIds)];
+
+        if (uniqueTeamIds.length === 0) {
+            // No teams, so no stats
+            return { recentMatches: [], stats: null };
+        }
+
+        // 2. Get all participant records for those teams
+        const { data: participantRecords, error: pError } = await supabase
+            .from('tournament_participants')
+            .select('id, team_name, tournaments(id, game, name)') // Get tournament info
+            .in('team_id', uniqueTeamIds);
+        
+        if (pError) throw pError;
+        if (!participantRecords || participantRecords.length === 0) {
+            return { recentMatches: [], stats: null };
+        }
+
+        const participantIds = participantRecords.map(p => p.id);
+
+        // 3. Get all match results for these participants
+        const { data: matchResults, error: resultsError } = await supabase
+            .from('match_results')
+            .select('*')
+            .in('participant_id', participantIds)
+            .order('created_at', { ascending: false }); // Order by creation date for "recent"
+
+        if (resultsError) throw resultsError;
+        
+        const results = matchResults || [];
+
+        // 4. Calculate Stats
+        let totalKills = 0;
+        let totalPlacementSum = 0;
+        let totalWins = 0;
+        results.forEach(r => {
+            totalKills += r.kills || 0;
+            totalPlacementSum += r.placement || 0;
+            if (r.placement === 1) totalWins++;
+        });
+        
+        const totalMatches = results.length;
+        const totalLosses = totalMatches - totalWins;
+        const stats = {
+            totalKills: totalKills,
+            totalMatches: totalMatches,
+            avgPlacement: totalMatches > 0 ? (totalPlacementSum / totalMatches).toFixed(1) : 0,
+            totalWins: totalWins,
+            totalLosses: totalLosses,
+            winRate: totalMatches > 0 ? Math.round((totalWins / totalMatches) * 100) : 0
+        };
+
+        // 5. Format Recent Matches
+        const recentMatches = results.slice(0, 5).map(r => {
+            const participant = participantRecords.find(p => p.id === r.participant_id);
+            return {
+                id: r.id,
+                game: participant?.tournaments?.game || 'Unknown Game',
+                tournamentName: participant?.tournaments?.name || 'Unknown Tournament',
+                teamName: participant?.team_name || 'Unknown Team',
+                placement: r.placement,
+                kills: r.kills,
+                date: r.created_at
+            };
+        });
+        
+        return { recentMatches, stats };
+
+    } catch (error) {
+        console.error("Error in fetchUserStats:", error.message);
+        return { recentMatches: [], stats: null };
+    }
+};
+
 
 export default function ProfilePage() {
     const { username: usernameParam } = useParams();
@@ -28,17 +151,28 @@ export default function ProfilePage() {
     const [isLiking, setIsLiking] = useState(false);
     const [likeError, setLikeError] = useState(null);
     // ---
+    
+    // --- NEW: State for dynamic data ---
+    const [teams, setTeams] = useState([]);
+    const [recentMatches, setRecentMatches] = useState([]);
+    const [gameStats, setGameStats] = useState(null); // For stats from tournaments
+    // ---
 
     useEffect(() => {
         let isMounted = true;
 
-        const fetchProfileAndLikeStatus = async () => {
+        const fetchAllProfileData = async () => {
              if (!isMounted) return;
             setLoading(true);
             setError(null);
             setLikeError(null);
-            setHasLiked(false); // Reset like status
+            setHasLiked(false);
             setProfile(null);
+            // --- NEW: Reset dynamic state ---
+            setTeams([]);
+            setRecentMatches([]);
+            setGameStats(null);
+            // ---
 
             try {
                 let query;
@@ -84,15 +218,31 @@ export default function ProfilePage() {
                         email: isCurrentUserProfile ? authUser.email : 'Protected',
                         joinDate: isCurrentUserProfile ? authUser.created_at : data.created_at,
                         favoriteGames: data.favorite_games || [],
-                        gameDetails: data.game_details || {},
+                        gameDetails: data.game_details || {}, // --- This is for Game Profiles
                         socialLinks: data.social_links || {},
                         credits: data.credits ?? 0,
-                        totalWins: data.total_wins ?? 0,
-                        totalLosses: data.total_losses ?? 0,
+                        totalWins: data.total_wins ?? 0, // Fallback stats
+                        totalLosses: data.total_losses ?? 0, // Fallback stats
                         avatar: data.avatar_url || '/images/ava_m_1.png',
                         banner: data.banner_url || '/images/lan_3.jpg',
                     };
                     setProfile(enhancedData);
+
+                    // --- NEW: Fetch Teams and Stats in parallel ---
+                    const [teamsResult, statsResult] = await Promise.all([
+                        fetchUserTeams(targetUserId),
+                        fetchUserStats(targetUserId)
+                    ]);
+            
+                    if (isMounted) {
+                        console.log("[ProfilePage] Fetched Teams:", teamsResult);
+                        setTeams(teamsResult);
+                        
+                        console.log("[ProfilePage] Fetched Stats:", statsResult);
+                        setRecentMatches(statsResult.recentMatches);
+                        setGameStats(statsResult.stats);
+                    }
+                    // ---
 
                     // Fetch Like Status if applicable
                     if (authUser && !isCurrentUserProfile && targetUserId) {
@@ -106,7 +256,6 @@ export default function ProfilePage() {
 
                          if (likeError && isMounted) {
                             console.error("Error checking like status:", likeError);
-                            // Decide if this error should block rendering or just log
                          } else if (likeData && isMounted) {
                              console.log("[ProfilePage] User has already liked this profile.");
                              setHasLiked(true);
@@ -127,7 +276,7 @@ export default function ProfilePage() {
 
         // Trigger fetch only when auth state is resolved and we have a target (param or logged-in user)
         if (!authLoading && (usernameParam || authUser)) {
-            fetchProfileAndLikeStatus();
+            fetchAllProfileData();
         } else if (!authLoading && !usernameParam && !authUser) {
             // No target and not logged in - error state handled by redirect check later
              if(isMounted) {
@@ -140,16 +289,7 @@ export default function ProfilePage() {
 
     }, [authUser, authLoading, usernameParam]);
 
-    // --- Placeholder Teams/Matches ---
-    const teams = [
-      { id: 'thunder-hawks-123', name: 'Thunder Hawks', logo: 'https://via.placeholder.com/40x40?text=TH', game: 'COD Warzone', role: 'Captain' },
-      { id: 2, name: 'Lagos Lions', logo: '/images/team_ll.png', game: 'FIFA 24', role: 'Member' },
-    ];
-    const recentMatches = [
-      { id: 1, game: 'FIFA 24', opponent: 'DesertStorm', result: 'Win', score: '3-1', date: '2024-01-14' },
-      { id: 2, game: 'COD Warzone', opponent: 'LionHeart', result: 'Loss', score: '12-15', date: '2024-01-13' },
-      { id: 3, game: 'FIFA 24', opponent: 'AtlasWarrior', result: 'Win', score: '2-0', date: '2024-01-12' }
-    ];
+    // --- (Placeholder Teams/Matches removed) ---
     // ---
 
     // --- Handle Like Button Click (Use RPC) ---
@@ -225,9 +365,11 @@ export default function ProfilePage() {
     }
 
 
-    // --- Calculate Win Rate ---
-    const winRate = profile.totalWins + profile.totalLosses > 0
-      ? Math.round((profile.totalWins / (profile.totalWins + profile.totalLosses)) * 100)
+    // --- Calculate Win Rate (Use new stats if available, else fallback) ---
+    const totalWins = gameStats ? gameStats.totalWins : (profile.totalWins ?? 0);
+    const totalLosses = gameStats ? gameStats.totalLosses : (profile.totalLosses ?? 0);
+    const winRate = totalWins + totalLosses > 0
+      ? Math.round((totalWins / (totalWins + totalLosses)) * 100)
       : 0;
 
     // --- Render Profile ---
@@ -284,7 +426,7 @@ export default function ProfilePage() {
                                     {likeError && !isOwnProfile && <p className="text-xs text-red-400 mt-1 text-center md:text-right">{likeError}</p>}
                                 </div>
                             </div>
-                            {/* Stats Section (Using Heart for Likes/Credits) */}
+                            {/* Stats Section (Using Heart for Likes/Credits) --- UPDATED with dynamic stats --- */}
                             <AnimatedSection tag="div" className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6 text-center bg-dark-800/80 p-4 rounded-lg border border-dark-700/50" delay={50}>
                                 <div>
                                     <div className="text-2xl font-bold text-primary-400 flex items-center justify-center">
@@ -293,8 +435,8 @@ export default function ProfilePage() {
                                     </div>
                                     <div className="text-gray-400 text-sm">Likes</div>
                                 </div>
-                                <div><div className="text-2xl font-bold text-green-400">{profile.totalWins}</div><div className="text-gray-400 text-sm">Wins</div></div>
-                                <div><div className="text-2xl font-bold text-red-400">{profile.totalLosses}</div><div className="text-gray-400 text-sm">Losses</div></div>
+                                <div><div className="text-2xl font-bold text-green-400">{totalWins}</div><div className="text-gray-400 text-sm">Wins</div></div>
+                                <div><div className="text-2xl font-bold text-red-400">{totalLosses}</div><div className="text-gray-400 text-sm">Losses</div></div>
                                 <div><div className="text-2xl font-bold text-blue-400">{winRate}%</div><div className="text-gray-400 text-sm">Win Rate</div></div>
                             </AnimatedSection>
                             {/* Bio */}
@@ -320,23 +462,39 @@ export default function ProfilePage() {
                  {/* Main Content & Sidebar Grid */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 pt-8">
                     <div className="lg:col-span-2 space-y-8">
-                        {/* Recent Matches */}
+                        
+                        {/* --- UPDATED: Recent Matches --- */}
                         <AnimatedSection tag="div" className="card bg-dark-800 p-6 rounded-xl shadow-lg" delay={200}>
                             <h2 className="text-2xl font-bold mb-6 text-primary-300">Recent Matches</h2>
                             {recentMatches.length > 0 ? (
                                 <div className="space-y-4">
                                     {recentMatches.map(match => (
-                                         <div key={match.id} className="bg-dark-700 p-3 rounded">
-                                             <p>vs {match.opponent} ({match.game}) - <span className={match.result === 'Win' ? 'text-green-400' : 'text-red-400'}>{match.result}</span> ({match.score})</p>
-                                             <p className="text-xs text-gray-500">{match.date}</p>
+                                         <div key={match.id} className="bg-dark-700 p-3 rounded-lg border border-dark-600">
+                                             <div className="flex justify-between items-start">
+                                                <div>
+                                                    <p className="text-xs text-gray-400">{match.game} - {match.tournamentName}</p>
+                                                    <p className="font-medium text-white">
+                                                        Team: <span className="text-primary-300">{match.teamName}</span>
+                                                    </p>
+                                                </div>
+                                                <p className="text-xs text-gray-500">{new Date(match.date).toLocaleDateString()}</p>
+                                             </div>
+                                             <div className="flex gap-4 mt-2 pt-2 border-t border-dark-600">
+                                                <p className="text-sm">
+                                                    Placement: <span className="text-primary-400 font-bold text-base">#{match.placement}</span>
+                                                </p>
+                                                <p className="text-sm">
+                                                    Kills: <span className="text-red-400 font-bold text-base">{match.kills}</span>
+                                                </p>
+                                             </div>
                                          </div>
                                     ))}
                                 </div>
-                             ) : ( <p className="text-gray-400">No recent match history.</p> )}
+                             ) : ( <p className="text-gray-400 text-center py-4">No recent match history from tournaments.</p> )}
                             {recentMatches.length > 0 && profile.username && ( <div className="text-center mt-4"> <Link to={`/profile/${profile.username}/matches`} className="text-primary-400 hover:text-primary-300 text-sm font-medium"> View All Matches </Link> </div> )}
                         </AnimatedSection>
 
-                        {/* Teams Section */}
+                        {/* --- UPDATED: Teams Section --- */}
                         <AnimatedSection tag="div" className="card bg-dark-800 p-6 rounded-xl shadow-lg" delay={300}>
                             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 border-b border-dark-700 pb-3">
                                 <h2 className="text-2xl font-bold text-primary-300 mb-3 sm:mb-0">Teams</h2>
@@ -354,27 +512,43 @@ export default function ProfilePage() {
                                     <AnimatedSection key={team.id} tag="div" className="bg-dark-900 border border-dark-700 rounded-lg p-4 hover:border-primary-500/50 transition-colors" delay={index * 50}>
                                     <div className="flex items-center justify-between">
                                         <div className="flex items-center">
-                                        <img src={team.logo} alt={`${team.name} logo`} className="w-10 h-10 rounded-md mr-4 border border-dark-600"/>
+                                        <img src={team.logo_url || '/images/placeholder_team.png'} alt={`${team.name} logo`} className="w-10 h-10 rounded-md mr-4 border border-dark-600 object-cover"/>
                                         <div>
                                             <Link to={`/team/${team.id}`} className="font-semibold hover:text-primary-400 transition-colors">{team.name}</Link>
                                             <p className="text-sm text-gray-400">{team.game}</p>
                                         </div>
                                         </div>
-                                        <span className="text-sm bg-primary-700 text-primary-100 px-2 py-1 rounded-full">{team.role}</span>
+                                        <span className={`text-sm px-2 py-1 rounded-full font-medium ${team.role === 'Owner' ? 'bg-yellow-600/20 text-yellow-300' : 'bg-primary-700 text-primary-100'}`}>{team.role}</span>
                                     </div>
                                     </AnimatedSection>
                                 ))}
                                 </div>
                             ) : (
-                                <p className="text-gray-400 text-center py-4">{isOwnProfile ? 'You are not' : 'This user is not'} currently part of any teams.</p>
+                                <p className="text-gray-400 text-center py-4">{isOwnProfile ? 'You have not' : 'This user has not'} created or joined any teams.</p>
                             )}
                         </AnimatedSection>
 
 
-                         {/* Game Profiles */}
+                         {/* --- UPDATED: Game Profiles --- */}
                         <AnimatedSection tag="div" className="card bg-dark-800 p-6 rounded-xl shadow-lg" delay={400}>
                             <h2 className="text-2xl font-bold mb-6 text-primary-300 flex items-center"><Gamepad2 size={20} className="mr-2"/> Game Profiles</h2>
-                            <p className="text-gray-400">In-game names and IDs will be displayed here.</p>
+                            {profile.gameDetails && Object.keys(profile.gameDetails).length > 0 && Object.values(profile.gameDetails).some(d => d.ign || d.uid) ? (
+                                <div className="space-y-4">
+                                    {Object.entries(profile.gameDetails).map(([game, details]) => (
+                                        (details.ign || details.uid) && ( // Only show if there is data
+                                            <div key={game} className="bg-dark-900 border border-dark-700 rounded-lg p-3">
+                                                <p className="font-semibold text-primary-400 text-base">{game}</p>
+                                                <div className="pl-2 space-y-1 mt-1">
+                                                    {details.ign && <p className="text-sm text-gray-300">IGN: <span className="font-medium text-white">{details.ign}</span></p>}
+                                                    {details.uid && <p className="text-sm text-gray-300">UID: <span className="font-medium text-white">{details.uid}</span></p>}
+                                                </div>
+                                            </div>
+                                        )
+                                    ))}
+                                </div>
+                            ) : (
+                                <p className="text-gray-400 text-sm italic text-center py-2">No in-game profiles added. {isOwnProfile && <Link to="/edit-profile" className="text-primary-400 hover:underline">Add them now</Link>}</p>
+                            )}
                         </AnimatedSection>
                     </div>
 
@@ -393,11 +567,21 @@ export default function ProfilePage() {
                         <AnimatedSection tag="div" className="card bg-dark-800 p-6 rounded-xl shadow-lg" delay={600}>
                            <h2 className="text-xl font-bold mb-4 text-primary-300">Social Links</h2>
                            <p className="text-gray-400 text-sm">Social media links will appear here.</p>
+                           {/* TODO: Render profile.socialLinks */}
                         </AnimatedSection>
-                         {/* Game Stats (Placeholder) */}
+                         {/* --- UPDATED: Game Stats (Sidebar) --- */}
                         <AnimatedSection tag="div" className="card bg-dark-800 p-6 rounded-xl shadow-lg" delay={700}>
-                             <h2 className="text-xl font-bold mb-4 text-primary-300">Game Statistics</h2>
-                             <p className="text-gray-400 text-sm">Overall game statistics will appear here.</p>
+                             <h2 className="text-xl font-bold mb-4 text-primary-300">Tournament Statistics</h2>
+                             {gameStats ? (
+                                <div className="space-y-3 text-sm">
+                                    <p className="flex items-center justify-between"><span className="text-gray-400 flex items-center"><BarChart size={14} className="mr-1.5"/>Total Matches:</span> <span className="font-bold text-lg text-white">{gameStats.totalMatches}</span></p>
+                                    <p className="flex items-center justify-between"><span className="text-gray-400 flex items-center"><Trophy size={14} className="mr-1.5"/>Total Wins:</span> <span className="font-bold text-lg text-green-400">{gameStats.totalWins}</span></p>
+                                    <p className="flex items-center justify-between"><span className="text-gray-400 flex items-center"><Crosshair size={14} className="mr-1.5"/>Total Kills:</span> <span className="font-bold text-lg text-red-400">{gameStats.totalKills}</span></p>
+                                    <p className="flex items-center justify-between"><span className="text-gray-400 flex items-center"><Percent size={14} className="mr-1.5"/>Avg. Placement:</span> <span className="font-bold text-lg text-blue-400">#{gameStats.avgPlacement}</span></p>
+                                </div>
+                            ) : (
+                                <p className="text-gray-400 text-sm italic text-center py-2">No tournament statistics found.</p>
+                            )}
                         </AnimatedSection>
                     </div>
                 </div>

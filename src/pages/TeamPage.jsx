@@ -4,11 +4,97 @@ import React, { useState, useEffect } from 'react';
 import { Link, useParams, Navigate } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
 import { useAuth } from '../contexts/AuthContext.jsx';
-// Added Heart and ClockIcon icons
+// Added/changed icons: Heart, Clock, BarChart, Crosshair, Percent, User, LogOut, CheckCircle
 import {
-    Users, Trophy, Calendar, MapPin, Star, Mail, UserPlus, Settings, BarChart, Percent, Crosshair, Loader2, AlertCircle, Gamepad2, User, UserX, LogOut, Heart, Clock as ClockIcon
+    Users, Trophy, Calendar, MapPin, Star, Mail, UserPlus, Settings, BarChart, Percent, Crosshair, Loader2, AlertCircle, Gamepad2, User, UserX, LogOut, Heart, Clock as ClockIcon, CheckCircle
 } from 'lucide-react';
 import AnimatedSection from '../components/AnimatedSection';
+
+// --- NEW: Helper function to fetch team stats, matches, and events ---
+const fetchTeamPerformance = async (teamId) => {
+    if (!teamId) return { stats: null, recentMatches: [], upcomingEvents: [] };
+
+    try {
+        // 1. Get all participant records for this team
+        const { data: participantRecords, error: pError } = await supabase
+            .from('tournament_participants')
+            .select('id, team_name, tournaments!inner(id, name, game, start_date, status)') // inner join to only get participants in tournaments
+            .eq('team_id', teamId);
+        
+        if (pError) throw pError;
+        if (!participantRecords || participantRecords.length === 0) {
+            console.log("No participant records found for team:", teamId);
+            return { stats: null, recentMatches: [], upcomingEvents: [] };
+        }
+
+        const participantIds = participantRecords.map(p => p.id);
+
+        // 2. Fetch all match results for these participant records
+        const { data: results, error: resultsError } = await supabase
+            .from('match_results')
+            .select('id, created_at, placement, kills, participant_id')
+            .in('participant_id', participantIds)
+            .order('created_at', { ascending: false });
+
+        if (resultsError) throw resultsError;
+        
+        const allResults = results || [];
+
+        // 3. Calculate Stats
+        let totalKills = 0;
+        let totalPlacementSum = 0;
+        let totalWins = 0;
+        allResults.forEach(r => {
+            totalKills += r.kills || 0;
+            totalPlacementSum += r.placement || 0;
+            if (r.placement === 1) totalWins++;
+        });
+        
+        const totalMatches = allResults.length;
+        const totalLosses = totalMatches - totalWins;
+        const stats = {
+            totalMatches: totalMatches,
+            totalWins: totalWins,
+            totalLosses: totalLosses,
+            totalKills: totalKills,
+            winRate: totalMatches > 0 ? Math.round((totalWins / totalMatches) * 100) : 0,
+            avgPlacement: totalMatches > 0 ? (totalPlacementSum / totalMatches).toFixed(1) : 0,
+        };
+
+        // 4. Format Recent Matches (Top 5)
+        const recentMatches = allResults.slice(0, 5).map(r => {
+            const participant = participantRecords.find(p => p.id === r.participant_id);
+            return {
+                id: r.id,
+                game: participant?.tournaments?.game || 'Unknown Game',
+                tournamentName: participant?.tournaments?.name || 'Unknown Tournament',
+                placement: r.placement,
+                kills: r.kills,
+                date: r.created_at
+            };
+        });
+
+        // 5. Format Upcoming Events
+        const upcomingEvents = participantRecords
+            .filter(p => p.tournaments.status === 'Draft' || p.tournaments.status === 'In Progress')
+            .map(p => ({
+                id: p.tournaments.id,
+                name: p.tournaments.name,
+                startDate: p.tournaments.start_date
+            }))
+            // De-duplicate events
+            .filter((event, index, self) => self.findIndex(e => e.id === event.id) === index)
+            .sort((a, b) => new Date(a.startDate) - new Date(b.startDate));
+
+
+        return { stats, recentMatches, upcomingEvents };
+
+    } catch (error) {
+        console.error("Error in fetchTeamPerformance:", error.message);
+        return { stats: null, recentMatches: [], upcomingEvents: [] };
+    }
+};
+// ---
 
 export default function TeamPage() {
     const { teamId } = useParams();
@@ -32,6 +118,12 @@ export default function TeamPage() {
     const [joinRequestError, setJoinRequestError] = useState(null);
     // ---
 
+    // --- NEW: State for dynamic data ---
+    const [teamStats, setTeamStats] = useState(null);
+    const [recentMatches, setRecentMatches] = useState([]);
+    const [upcomingEvents, setUpcomingEvents] = useState([]);
+    // ---
+
     // --- Fetch Team Data, Members, Like Status, and Join Request Status ---
     useEffect(() => {
         let isMounted = true;
@@ -46,6 +138,9 @@ export default function TeamPage() {
             if (!isMounted) return;
             setLoading(true); setError(null); setLikeError(null);
             setJoinRequestError(null); setHasPendingRequest(false); setHasLiked(false); // Reset all relevant states
+            // --- NEW: Reset dynamic state ---
+            setTeamStats(null); setRecentMatches([]); setUpcomingEvents([]);
+            // ---
 
             console.log(`TeamPage: Fetching data for team ID: ${numericTeamId}`);
 
@@ -71,11 +166,12 @@ export default function TeamPage() {
                 setIsOwner(ownerCheck);
 
                 // Fetch members
+                // --- UPDATED: Fetch all profile data (*) for members ---
                 const { data: membersResult, error: membersError } = await supabase
                     .from('team_members')
                     .select(`
-                        *, impact_score, win_share, accuracy,
-                        profiles ( id, username, avatar_url, game_details )
+                        *,
+                        profiles ( * )
                     `)
                     .eq('team_id', numericTeamId).order('joined_at');
                 if (membersError) throw membersError;
@@ -86,6 +182,15 @@ export default function TeamPage() {
                 // Check membership
                 const memberCheck = authUser && membersResult?.some(m => m.user_id === authUser.id);
                 setIsMember(memberCheck);
+
+                // --- NEW: Fetch Stats, Matches, and Events ---
+                const { stats, recentMatches, upcomingEvents } = await fetchTeamPerformance(numericTeamId);
+                if (isMounted) {
+                    setTeamStats(stats);
+                    setRecentMatches(recentMatches);
+                    setUpcomingEvents(upcomingEvents);
+                }
+                // ---
 
                 // --- Fetch Like & Join Request Status (only if logged in and not owner/member) ---
                 if (authUser && !ownerCheck && !memberCheck) {
@@ -114,17 +219,12 @@ export default function TeamPage() {
                 }
                 // --- End Status Fetches ---
 
-                // Placeholders
+                // Placeholders (Only achievements left)
                 if(isMounted){
                     setTeamData(prev => ({
                         ...(prev || {}),
-                         recentMatches: prev?.recentMatches || [
-                              { id: 1, opponent: 'Rival Team', result: 'Win', score: '16-12', date: '2025-10-14', duration: '45 min' },
-                         ],
                          achievements: prev?.achievements || [
                               { title: 'Local Champions', description: 'Won City League 2024', icon: Trophy, date: '2024-12-15' },
-                              { title: 'Bronze Scrims', description: 'Top 3 placement in weekly scrims', icon: Trophy, date: '2025-01-22' },
-                              { title: 'Rising Star', description: 'Most Improved Team Award 2025', icon: Star, date: '2025-09-01' },
                          ]
                     }));
                 }
@@ -242,9 +342,8 @@ export default function TeamPage() {
      if (!teamData) { return <Navigate to="/players?view=teams" replace />; } // Redirect if no team data after loading
 
     // --- Calculations ---
-    const winRate = 0; // Placeholder
     const teamGame = teamData.game;
-    const currentLikes = teamData.likes ?? 0; // Use fetched likes count
+    const currentLikes = teamData.likes ?? 0;
 
     return (
         <div className="bg-gradient-to-br from-dark-900 via-dark-800 to-primary-900 text-white min-h-screen relative overflow-hidden z-10">
@@ -325,12 +424,18 @@ export default function TeamPage() {
                      <div className="lg:col-span-2 space-y-8 lg:space-y-10">
                         {/* Team Stats Overview */}
                         <AnimatedSection delay={100} className="card bg-dark-800 p-5 rounded-xl shadow-lg">
-                           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
-                                <div><div className="text-3xl font-bold text-primary-400">#?</div><div className="text-gray-400 text-xs uppercase tracking-wider">Rank</div></div>
-                                <div><div className="text-3xl font-bold text-green-400">0</div><div className="text-gray-400 text-xs uppercase tracking-wider">Wins</div></div>
-                                <div><div className="text-3xl font-bold text-red-400">0</div><div className="text-gray-400 text-xs uppercase tracking-wider">Losses</div></div>
-                                <div><div className="text-3xl font-bold text-blue-400">{winRate}%</div><div className="text-gray-400 text-xs uppercase tracking-wider">Win Rate</div></div>
-                            </div>
+                           {/* --- UPDATED: "Quick Stats" is now "Overall Stats" --- */}
+                           <h2 className="text-2xl font-bold text-primary-300 mb-4">Overall Stats</h2>
+                           {teamStats ? (
+                               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
+                                    <div><div className="text-3xl font-bold text-blue-400">{teamStats.totalMatches}</div><div className="text-gray-400 text-xs uppercase tracking-wider">Matches</div></div>
+                                    <div><div className="text-3xl font-bold text-green-400">{teamStats.totalWins}</div><div className="text-gray-400 text-xs uppercase tracking-wider">Wins</div></div>
+                                    <div><div className="text-3xl font-bold text-red-400">{teamStats.totalKills}</div><div className="text-gray-400 text-xs uppercase tracking-wider">Kills</div></div>
+                                    <div><div className="text-3xl font-bold text-blue-400">{teamStats.winRate}%</div><div className="text-gray-400 text-xs uppercase tracking-wider">Win Rate</div></div>
+                                </div>
+                           ) : (
+                                <p className="text-gray-500 text-center text-sm py-2">No tournament stats recorded yet.</p>
+                           )}
                         </AnimatedSection>
 
                         {/* Team Description */}
@@ -342,19 +447,66 @@ export default function TeamPage() {
                              {members.length > 0 ? (
                                  <div className="space-y-5">
                                      {members.map((member, index) => {
-                                         const memberGameDetails = member.profiles?.game_details?.[teamGame];
-                                         const memberStats = { impactScore: member.impact_score ?? 0, winShare: member.win_share ?? 0.0, accuracy: member.accuracy ?? 0.0 };
-                                         const profileUsername = member.profiles?.username;
+                                         // --- UPDATED: Get IGN/UID and Profile Stats ---
+                                         const profile = member.profiles;
+                                         if (!profile) return null; // Skip if profile is missing
+
+                                         const memberGameDetails = profile.game_details?.[teamGame];
+                                         const memberWins = profile.total_wins ?? 0;
+                                         const memberLosses = profile.total_losses ?? 0;
+                                         const memberTotal = memberWins + memberLosses;
+                                         const memberWinRate = memberTotal > 0 ? Math.round((memberWins / memberTotal) * 100) : 0;
+                                         // ---
+                                         
                                          return (
                                              <AnimatedSection key={member.user_id || index} delay={index * 50} className="bg-dark-700/50 rounded-lg p-4 transition-all duration-300 hover:bg-dark-700/80 border border-dark-600 hover:border-primary-600/50">
-                                                 <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mb-4">
-                                                     {profileUsername ? ( <Link to={`/profile/${profileUsername}`} className="flex items-center flex-grow w-full sm:w-auto group"> <img src={member.profiles?.avatar_url || '/images/placeholder_player.png'} alt={profileUsername} className="w-12 h-12 rounded-full mr-4 border border-primary-500/50 flex-shrink-0 object-cover group-hover:ring-2 group-hover:ring-primary-400 transition-all" /> <div> <span className="font-semibold text-lg text-white group-hover:text-primary-300 transition-colors block">{profileUsername}</span> <span className="text-primary-400 font-medium text-sm block">{member.role}</span> </div> </Link> ) : ( <div className="flex items-center flex-grow w-full sm:w-auto"> <img src={'/images/placeholder_player.png'} alt="User Avatar" className="w-12 h-12 rounded-full mr-4 border border-primary-500/50 flex-shrink-0 object-cover" /> <div> <span className="font-semibold text-lg text-white block">{'Unknown User'}</span> <span className="text-primary-400 font-medium text-sm block">{member.role}</span> </div> </div> )}
-                                                     <div className="text-right text-xs text-gray-400 flex-shrink-0 mt-2 sm:mt-0 w-full sm:w-auto"> <p>Joined: {new Date(member.joined_at).toLocaleDateString()}</p> </div>
+                                                 <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-3">
+                                                     <Link to={`/profile/${profile.username}`} className="flex items-center flex-grow w-full sm:w-auto group">
+                                                         <img src={profile.avatar_url || '/images/placeholder_player.png'} alt={profile.username} className="w-12 h-12 rounded-full mr-4 border border-primary-500/50 flex-shrink-0 object-cover group-hover:ring-2 group-hover:ring-primary-400 transition-all" />
+                                                         <div>
+                                                             <span className="font-semibold text-lg text-white group-hover:text-primary-300 transition-colors block">{profile.username}</span>
+                                                             <span className="text-primary-400 font-medium text-sm block">{member.role}</span>
+                                                         </div>
+                                                     </Link>
+                                                     
+                                                     <div className="text-left sm:text-right text-sm w-full sm:w-auto flex-shrink-0">
+                                                        <p className="text-xs text-gray-500">Joined: {new Date(member.joined_at).toLocaleDateString()}</p>
+                                                     </div>
                                                  </div>
-                                                 {/* Game Details */}
-                                                 {(memberGameDetails && (memberGameDetails.ign || memberGameDetails.uid)) ? ( <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 text-sm mb-4 border-t border-dark-600/50 pt-3"> {memberGameDetails.ign && ( <div className="flex items-center text-gray-300" title={`${teamGame} In-Game Name`}> <Gamepad2 size={14} className="mr-2 text-primary-400 flex-shrink-0"/> <span className="truncate">{memberGameDetails.ign}</span> </div> )} {memberGameDetails.uid && ( <div className="flex items-center text-gray-300" title={`${teamGame} User ID`}> <User size={14} className="mr-2 text-primary-400 flex-shrink-0"/> <span className="truncate">{memberGameDetails.uid}</span> </div> )} </div> ) : ( <div className="text-xs text-gray-500 italic mb-4 border-t border-dark-600/50 pt-3"> No {teamGame} profile data added by this user. </div> )}
-                                                 {/* Stats */}
-                                                 <div className={`grid grid-cols-3 gap-2 text-sm ${ (memberGameDetails && (memberGameDetails.ign || memberGameDetails.uid)) ? 'pt-3 border-t border-dark-600/50' : ''}`}> <div className="text-center"> <div className="font-semibold text-xl text-green-400">{memberStats.impactScore}</div> <div className="text-gray-400 uppercase tracking-wider text-xs flex items-center justify-center"><BarChart size={12} className="mr-1"/>Impact</div> </div> <div className="text-center"> <div className="font-semibold text-xl text-blue-400">{(memberStats.winShare * 100).toFixed(1)}%</div> <div className="text-gray-400 uppercase tracking-wider text-xs flex items-center justify-center"><Percent size={12} className="mr-1"/>Win Share</div> </div> <div className="text-center"> <div className="font-semibold text-xl text-yellow-400">{(memberStats.accuracy * 100).toFixed(1)}%</div> <div className="text-gray-400 uppercase tracking-wider text-xs flex items-center justify-center"><Crosshair size={12} className="mr-1"/>Accuracy</div> </div> </div>
+                                                 
+                                                 {/* --- REPLACEMENT: Show IGN/UID and Personal Stats --- */}
+                                                 <div className="space-y-2 border-t border-dark-600 pt-3">
+                                                     {(memberGameDetails?.ign || memberGameDetails?.uid) ? (
+                                                        <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+                                                            {memberGameDetails.ign && (
+                                                                <div className="flex items-center text-gray-300" title={`${teamGame} In-Game Name`}> <Gamepad2 size={14} className="mr-1.5 text-primary-400 flex-shrink-0"/> <span className="font-medium">{memberGameDetails.ign}</span> </div>
+                                                            )}
+                                                            {memberGameDetails.uid && (
+                                                                <div className="flex items-center text-gray-300" title={`${teamGame} User ID`}> <User size={14} className="mr-1.5 text-primary-400 flex-shrink-0"/> <span className="font-medium">{memberGameDetails.uid}</span> </div>
+                                                            )}
+                                                        </div>
+                                                     ) : (
+                                                        <p className="text-gray-500 italic text-sm">No {teamGame} IGN/UID provided.</p>
+                                                     )}
+                                                     
+                                                     {/* Personal Profile Stats */}
+                                                     <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm pt-2 border-t border-dark-600/50">
+                                                        <div className="flex items-center text-gray-300" title="Personal Profile Win Rate">
+                                                            <BarChart size={14} className="mr-1.5 text-blue-400"/>
+                                                            <span className="font-bold text-blue-400">{memberWinRate}%</span>&nbsp;Win Rate
+                                                        </div>
+                                                        <div className="flex items-center text-gray-300" title="Personal Profile Wins">
+                                                            <Trophy size={14} className="mr-1.5 text-green-400"/>
+                                                            <span className="font-bold text-green-400">{memberWins}</span>&nbsp;Wins
+                                                        </div>
+                                                        <div className="flex items-center text-gray-300" title="Personal Profile Losses">
+                                                            <UserX size={14} className="mr-1.5 text-red-400"/>
+                                                            <span className="font-bold text-red-400">{memberLosses}</span>&nbsp;Losses
+                                                        </div>
+                                                     </div>
+                                                 </div>
+                                                 {/* --- End Replacement --- */}
+
                                              </AnimatedSection>
                                          );
                                      })}
@@ -362,37 +514,57 @@ export default function TeamPage() {
                              ) : ( <p className="text-gray-400 text-center py-4">This team has no members yet (besides the owner).</p> )}
                          </AnimatedSection>
 
-                         {/* Recent Matches */}
-                         {teamData.recentMatches && teamData.recentMatches.length > 0 && (
-                            <AnimatedSection delay={300} className="card bg-dark-800 p-6 rounded-xl shadow-lg">
-                                <h2 className="text-2xl font-bold mb-6 text-primary-300 border-b border-dark-700 pb-3">Recent Matches</h2>
-                                <div className="space-y-4">
-                                    {teamData.recentMatches.map((match, index) => (
-                                        <div key={match.id || index} className="bg-dark-700/50 p-3 rounded">
-                                            <p className='text-gray-200'>vs <span className='font-semibold'>{match.opponent}</span> - <span className={`font-bold ${match.result === 'Win' ? 'text-green-400' : 'text-red-400'}`}>{match.result}</span> ({match.score})</p>
-                                            <p className="text-xs text-gray-400">{match.date} ({match.duration})</p>
-                                        </div>
-                                    ))}
-                                </div>
-                            </AnimatedSection>
-                         )}
+                         {/* --- UPDATED: Recent Matches --- */}
+                         <AnimatedSection delay={300} className="card bg-dark-800 p-6 rounded-xl shadow-lg">
+                             <h2 className="text-2xl font-bold mb-6 text-primary-300 border-b border-dark-700 pb-3">Recent Matches</h2>
+                             <div className="space-y-4">
+                                 {recentMatches.length > 0 ? (
+                                     recentMatches.map((match, index) => (
+                                         <div key={match.id || index} className="bg-dark-700/50 p-3 rounded-lg border border-dark-600">
+                                            <div className="flex justify-between items-center mb-2">
+                                                <p className="text-xs text-gray-400">{match.game} - <span className="font-semibold">{match.tournamentName}</span></p>
+                                                <p className="text-xs text-gray-500">{new Date(match.date).toLocaleDateString()}</p>
+                                            </div>
+                                            <div className="flex gap-4">
+                                                <p className="text-sm">
+                                                    Result: <span className={`font-bold text-lg ${match.placement === 1 ? 'text-green-400' : 'text-primary-400'}`}>
+                                                        {match.placement === 1 ? 'Win' : `#${match.placement}`}
+                                                    </span>
+                                                </p>
+                                                <p className="text-sm">
+                                                    Kills: <span className="font-bold text-lg text-red-400">{match.kills}</span>
+                                                </p>
+                                            </div>
+                                         </div>
+                                     ))
+                                 ) : (
+                                    <p className="text-gray-500 text-center py-2">No recent matches found.</p>
+                                 )}
+                             </div>
+                         </AnimatedSection>
+
                      </div> {/* End Left Column */}
 
                      {/* Right Column */}
                      <div className="space-y-8 lg:sticky lg:top-24 self-start">
-                         {/* Quick Stats */}
-                         <AnimatedSection delay={400} className="card bg-dark-800 p-6 rounded-xl shadow-lg">
-                              <h2 className="text-xl font-bold mb-4 text-primary-300 border-b border-dark-700 pb-2">Quick Stats</h2>
-                              <div className="space-y-3 text-base"> {/* Placeholder */}
-                                <p>Stat 1: Value</p>
-                                <p>Stat 2: Value</p>
-                              </div>
-                         </AnimatedSection>
-                         {/* Upcoming Events */}
+                         
+                         {/* --- UPDATED: Upcoming Events --- */}
                          <AnimatedSection delay={500} className="card bg-dark-800 p-6 rounded-xl shadow-lg">
                              <h2 className="text-xl font-bold mb-4 text-primary-300 border-b border-dark-700 pb-2">Upcoming Events</h2>
-                             <div className="space-y-4"> <p className='text-sm text-gray-400 italic'>No upcoming events scheduled.</p> </div>
+                             <div className="space-y-3">
+                                {upcomingEvents.length > 0 ? (
+                                    upcomingEvents.map(event => (
+                                        <Link key={event.id} to={`/tournament/${event.id}`} className="block bg-dark-700/50 p-3 rounded-lg hover:bg-dark-700/80 border border-dark-600 hover:border-primary-600/50 transition-colors">
+                                            <p className="font-semibold text-white group-hover:text-primary-300">{event.name}</p>
+                                            <p className="text-sm text-gray-400">Starts: {new Date(event.startDate).toLocaleDateString()}</p>
+                                        </Link>
+                                    ))
+                                ) : (
+                                    <p className='text-sm text-gray-400 italic text-center py-2'>No upcoming events scheduled.</p>
+                                )}
+                             </div>
                          </AnimatedSection>
+
                           {/* Team Owner */}
                          {teamData.owner && (
                               <AnimatedSection delay={550} className="card bg-dark-800 p-6 rounded-xl shadow-lg">
