@@ -3,7 +3,7 @@
 import {
     Trophy, Calendar, Users, MapPin, DollarSign, Clock, Star, UserPlus,
     Tv, ListChecks, Info, ChevronRight, CheckCircle, User, Gamepad2, FileText, Eye,
-    ArrowLeft, Loader2, AlertCircle, X, XCircle, UserCheck // Added new icons
+    ArrowLeft, Loader2, AlertCircle, X, XCircle, UserCheck
 } from 'lucide-react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import AnimatedSection from '../components/AnimatedSection';
@@ -12,7 +12,7 @@ import { supabase } from '../lib/supabaseClient'; // --- IMPORT SUPABASE ---
 import { useAuth } from '../contexts/AuthContext'; // --- IMPORT AUTH ---
 
 
-// --- NEW: Custom Modal Component (for alerts) ---
+// --- Custom Modal Component (for alerts) ---
 const CustomModal = ({ isOpen, onClose, title, children, confirmText = 'OK', onConfirm, showCancel = false, isLoading = false }) => {
     if (!isOpen) return null;
 
@@ -54,12 +54,15 @@ export default function TournamentDetailsPage() {
 
     // --- Data States ---
     const [tournament, setTournament] = useState(null);
+    const [allTournamentParticipants, setAllTournamentParticipants] = useState([]); // <-- NEW: List of all teams in tourney
     const [participantCount, setParticipantCount] = useState(0);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const [userTeam, setUserTeam] = useState(null);
-    const [teamMemberCount, setTeamMemberCount] = useState(0);
-    const [isRegistered, setIsRegistered] = useState(false);
+    
+    // --- User-specific States ---
+    const [isRegistered, setIsRegistered] = useState(false); // True if *any* of user's teams are in
+    const [eligibleTeams, setEligibleTeams] = useState([]); // User's owned teams that can join
+    const [selectedTeamId, setSelectedTeamId] = useState(''); // Team selected from dropdown
 
     // --- UI States ---
     const [joinState, setJoinState] = useState('LOADING'); // LOADING, READY, DISABLED, JOINED
@@ -69,165 +72,220 @@ export default function TournamentDetailsPage() {
 
     // --- Data Fetching Effect ---
     useEffect(() => {
+        let isMounted = true;
         const fetchTournamentData = async () => {
             if (!tournamentId) {
-                setError("No tournament ID provided.");
-                setLoading(false);
+                if (isMounted) setError("No tournament ID provided.");
+                if (isMounted) setLoading(false);
                 return;
             }
 
-            setLoading(true);
-            setError(null);
-            let teamData = null;
-            let memberCount = 0;
-            let registered = false;
+            if (isMounted) setLoading(true);
+            if (isMounted) setError(null);
+            let tournamentData = null;
+            let participants = [];
+            // --- *** FIX: Removed parseInt *** ---
+            // const numericTournamentId = parseInt(tournamentId, 10); // <--- REMOVED
+            // Use `tournamentId` (string) directly from useParams
+            // --- *** END FIX *** ---
 
             try {
                 // 1. Fetch tournament details
-                const { data: tournamentData, error: tournamentError } = await supabase
+                const { data: tourneyData, error: tournamentError } = await supabase
                     .from('tournaments')
                     .select('*')
-                    .eq('id', tournamentId)
+                    .eq('id', tournamentId) // <-- Use string tournamentId
                     .single();
 
                 if (tournamentError) throw tournamentError;
-                if (!tournamentData) throw new Error("Tournament not found.");
-                setTournament(tournamentData);
+                if (!tourneyData) throw new Error("Tournament not found.");
+                if (isMounted) setTournament(tourneyData);
+                tournamentData = tourneyData;
 
-                // 2. Fetch participant count
-                const { count, error: countError } = await supabase
+                // 2. Fetch ALL participants for this tournament
+                const { data: participantData, error: countError } = await supabase
                     .from('tournament_participants')
-                    .select('id', { count: 'exact', head: true })
-                    .eq('tournament_id', tournamentId);
+                    .select('id, team_id, captain_id')
+                    .eq('tournament_id', tournamentId); // <-- Use string tournamentId
 
                 if (countError) throw countError;
-                setParticipantCount(count || 0);
-
-                // 3. (If user is logged in) Fetch user's team, member count, and registration status
-                if (user) {
-                    // 3a. Find team where user is owner
-                    // *** UPDATED QUERY to select * to match ManageTeamPage.jsx ***
-                    const { data: teamFetchData, error: teamError } = await supabase
-                        .from('teams')
-                        .select('*') // Use '*' to satisfy RLS and get all team data
-                        .eq('owner_id', user.id)
-                        .single();
-
-                    if (teamError && teamError.code !== 'PGRST116') { // Ignore "no rows found"
-                        console.error("Error fetching team:", teamError.message);
-                        throw teamError;
-                    }
-
-                    if (teamFetchData) {
-                        setUserTeam(teamFetchData);
-                        teamData = teamFetchData;
-
-                        // 3b. Get team member count (add 1 for the owner)
-                        const { count: memberCountData, error: memberError } = await supabase
-                            .from('team_members')
-                            .select('id', { count: 'exact', head: true })
-                            .eq('team_id', teamFetchData.id);
-
-                        if (memberError) throw memberError;
-                        const totalMembers = (memberCountData || 0) + 1; // +1 for the owner
-                        setTeamMemberCount(totalMembers);
-                        memberCount = totalMembers;
-
-                        // 3c. Check if this team is already registered
-                        const { data: registrationData, error: regError } = await supabase
-                            .from('tournament_participants')
-                            .select('id')
-                            .eq('tournament_id', tournamentId)
-                            .eq('captain_id', user.id) // Check if user (as captain) is registered
-                            .maybeSingle();
-
-                        if (regError) throw regError;
-
-                        if (registrationData) {
-                            setIsRegistered(true);
-                            registered = true;
-                        }
-                    }
+                participants = participantData || [];
+                if (isMounted) {
+                    setAllTournamentParticipants(participants);
+                    setParticipantCount(participants.length);
                 }
 
-                // 4. Update the Join Button state based on all fetched data
-                updateJoinButtonState(tournamentData, count, teamData, memberCount, registered);
-
             } catch (err) {
-                console.error("Error fetching tournament details:", err.message);
-                setError(err.message);
-            } finally {
-                setLoading(false);
+                console.error("Error fetching tournament data:", err.message);
+                if (isMounted) setError(err.message);
+                if (isMounted) setLoading(false);
+                return; // Stop if tournament fetch fails
+            }
+
+            // 3. (If user is logged in) Fetch user's team data
+            if (user && isMounted) {
+                try {
+                    // 3a. Get all user's team IDs (owned & member)
+                    const { data: ownedTeamsData, error: ownedErr } = await supabase.from('teams').select('id, name, game, logo_url, owner_id').eq('owner_id', user.id);
+                    const { data: memberTeams, error: memberErr } = await supabase.from('team_members').select('team_id').eq('user_id', user.id);
+                    if (ownedErr) throw ownedErr;
+                    if (memberErr) throw memberErr;
+
+                    const ownedTeams = ownedTeamsData || [];
+                    const ownedTeamIds = ownedTeams.map(t => t.id);
+                    const memberTeamIds = memberTeams ? memberTeams.map(t => t.team_id) : [];
+                    const allUserTeamIds = [...new Set([...ownedTeamIds, ...memberTeamIds])];
+                    
+                    // 3b. Check if ANY of these teams are already registered
+                    const registeredTeam = participants.find(p => allUserTeamIds.includes(p.team_id));
+                    
+                    if (registeredTeam) {
+                        if (isMounted) {
+                            setIsRegistered(true);
+                            setJoinState('JOINED');
+                            setJoinMessage('Team Already Joined');
+                        }
+                    } else {
+                        // 3c. User is not registered, so find eligible *owned* teams
+                        if (isMounted) setIsRegistered(false);
+                        
+                        const teamsForGame = ownedTeams.filter(t => t.game === tournamentData.game);
+                        const isFull = participants.length >= tournamentData.max_participants;
+                        const isClosed = new Date() > new Date(tournamentData.registration_deadline);
+                        
+                        if (isFull) {
+                            setJoinState('DISABLED');
+                            setJoinMessage('Tournament Full');
+                        } else if (isClosed) {
+                            setJoinState('DISABLED');
+                            setJoinMessage('Registration Closed');
+                        } else if (teamsForGame.length === 0) {
+                            setJoinState('DISABLED');
+                            setJoinMessage(`You don't own a ${tournamentData.game} team.`);
+                        } else {
+                            // User has eligible teams, set up the dropdown
+                            setJoinState('READY');
+                            setJoinMessage('Select a team to join');
+                            setEligibleTeams(teamsForGame);
+                            setSelectedTeamId(teamsForGame[0].id.toString()); // Default to first team
+                        }
+                    }
+                } catch (err) {
+                    console.error("Error fetching user team data:", err.message);
+                    if (isMounted) setError(err.message);
+                } finally {
+                    if (isMounted) setLoading(false);
+                }
+            } else {
+                // No user, not loading
+                if (isMounted) setJoinState('DISABLED');
+                if (isMounted) setJoinMessage('Login to Join Tournament');
+                if (isMounted) setLoading(false);
             }
         };
 
         fetchTournamentData();
+
+        return () => { isMounted = false; }; // Cleanup
     }, [tournamentId, user]); // Re-run if user logs in or tournamentId changes
 
-    // --- Logic to determine join button state ---
-    const updateJoinButtonState = (tournamentData, currentCount, team, members, isAlreadyRegistered) => {
-        if (!tournamentData) return;
-
-        const isFull = currentCount >= tournamentData.max_participants;
-        const now = new Date();
-        const regDeadline = new Date(tournamentData.registration_deadline);
-
-        if (isAlreadyRegistered) {
-            setJoinState('JOINED');
-            setJoinMessage('Team Already Joined');
-        } else if (!user) {
-            setJoinState('DISABLED');
-            setJoinMessage('Login to Join Tournament');
-        } else if (isFull) {
-            setJoinState('DISABLED');
-            setJoinMessage('Tournament Full');
-        } else if (now > regDeadline) {
-            setJoinState('DISABLED');
-            setJoinMessage('Registration Closed');
-        } else if (!team) {
-            setJoinState('DISABLED');
-            setJoinMessage('Create a Team to Join');
-        } else if (members < 4) { // --- YOUR RULE: Min 4 members ---
-            setJoinState('DISABLED');
-            setJoinMessage(`Team needs 4+ members (has ${members})`);
-        } else {
-            setJoinState('READY');
-            setJoinMessage('Join Tournament');
-        }
-    };
 
     // --- Handle Join Button Click ---
     const handleJoinTournament = async () => {
-        if (joinState !== 'READY' || !user || !userTeam || !tournament) {
-            setAlertModal({ isOpen: true, title: "Error", message: "Cannot join tournament. Please refresh." });
+        if (joinState !== 'READY' || !user || !selectedTeamId || !tournament) {
+            setAlertModal({ isOpen: true, title: "Error", message: "Cannot join. Please select a team." });
             return;
         }
 
-        setIsJoining(true); // Show loading spinner on button
+        setIsJoining(true);
+        setJoinMessage('Validating team...');
+        setAlertModal({ isOpen: false }); // Close any previous error
 
-        const { error } = await supabase
-            .from('tournament_participants')
-            .insert({
-                tournament_id: tournament.id,
-                team_name: userTeam.name,        
-                team_logo_url: userTeam.logo_url,
-                captain_id: user.id,
-                team_id: userTeam.id             
-            });
+        const teamToJoin = eligibleTeams.find(t => t.id === Number(selectedTeamId));
+        if (!teamToJoin) {
+            setAlertModal({ isOpen: true, title: "Error", message: "Selected team not found." });
+            setIsJoining(false);
+            return;
+        }
 
-        setIsJoining(false);
+        try {
+            // --- Validation 1: Check Member Count ---
+            const { count: memberCount, error: memberCountError } = await supabase
+                .from('team_members')
+                .select('id', { count: 'exact', head: true })
+                .eq('team_id', teamToJoin.id);
+            
+            if (memberCountError) throw memberCountError;
+            
+            const totalMembers = (memberCount || 0) + 1; // +1 for owner
+            if (totalMembers < 4) { // --- YOUR RULE: Min 4 members ---
+                throw new Error(`Your team "${teamToJoin.name}" needs 4+ members (currently has ${totalMembers}).`);
+            }
 
-        if (error) {
-            console.error("Error joining tournament:", error.message);
-            setAlertModal({ isOpen: true, title: "Error Joining", message: error.message });
-        } else {
+            // --- Validation 2: Check for Player Conflicts ---
+            setJoinMessage('Checking for player conflicts...');
+            
+            // 2a. Get all user IDs from the team we want to register
+            const { data: selectedTeamMembers } = await supabase.from('team_members').select('user_id').eq('team_id', teamToJoin.id);
+            const selectedTeamUserIds = new Set((selectedTeamMembers || []).map(m => m.user_id));
+            selectedTeamUserIds.add(user.id); // Add the owner
+
+            // 2b. Get all user IDs *already* in the tournament
+            const participantTeamIds = allTournamentParticipants.map(p => p.team_id);
+            const participantCaptainIds = allTournamentParticipants.map(p => p.captain_id);
+            
+            let allRegisteredUserIds = new Set(participantCaptainIds);
+
+            if (participantTeamIds.length > 0) {
+                 const { data: participantMembers, error: pMemberError } = await supabase
+                    .from('team_members')
+                    .select('user_id')
+                    .in('team_id', participantTeamIds);
+                if (pMemberError) throw pMemberError;
+                (participantMembers || []).forEach(m => allRegisteredUserIds.add(m.user_id));
+            }
+           
+            // 2c. Find the conflict
+            const conflictId = [...selectedTeamUserIds].find(id => allRegisteredUserIds.has(id));
+
+            if (conflictId) {
+                const { data: conflictProfile } = await supabase.from('profiles').select('username').eq('id', conflictId).single();
+                throw new Error(`Join failed: Player "${conflictProfile?.username || conflictId}" (on your team) is already registered in this tournament.`);
+            }
+
+            // --- All Validations Passed, Proceed to Join ---
+            setJoinMessage('Joining tournament...');
+            const { data: newParticipant, error: insertError } = await supabase
+                .from('tournament_participants')
+                .insert({
+                    tournament_id: tournament.id,
+                    team_name: teamToJoin.name,        
+                    team_logo_url: teamToJoin.logo_url || null,
+                    captain_id: user.id,
+                    team_id: teamToJoin.id             
+                })
+                .select()
+                .single();
+
+            if (insertError) throw insertError;
+            
+            // Add new participant to local state
+            setAllTournamentParticipants(prev => [...prev, newParticipant]);
+
             // Success!
-            setAlertModal({ isOpen: true, title: "Success!", message: `Your team, ${userTeam.name}, has successfully joined the tournament.` });
-            // Update UI immediately
+            setAlertModal({ isOpen: true, title: "Success!", message: `Your team, ${teamToJoin.name}, has successfully joined the tournament.` });
             setJoinState('JOINED');
-            setJoinMessage('Successfully Joined!');
+            setJoinMessage('Team Already Joined');
             setParticipantCount(prev => prev + 1);
             setIsRegistered(true);
+
+        } catch (err) {
+            console.error("Error during join validation/insert:", err.message);
+            setAlertModal({ isOpen: true, title: "Join Failed", message: err.message });
+            setJoinState('READY'); // Reset button
+            setJoinMessage('Select a team to join');
+        } finally {
+            setIsJoining(false);
         }
     };
 
@@ -250,8 +308,7 @@ export default function TournamentDetailsPage() {
         );
     }
 
-    // --- Data processing for display (from your file) ---
-    // Using `prize_pool_amount` from the table
+    // --- Data processing for display ---
     const prizeDistribution = tournament.prize_pool_amount >= 5000
        ? [ { position: '1st Place', prize: '$2,500', percentage: '50%' }, { position: '2nd Place', prize: '$1,250', percentage: '25%' }, { position: '3rd Place', prize: '$750', percentage: '15%' }, { position: '4th Place', prize: '$500', percentage: '10%' } ]
        : [ { position: '1st Place', prize: 'R500', percentage: '50%' }, { position: '2nd Place', prize: 'R250', percentage: '25%' }, { position: '3rd Place', prize: 'R150', percentage: '15%' }, { position: '4th Place', prize: 'R100', percentage: '10%' } ];
@@ -279,23 +336,21 @@ export default function TournamentDetailsPage() {
     else if (new Date() > new Date(tournament.registration_deadline)) statusText = 'Registration Closed';
     else if (tournament.status === 'Draft' || tournament.status === 'Setup') statusText = 'Registration Open';
 
-    // --- *** NEW: Helper function to get game-specific banner *** ---
+    // --- Helper function to get game-specific banner ---
     const getGameBanner = (gameName) => {
         if (gameName === 'Free Fire') {
             return '/images/FF_ban.jpg';
         }
         if (gameName === 'Mobile Legends') {
-            return '/images/ml_ban.jpeg'; // Assuming this is the path
+            return '/images/ml_ban.jpeg';
         }
         if (gameName === 'Farlight 84') {
-            return '/images/far_ban.jpeg'; // Assuming this is the path
+            return '/images/far_ban.jpeg';
         }
-        // Default banner if no match or if `tournament.image` is null
         return tournament.image || '/images/lan_6.jpg'; 
     };
 
     const bannerUrl = getGameBanner(tournament.game);
-    // --- *** END NEW FUNCTION *** ---
 
 
     return (
@@ -315,9 +370,7 @@ export default function TournamentDetailsPage() {
 
                 {/* --- Hero Banner --- */}
                 <AnimatedSection delay={0} className="relative h-72 sm:h-96 w-full overflow-hidden shadow-xl">
-                    {/* --- *** UPDATED SRC *** --- */}
                     <img src={bannerUrl} alt={`${tournament.name} Banner`} className="absolute inset-0 w-full h-full object-cover object-center scale-105 blur-sm opacity-30"/>
-                    {/* --- *** END UPDATE *** --- */}
                     <div className="absolute inset-0 bg-gradient-to-t from-dark-900 via-dark-900/60 to-transparent"></div>
                     <div className="relative z-10 h-full flex flex-col justify-end max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-8 sm:pb-12">
                         <AnimatedSection tag="div" delay={100}>
@@ -355,30 +408,52 @@ export default function TournamentDetailsPage() {
                                 <p><span className="text-gray-400 font-medium block">Teams Allowed:</span> <span className="font-semibold text-lg">Yes</span></p>
                             </div>
 
-                            {/* --- UPDATED Action Buttons --- */}
-                            <div className="flex flex-col sm:flex-row gap-4 border-t border-dark-700 pt-6">
-                                <button
-                                    onClick={handleJoinTournament}
-                                    className={`btn-primary text-lg px-8 py-3 flex-1 flex items-center justify-center transform transition-transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100
-                                        ${joinState === 'JOINED' ? 'bg-green-600 hover:bg-green-700' : ''}
-                                        ${joinState === 'DISABLED' ? 'bg-gray-600 hover:bg-gray-600' : ''}
-                                    `}
-                                    disabled={joinState !== 'READY' || isJoining}
-                                >
-                                    {isJoining ? <Loader2 className="w-5 h-5 animate-spin" /> : 
-                                    joinState === 'JOINED' ? <UserCheck size={20} className="mr-2" /> : 
-                                    joinState === 'READY' ? <UserPlus size={20} className="mr-2" /> :
-                                    <XCircle size={20} className="mr-2" />}
-                                    {joinMessage}
-                                </button>
+                            {/* --- *** UPDATED: Action/Join Button Block *** --- */}
+                            <div className="border-t border-dark-700 pt-6">
+                                {joinState === 'READY' ? (
+                                    <div className="flex flex-col sm:flex-row gap-4">
+                                        <select 
+                                            value={selectedTeamId}
+                                            onChange={(e) => setSelectedTeamId(e.target.value)}
+                                            className="input-field text-lg flex-1 appearance-none"
+                                            disabled={isJoining}
+                                        >
+                                            {eligibleTeams.map(team => (
+                                                <option key={team.id} value={team.id}>{team.name}</option>
+                                            ))}
+                                        </select>
+                                        <button
+                                            onClick={handleJoinTournament}
+                                            className="btn-primary text-lg px-8 py-3 flex-1 sm:flex-none flex items-center justify-center"
+                                            disabled={isJoining}
+                                        >
+                                            {isJoining ? <Loader2 className="w-5 h-5 animate-spin" /> : <UserPlus size={20} className="mr-2" />}
+                                            {isJoining ? joinMessage : 'Join Tournament'}
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <button
+                                        className={`btn-primary text-lg px-8 py-3 w-full flex items-center justify-center disabled:opacity-70
+                                            ${joinState === 'JOINED' ? 'bg-green-600 hover:bg-green-700' : ''}
+                                            ${joinState === 'DISABLED' ? 'bg-gray-600 hover:bg-gray-600' : ''}
+                                            ${joinState === 'LOADING' ? 'disabled:opacity-50' : ''}
+                                        `}
+                                        disabled={true} // Disabled for JOINED, DISABLED, LOADING
+                                    >
+                                        {joinState === 'LOADING' && <Loader2 className="w-5 h-5 animate-spin" />}
+                                        {joinState === 'JOINED' && <UserCheck size={20} className="mr-2" />}
+                                        {joinState === 'DISABLED' && <XCircle size={20} className="mr-2" />}
+                                        {joinMessage}
+                                    </button>
+                                )}
 
                                 <Link
                                     to={`/cup/${tournament.id}`} // Link to the cup page
-                                    className="btn-secondary text-lg px-8 py-3 flex-1 flex items-center justify-center transform transition-transform hover:scale-105">
+                                    className="btn-secondary text-lg px-8 py-3 w-full flex items-center justify-center transform transition-transform hover:scale-105 mt-4">
                                     <Eye className="mr-2" size={20} /> View Cup / Bracket
                                 </Link>
                             </div>
-                            {/* --------------------------- */}
+                            {/* --- *** END ACTION BLOCK *** --- */}
                         </AnimatedSection>
 
                         {/* Game Specific Settings */}
