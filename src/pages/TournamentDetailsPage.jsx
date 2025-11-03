@@ -205,17 +205,14 @@ export default function TournamentDetailsPage() {
 
         setIsJoining(true); // Show loading spinner on button
 
-        // --- *** THE FIX IS HERE *** ---
-        // We read `userTeam.name` (from 'teams' table) and insert it into the `team_name` column.
-        // We read `userTeam.id` and insert it into the `team_id` column.
         const { error } = await supabase
             .from('tournament_participants')
             .insert({
                 tournament_id: tournament.id,
-                team_name: userTeam.name,        // <-- FIX 1: Use `userTeam.name`
+                team_name: userTeam.name,        
                 team_logo_url: userTeam.logo_url,
                 captain_id: user.id,
-                team_id: userTeam.id             // <-- FIX 2: Ensure this is saved
+                team_id: userTeam.id             
             });
 
         setIsJoining(false);
@@ -282,6 +279,24 @@ export default function TournamentDetailsPage() {
     else if (new Date() > new Date(tournament.registration_deadline)) statusText = 'Registration Closed';
     else if (tournament.status === 'Draft' || tournament.status === 'Setup') statusText = 'Registration Open';
 
+    // --- *** NEW: Helper function to get game-specific banner *** ---
+    const getGameBanner = (gameName) => {
+        if (gameName === 'Free Fire') {
+            return '/images/FF_ban.jpg';
+        }
+        if (gameName === 'Mobile Legends') {
+            return '/images/ml_ban.jpeg'; // Assuming this is the path
+        }
+        if (gameName === 'Farlight 84') {
+            return '/images/far_ban.jpeg'; // Assuming this is the path
+        }
+        // Default banner if no match or if `tournament.image` is null
+        return tournament.image || '/images/lan_6.jpg'; 
+    };
+
+    const bannerUrl = getGameBanner(tournament.game);
+    // --- *** END NEW FUNCTION *** ---
+
 
     return (
         <div className="bg-dark-900 text-white min-h-screen">
@@ -300,7 +315,9 @@ export default function TournamentDetailsPage() {
 
                 {/* --- Hero Banner --- */}
                 <AnimatedSection delay={0} className="relative h-72 sm:h-96 w-full overflow-hidden shadow-xl">
-                    <img src={tournament.image || '/images/lan_6.jpg'} alt={`${tournament.name} Banner`} className="absolute inset-0 w-full h-full object-cover object-center scale-105 blur-sm opacity-30"/>
+                    {/* --- *** UPDATED SRC *** --- */}
+                    <img src={bannerUrl} alt={`${tournament.name} Banner`} className="absolute inset-0 w-full h-full object-cover object-center scale-105 blur-sm opacity-30"/>
+                    {/* --- *** END UPDATE *** --- */}
                     <div className="absolute inset-0 bg-gradient-to-t from-dark-900 via-dark-900/60 to-transparent"></div>
                     <div className="relative z-10 h-full flex flex-col justify-end max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-8 sm:pb-12">
                         <AnimatedSection tag="div" delay={100}>

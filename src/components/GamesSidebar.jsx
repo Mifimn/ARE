@@ -4,11 +4,11 @@ import { Layers } from 'lucide-react';
 // Define games with names and image paths
 const supportedGames = [
   { value: 'all', label: 'All Games', imageSrc: null, hubPath: '/tournaments' }, // Link "All" to the main tournaments/games page
-  { value: 'Free Fire', label: 'Free Fire', imageSrc: '/images/action_1.jpg', hubPath: '/freefire' }, // Placeholder image
-  { value: 'Mobile Legends', label: 'Mobile Legends', imageSrc: 'https://images.unsplash.com/photo-1556438064-2d7646166914?w=100&h=100&fit=crop', hubPath: '/mobilelegends' }, // Placeholder - needs route
-  { value: 'COD Warzone', label: 'COD Warzone', imageSrc: '/images/action_3.jpg', hubPath: '/cod' }, // Placeholder image
-  { value: 'Bloodstrike', label: 'Bloodstrike', imageSrc: '/images/action_4.jpg', hubPath: '/bloodstrike' }, // Placeholder image
-  { value: 'Farlight 84', label: 'Farlight 84', imageSrc: '/images/lan_7.jpg', hubPath: '/farlight84' }, // Placeholder image
+  { value: 'Free Fire', label: 'Free Fire', imageSrc: '/images/free_fire.jpeg', hubPath: '/freefire' }, // Placeholder image
+  { value: 'Mobile Legends', label: 'Mobile Legends', imageSrc: '/images/mobile_legend.jpeg', hubPath: '/mobilelegends' }, // Placeholder - needs route
+  { value: 'COD Warzone', label: 'COD Warzone', imageSrc: '/images/cod.jpeg', hubPath: '/cod' }, // Placeholder image
+  { value: 'Bloodstrike', label: 'Bloodstrike', imageSrc: '/images/bloodstrike.jpeg', hubPath: '/bloodstrike' }, // Placeholder image
+  { value: 'Farlight 84', label: 'Farlight 84', imageSrc: '/images/farlight84.jpeg', hubPath: '/farlight84' }, // Placeholder image
   // Add other games here with their specific image paths and hubPath
 ];
 

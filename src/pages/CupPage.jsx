@@ -15,6 +15,26 @@ const calculateKillPoints = (kills) => {
     return kills * 2;
 };
 
+// --- *** NEW: Helper function to get game-specific banner *** ---
+const getGameBanner = (tournament) => {
+    if (!tournament) return '/images/lan_6.jpg'; // Default
+    
+    const gameName = tournament.game;
+    if (gameName === 'Free Fire') {
+        return '/images/FF_ban.jpg';
+    }
+    if (gameName === 'Mobile Legends') {
+        return '/images/ml_ban.jpeg';
+    }
+    if (gameName === 'Farlight 84') {
+        return '/images/far_ban.jpeg';
+    }
+    // Default banner if no match or if `tournament.image` is null
+    return tournament.image || '/images/lan_6.jpg'; 
+};
+// --- *** END NEW FUNCTION *** ---
+
+
 // --- Custom Modal (for errors) ---
 const CustomModal = ({ isOpen, onClose, title, children }) => {
     if (!isOpen) return null;
@@ -504,6 +524,10 @@ export default function CupPage() {
 
     if (!tournament) return null; // Should be covered by error state
 
+    // --- *** NEW: Get banner URL *** ---
+    const bannerUrl = getGameBanner(tournament);
+    // ---
+
     // --- Format Prize ---
     const prize = tournament.prize_type === 'Cash (USD)'
         ? `$${tournament.prize_pool_amount.toLocaleString()}`
@@ -514,7 +538,8 @@ export default function CupPage() {
              <div className="max-w-full mx-auto space-y-10 pb-10">
                 {/* Header / Banner */}
                  <AnimatedSection delay={0} className="relative h-64 sm:h-72 w-full overflow-hidden shadow-xl">
-                    <img src={tournament.image || '/images/lan_6.jpg'} alt={`${tournament.name} Banner`} className="absolute inset-0 w-full h-full object-cover object-center scale-105 blur-sm opacity-40"/>
+                    {/* --- *** UPDATED SRC *** --- */}
+                    <img src={bannerUrl} alt={`${tournament.name} Banner`} className="absolute inset-0 w-full h-full object-cover object-center scale-105 blur-sm opacity-40"/>
                     <div className="absolute inset-0 bg-gradient-to-t from-dark-900 via-dark-900/70 to-transparent"></div>
                     <div className="relative z-10 h-full flex flex-col justify-end max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-8 sm:pb-12">
                          <div className="flex items-center mb-4"><Trophy className="w-10 h-10 sm:w-12 sm:h-12 mr-4 text-primary-400 bg-dark-800/50 p-2 rounded-lg border border-primary-500/30" /><h1 className="text-4xl md:text-5xl font-extrabold text-white drop-shadow-md">{tournament.name}</h1></div>
@@ -565,4 +590,4 @@ export default function CupPage() {
             </div>
         </div>
     );
-}
+} 

@@ -9,8 +9,8 @@ import { useAuth } from '../contexts/AuthContext.jsx'; // --- IMPORT AUTH ---
 
 // --- Game-specific config ---
 const GAME_NAME = "Mobile Legends";
-const GAME_BANNER_URL = "/images/lan_2.jpg"; // Using a generic MOBA banner
-const GAME_CUP_THUMBNAIL = "/images/action_2.jpg"; // Using a generic MOBA thumb
+const GAME_BANNER_URL = "/images/1001350376.jpg"; // Use the uploaded ML image
+const GAME_CUP_THUMBNAIL = "/images/ml_ban.jpeg"; // <-- YOUR REQUESTED IMAGE
 // ---
 
 // --- Enhanced Cup List Item (Uses Supabase data) ---
@@ -28,11 +28,14 @@ const CupListItem = ({ cup, isPast = false }) => {
             to={`/tournament/${cup.id}`} // This is the correct link
             className="block relative group overflow-hidden rounded-xl shadow-lg border border-dark-700 hover:border-primary-500/50 transition-all duration-300"
         >
+            {/* --- *** UPDATED THIS IMAGE SRC *** --- */}
             <img
-                src={cup.image || GAME_CUP_THUMBNAIL}
-                alt="Cup Background"
+                src={GAME_CUP_THUMBNAIL} // Use the constant Mobile Legends banner
+                alt="Mobile Legends Cup Background"
                 className={`absolute inset-0 w-full h-full object-cover transition-all duration-500 group-hover:scale-110 ${isPast ? 'opacity-20 group-hover:opacity-30' : 'opacity-30 group-hover:opacity-40'}`}
             />
+            {/* --- *** END UPDATE *** --- */}
+
             <div className="relative z-10 p-5 bg-gradient-to-r from-dark-800/90 via-dark-800/80 to-transparent flex items-center justify-between">
                 <div className="flex-grow pr-4">
                     <h4 className={`text-lg font-bold mb-1 transition-colors ${isPast ? 'text-gray-400 group-hover:text-gray-300' : 'text-white group-hover:text-primary-300'}`}>
@@ -322,7 +325,7 @@ export default function MobileLegendsPage() {
             try {
                 const { data: cupData, error: cupError } = await supabase
                     .from('tournaments')
-                    .select('id, name, format, max_participants, start_date, prize_pool_amount, prize_type, prize_currency, status, image') // Added image
+                    .select('id, name, format, max_participants, start_date, prize_pool_amount, prize_type, prize_currency, status, image')
                     .eq('game', GAME_NAME)
                     .eq('is_public', true)
                     .order('start_date', { ascending: false }); // Get most recent first
@@ -330,19 +333,15 @@ export default function MobileLegendsPage() {
                 if (cupError) throw new Error(`Cup Error: ${cupError.message}`);
 
                 // --- *** FIX FOR UPCOMING CUPS *** ---
-                // Past cups are ONLY those marked 'Completed'
                 const past = cupData.filter(t => t.status === 'Completed');
-                
-                // Upcoming cups are ALL OTHERS ('Draft', 'In Progress', or any other status)
-                // We also sort these to show the soonest first.
                 const upcoming = cupData
                     .filter(t => t.status !== 'Completed')
                     .sort((a, b) => new Date(a.start_date) - new Date(b.start_date)); // Sort ascending
                 
                 setUpcomingCups(upcoming);
-                setPastCups(past); // Already sorted descending by the query
+                setPastCups(past);
                 // --- *** END FIX *** ---
-
+                
                 setCupsError(null);
             } catch (cupError) {
                 console.error("Error fetching tournaments:", cupError);
@@ -569,4 +568,4 @@ export default function MobileLegendsPage() {
             </div>
         </div>
     );
-} 
+}

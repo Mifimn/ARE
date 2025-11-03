@@ -22,11 +22,14 @@ const CupListItem = ({ cup, isPast = false }) => {
             to={`/tournament/${cup.id}`} // This is the correct link
             className="block relative group overflow-hidden rounded-xl shadow-lg border border-dark-700 hover:border-primary-500/50 transition-all duration-300"
         >
+            {/* --- *** UPDATED THIS IMAGE SRC *** --- */}
             <img
-                src={cup.image || '/images/ff_cup_thumb.jpg'}
-                alt="Cup Background"
+                src="/images/FF_ban.jpg" // Use the constant Free Fire banner
+                alt="Free Fire Cup Background"
                 className={`absolute inset-0 w-full h-full object-cover transition-all duration-500 group-hover:scale-110 ${isPast ? 'opacity-20 group-hover:opacity-30' : 'opacity-30 group-hover:opacity-40'}`}
             />
+            {/* --- *** END UPDATE *** --- */}
+            
             <div className="relative z-10 p-5 bg-gradient-to-r from-dark-800/90 via-dark-800/80 to-transparent flex items-center justify-between">
                 <div className="flex-grow pr-4">
                     <h4 className={`text-lg font-bold mb-1 transition-colors ${isPast ? 'text-gray-400 group-hover:text-gray-300' : 'text-white group-hover:text-primary-300'}`}>
@@ -118,13 +121,11 @@ const LeaderboardContent = ({ leaderboard, loading, error }) => (
                 {!loading && !error && leaderboard.length > 0 && (
                     leaderboard.map((item, index) => {
                         const team = item.team;
-                        // --- FIX: Check for team object ---
                         if (!team) return null; 
                         return (
                             <AnimatedSection key={team.id || index} delay={100 + index * 50} className={`flex flex-wrap sm:flex-nowrap items-center p-3 rounded-lg transition-all duration-300 border-l-4 ${ index === 0 ? 'bg-yellow-500/10 border-yellow-400 hover:bg-yellow-500/20' : index === 1 ? 'bg-gray-500/10 border-gray-400 hover:bg-gray-500/20' : index === 2 ? 'bg-amber-600/10 border-amber-500 hover:bg-amber-600/20' : 'bg-dark-700 hover:bg-dark-600 border-transparent hover:border-primary-500/50' }`} >
                                 <div className="flex items-center space-x-3 w-full sm:w-6/12 pb-2 sm:pb-0">
                                     <span className={`text-center font-extrabold text-xl w-8 flex-shrink-0 ${index < 3 ? 'text-white' : 'text-gray-400'}`}>{index + 1}</span>
-                                    {/* --- FIX: Use correct team properties --- */}
                                     <img src={team.logo_url || '/images/team_placeholder.png'} alt={team.name} className="w-10 h-10 rounded-full object-cover border-2 border-dark-600 flex-shrink-0" />
                                     <div className="flex-grow">
                                         <p className={`font-semibold text-base leading-tight ${index < 3 ? 'text-white' : 'text-gray-200'}`}>{team.name}</p>
@@ -149,7 +150,6 @@ const LeaderboardContent = ({ leaderboard, loading, error }) => (
     </AnimatedSection>
 );
 
-// --- *** UPDATED: TeamsContent component *** ---
 const TeamsContent = ({ teams, loading, error }) => (
     <AnimatedSection delay={0} className="space-y-8">
         <h2 className="text-3xl font-bold text-primary-400 border-b-2 border-primary-500/30 pb-3 flex items-center"><Users size={28} className="mr-3" /> Team Directory</h2>
@@ -176,7 +176,6 @@ const TeamsContent = ({ teams, loading, error }) => (
             )}
             {!loading && !error && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* --- FIX: Use correct team properties from `teams` table --- */}
                     {teams.map((team, index) => (
                         <AnimatedSection key={team.id} delay={250 + index * 50} className="flex items-center p-4 bg-dark-800 rounded-xl hover:bg-dark-700 transition-colors shadow-lg border border-dark-700 hover:border-primary-500/50">
                             <img src={team.logo_url || '/images/team_placeholder.png'} alt={team.name} className="w-12 h-12 rounded-full object-cover border-2 border-dark-600 mr-4" />
@@ -196,11 +195,10 @@ const TeamsContent = ({ teams, loading, error }) => (
     </AnimatedSection>
 );
 
-// --- UPDATED: Rundown Content (to accept public matches) ---
 const RundownContent = ({ 
     upcomingCups, loadingCups, cupsError, 
     myTournaments, loadingMyData, myDataError,
-    publicRecentMatches, loadingPublicMatches, publicMatchesError, // <-- Accepts public matches
+    publicRecentMatches, loadingPublicMatches, publicMatchesError,
     userIsLoggedIn
 }) => {
     return (
@@ -292,7 +290,7 @@ export default function FreeFirePage() {
     const [upcomingCups, setUpcomingCups] = useState([]);
     const [pastCups, setPastCups] = useState([]);
     const [leaderboard, setLeaderboard] = useState([]);
-    const [allTeams, setAllTeams] = useState([]); // <-- FIX: For 'teams' tab
+    const [allTeams, setAllTeams] = useState([]);
     const [publicRecentMatches, setPublicRecentMatches] = useState([]); 
     const [loadingCups, setLoadingCups] = useState(true);
     const [cupsError, setCupsError] = useState(null);
@@ -300,8 +298,8 @@ export default function FreeFirePage() {
     const [leaderboardError, setLeaderboardError] = useState(null);
     const [loadingPublicMatches, setLoadingPublicMatches] = useState(true); 
     const [publicMatchesError, setPublicMatchesError] = useState(null); 
-    const [loadingAllTeams, setLoadingAllTeams] = useState(true); // <-- FIX: New loading state
-    const [allTeamsError, setAllTeamsError] = useState(null); // <-- FIX: New error state
+    const [loadingAllTeams, setLoadingAllTeams] = useState(true);
+    const [allTeamsError, setAllTeamsError] = useState(null);
     
     // --- User-Specific Data States ---
     const [myTournaments, setMyTournaments] = useState([]);
@@ -315,22 +313,29 @@ export default function FreeFirePage() {
             setLoadingCups(true);
             setLoadingLeaderboard(true);
             setLoadingPublicMatches(true);
-            setLoadingAllTeams(true); // <-- FIX: Set loading true
+            setLoadingAllTeams(true);
             
             // --- 1. Fetch Cups ---
             try {
                 const { data: cupData, error: cupError } = await supabase
                     .from('tournaments')
-                    .select('id, name, format, max_participants, start_date, prize_pool_amount, prize_type, prize_currency, status')
+                    .select('id, name, format, max_participants, start_date, prize_pool_amount, prize_type, prize_currency, status, image')
                     .eq('game', 'Free Fire')
                     .eq('is_public', true)
-                    .order('start_date', { ascending: false });
+                    .order('start_date', { ascending: false }); // Get most recent first
 
                 if (cupError) throw new Error(`Cup Error: ${cupError.message}`);
 
-                const now = new Date();
-                setUpcomingCups(cupData.filter(t => t.status === 'Draft' || t.status === 'In Progress' || new Date(t.start_date) > now));
-                setPastCups(cupData.filter(t => t.status === 'Completed' || new Date(t.start_date) <= now));
+                // --- FIX: Upcoming cups are any not 'Completed' ---
+                const past = cupData.filter(t => t.status === 'Completed');
+                const upcoming = cupData
+                    .filter(t => t.status !== 'Completed')
+                    .sort((a, b) => new Date(a.start_date) - new Date(b.start_date)); // Sort ascending
+                
+                setUpcomingCups(upcoming);
+                setPastCups(past);
+                // --- END FIX ---
+                
                 setCupsError(null);
             } catch (cupError) {
                 console.error("Error fetching tournaments:", cupError);
@@ -383,14 +388,12 @@ export default function FreeFirePage() {
                 }
                 
                 // 3d. Set Public Recent Matches (for Rundown tab)
-                // --- *** FIX IS HERE *** ---
-                const formattedRecentMatches = allResults.slice(0, 5).map(r => ({ // <-- Changed from formattedMatches
+                const formattedRecentMatches = allResults.slice(0, 5).map(r => ({
                     ...r,
                     teamName: r.tournament_participants?.team_name || 'Unknown',
                     tournamentName: r.tournament_participants?.tournaments?.name || 'Tournament'
                 }));
-                setPublicRecentMatches(formattedRecentMatches); // <-- Was formattedMatches
-                // --- *** END FIX *** ---
+                setPublicRecentMatches(formattedRecentMatches);
                 setPublicMatchesError(null);
 
                 // 3e. Calculate Leaderboard
@@ -518,7 +521,6 @@ export default function FreeFirePage() {
             case 'leaderboard': 
                 return <LeaderboardContent leaderboard={leaderboard} loading={loadingLeaderboard} error={leaderboardError} />;
             case 'teams': 
-                // --- FIX: Pass correct loading/error states ---
                 return <TeamsContent teams={allTeams} loading={loadingAllTeams} error={allTeamsError} />;
             case 'rundown': 
             default: return (
@@ -551,7 +553,7 @@ export default function FreeFirePage() {
                 </AnimatedSection>
                 <AnimatedSection delay={50} className="sticky top-16 bg-dark-900 z-30 shadow-md border-b border-dark-700">
                     <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex space-x-6 sm:space-x-8 text-base sm:text-lg font-semibold text-gray-400 overflow-x-auto">
-                        {navTabs.map((tab) => (<button key={tab.name} onClick={() => setActiveTab(tab.path)} className={`flex items-center py-4 px-1 whitespace-nowrap border-b-2 transition-all duration-200 ${activeTab === tab.path ? 'text-primary-400 border-primary-400' : 'border-transparent hover:text-white hover:border-gray-500'}`}><tab.icon size={18} className="mr-2 hidden sm:inline-block"/> {tab.name}</button>))}
+                        {navTabs.map((tab) => (<button key={tab.name} onClick={() => setActiveTab(tab.path)} className={`flex items-center py-4 px-1 whitespace-nowB-2 transition-all duration-200 ${activeTab === tab.path ? 'text-primary-400 border-primary-400' : 'border-transparent hover:text-white hover:border-gray-500'}`}><tab.icon size={18} className="mr-2 hidden sm:inline-block"/> {tab.name}</button>))}
                     </nav>
                 </AnimatedSection>
                 <div className="max-w-7xl mx-auto mt-8">

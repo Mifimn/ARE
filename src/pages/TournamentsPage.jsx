@@ -5,16 +5,15 @@ import { Gamepad2, ChevronRight } from 'lucide-react';
 import AnimatedSection from '../components/AnimatedSection'; // Import the animation wrapper
 
 // Define the specific games supported and their corresponding hub paths/images
-// ** IMPORTANT: Replace placeholder images with actual game banner images **
+// --- UPDATED with new images ---
 const supportedGames = [
-  { value: 'Free Fire', label: 'Free Fire', imageSrc: '/images/action_1.jpg', description: 'Enter the intense battlegrounds of Free Fire.', hubPath: '/freefire' },
-  { value: 'Mobile Legends', label: 'Mobile Legends', imageSrc: 'https://images.unsplash.com/photo-1556438064-2d7646166914?w=300&h=400&fit=crop', description: 'Battle it out in the popular mobile MOBA arena.', hubPath: '/mobilelegends' }, // Assuming path exists
-  { value: 'COD Warzone', label: 'COD Warzone', imageSrc: '/images/action_3.jpg', description: 'Drop into intense battle royale action.', hubPath: '/cod' },
-  { value: 'Bloodstrike', label: 'Bloodstrike', imageSrc: '/images/action_4.jpg', description: 'Experience fast-paced FPS combat.', hubPath: '/bloodstrike' }, // Assuming path exists
-  { value: 'Farlight 84', label: 'Farlight 84', imageSrc: '/images/lan_7.jpg', description: 'High-octane hero shooter battles await.', hubPath: '/farlight84' },
-  // Add FIFA 24, Valorant, Fortnite, Apex Legends back if needed, e.g.:
-  // { value: 'FIFA 24', label: 'FIFA 24', imageSrc: 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=300&h=400&fit=crop', description: 'Compete in the premier virtual football league.', hubPath: '/fifa' }, // Assuming path exists
+  { value: 'Free Fire', label: 'Free Fire', imageSrc: '/images/free_fire.jpeg', description: 'Enter the intense battlegrounds of Free Fire.', hubPath: '/freefire' },
+  { value: 'Mobile Legends', label: 'Mobile Legends', imageSrc: '/images/mobile_legend.jpeg', description: 'Battle it out in the popular mobile MOBA arena.', hubPath: '/mobilelegends' },
+  { value: 'COD Warzone', label: 'COD Warzone', imageSrc: '/images/cod.jpeg', description: 'Drop into intense battle royale action.', hubPath: '/cod' },
+  { value: 'Bloodstrike', label: 'Bloodstrike', imageSrc: '/images/bloodstrike.jpeg', description: 'Experience fast-paced FPS combat.', hubPath: '/bloodstrike' },
+  { value: 'Farlight 84', label: 'Farlight 84', imageSrc: '/images/farlight84.jpeg', description: 'High-octane hero shooter battles await.', hubPath: '/farlight84' },
 ];
+// --- End Update ---
 
 // Removed selectedGameFilter prop as it's not used for filtering on this page anymore
 export default function TournamentsPage() {

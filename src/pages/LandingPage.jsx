@@ -17,12 +17,17 @@ export default function LandingPage() {
     { icon: DollarSign, value: '$50K+', label: 'Prize Money Paid' },
     { icon: Gamepad2, value: '6+', label: 'Supported Games' },
   ];
+  
+  // --- *** UPDATED THIS ARRAY *** ---
   const featuredGames = [
-    { name: 'FIFA 24', image: 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=200&h=250&fit=crop', href: '/tournaments?game=fifa' },
-    { name: 'COD Warzone', image: 'https://images.unsplash.com/photo-1552820728-8b83bb6b773f?w=200&h=250&fit=crop', href: '/tournaments?game=cod' },
-    { name: 'Mobile Legends', image: 'https://images.unsplash.com/photo-1556438064-2d7646166914?w=200&h=250&fit=crop', href: '/tournaments?game=mlbb' },
-    { name: 'Valorant', image: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?w=200&h=250&fit=crop', href: '/tournaments?game=valorant' },
+    { name: 'Free Fire', image: '/images/free_fire.jpeg', href: '/freefire' },
+    { name: 'Farlight 84', image: '/images/farlight84.jpeg', href: '/farlight84' },
+    { name: 'Mobile Legends', image: '/images/mobile_legend.jpeg', href: '/mobilelegends' },
+    { name: 'COD Warzone', image: '/images/cod.jpeg', href: '/cod' },
+    { name: 'Bloodstrike', image: '/images/bloodstrike.jpeg', href: '/bloodstrike' },
   ];
+  // --- *** END UPDATE *** ---
+
    const actionImages = [
     '/images/action_1.jpg', // Make sure these files exist in public/images/
     '/images/action_2.jpg',
@@ -83,6 +88,8 @@ export default function LandingPage() {
            <AnimatedSection tag="h2" className="text-3xl md:text-4xl font-bold mb-12 uppercase tracking-wider">
              Featured Games
            </AnimatedSection>
+           
+           {/* --- *** UPDATED THIS BLOCK *** --- */}
            <AnimatedSection tag="div" className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
              {featuredGames.map((game, index) => (
                 <AnimatedSection key={game.name} tag={Link} to={game.href} delay={index * 100}
@@ -95,14 +102,10 @@ export default function LandingPage() {
                   </div>
                 </AnimatedSection>
              ))}
-             <AnimatedSection tag={Link} to="/tournaments" delay={featuredGames.length * 100}
-                className="group flex items-center justify-center rounded-lg bg-dark-800 border-2 border-dark-700 hover:border-primary-500 transition-all duration-300 hover:scale-105 h-64"> {/* Match height */}
-                 <div className="text-center p-4">
-                    <div className="text-3xl font-bold text-primary-500 mb-2">+10</div>
-                    <div className="text-gray-400 uppercase text-sm tracking-wider">More Games</div>
-                  </div>
-              </AnimatedSection>
+             {/* The "More Games" block is no longer needed as we now display 5 games */}
           </AnimatedSection>
+          {/* --- *** END UPDATE *** --- */}
+
         </div>
       </section>
 
