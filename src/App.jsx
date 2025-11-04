@@ -1,6 +1,6 @@
 // src/App.jsx
-import React, { useState } from 'react'; // Added useState
-import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom'; // Added useLocation
+import React, { useState } from 'react';
+import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { useAuth } from './contexts/AuthContext.jsx';
 
 // --- Page Imports ---
@@ -29,15 +29,16 @@ import UpdateTournamentPage from './pages/UpdateTournamentPage';
 import LeaguePage from './pages/LeaguePage';
 import CupPage from './pages/CupPage';
 import PlayersDirectoryPage from './pages/PlayersDirectoryPage';
-import TeamPage from './pages/TeamPage.jsx'; // <-- *** THIS IS THE FIX ***
+import TeamPage from './pages/TeamPage.jsx';
 import AboutPage from './pages/AboutPage.jsx';
+import GuidancePage from './pages/GuidancePage.jsx'; // <-- 1. IMPORT IT HERE
 
 // --- Component Imports ---
 import Header from './components/Header';
 import Footer from './components/Footer';
 import GamesSidebar from './components/GamesSidebar';
 import PrivateRoute from './components/PrivateRoute';
-import PublicOnlyRoute from './components/PublicOnlyRoute'; // <-- Import for public routes
+import PublicOnlyRoute from './components/PublicOnlyRoute';
 
 import './App.css';
 
@@ -116,6 +117,7 @@ export default function App() {
             <Route path="/rules" element={<RulesPage />} />
             <Route path="/terms" element={<TermsPage />} />
             <Route path="/privacy" element={<PrivacyPage />} />
+            <Route path="/guidance" element={<GuidancePage />} /> {/* <-- 2. ADD THE ROUTE HERE */}
             <Route path="/news" element={<NewsPage />} />
             <Route path="/freefire" element={<FreeFirePage />} />
             <Route path="/cod" element={<CODPage />} />

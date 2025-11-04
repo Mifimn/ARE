@@ -1,5 +1,8 @@
+// src/pages/RulesPage.jsx
 
+import { Link } from 'react-router-dom'; // Added Link import
 import { Shield, AlertTriangle, CheckCircle, Users, Trophy, Gavel } from 'lucide-react';
+// import AnimatedSection from '../components/AnimatedSection'; // Removed broken component
 
 export default function RulesPage() {
   const codeOfConduct = [
@@ -25,48 +28,60 @@ export default function RulesPage() {
     }
   ];
 
+  // --- *** UPDATED GAME RULES *** ---
   const tournamentRules = [
     {
-      game: 'FIFA 24',
+      game: 'Free Fire',
       rules: [
-        'Matches are played in Ultimate Team mode with 85+ rated squads',
-        'Each match is 6 minutes (3 minutes per half)',
-        'Default difficulty and settings apply',
-        'No pausing allowed except for technical issues',
-        'Screenshots of final scores must be submitted immediately after each match'
+        'Game Mode: Battle Royale (BR).',
+        'Squad Size: 4 players (Squads).',
+        'Maps: Bermuda, Purgatory, Kalahari (rotated by admins).',
+        'Scoring: Standard points system (Placement + Kills).',
+        'No hacks, emulators, exploits, or teaming.'
+      ]
+    },
+    {
+      game: 'Farlight 84',
+      rules: [
+        'Game Mode: Battle Royale (Hunt).',
+        'Squad Size: 4 players (Squads).',
+        'Maps: Sunset City, Lampton (rotated by admins).',
+        'Scoring: Standard BR points system (Placement + Kills).',
+        'All heroes and vehicles are permitted.'
       ]
     },
     {
       game: 'Mobile Legends',
       rules: [
-        'Matches are played in Draft Pick mode',
-        'Best of 3 format for elimination rounds',
-        'Teams must have a minimum of 5 players and maximum of 7',
-        'Hero bans follow official tournament restrictions',
-        'In-game chat must remain respectful at all times'
+        'Game Mode: 5v5 Draft Pick.',
+        'Map: Land of Dawn.',
+        'Format: Best of 3 (Bo3) for standard matches, Best of 5 (Bo5) for Finals.',
+        'No skins with significant visual advantages (e.g., recall animation bugs).',
+        'Pauses limited to 5 minutes per team for technical issues.'
       ]
     },
     {
-      game: 'Call of Duty Warzone',
+      game: 'COD Warzone',
       rules: [
-        'Squads of 3 players maximum',
-        'Battle Royale mode on Verdansk map',
-        'Custom lobbies for tournament matches',
-        'No vehicles in final circles',
-        'Stream delay required for live matches'
+        'Game Mode: Battle Royale (Quads or Trios as specified).',
+        'Maps: Urzikstan, Vondel (as specified).',
+        'Custom lobbies will be used.',
+        'All loadouts are permitted. No exploits or "glitch" spots.',
+        'Stream delay required for live matches if streaming.'
       ]
     },
     {
-      game: 'Valorant',
+      game: 'Bloodstrike',
       rules: [
-        'Competitive mode with tournament settings',
-        'Best of 3 maps for playoffs',
-        'Agent restrictions may apply based on tournament',
-        'Overtime rules: First to 13 wins',
-        'Technical timeouts limited to 2 per team per map'
+        'Game Mode: Squad Fight or Battle Royale (as specified).',
+        'Squad Size: 4 players.',
+        'All Strikers and weapons are permitted.',
+        'Scoring: Based on match placement and total squad eliminations.',
+        'Use of third-party software or crosshairs is strictly forbidden.'
       ]
     }
   ];
+  // --- *** END UPDATE *** ---
 
   const violations = [
     {
@@ -90,10 +105,12 @@ export default function RulesPage() {
   ];
 
   return (
-    <div className="pt-20 min-h-screen bg-dark-900">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    // Padding is handled by the LayoutWrapper in App.jsx
+    <div className="bg-dark-900 text-white min-h-screen">
+      <div className="max-w-7xl mx-auto py-8 space-y-16">
+        
         {/* Header */}
-        <div className="text-center mb-12">
+        <div className="text-center">
           <h1 className="text-4xl md:text-5xl font-bold mb-4">Rules & Regulations</h1>
           <p className="text-xl text-gray-300 max-w-3xl mx-auto">
             Fair play and respect are the foundations of our community. Please read and understand 
@@ -102,7 +119,7 @@ export default function RulesPage() {
         </div>
 
         {/* Code of Conduct */}
-        <div className="mb-16">
+        <div>
           <h2 className="text-3xl font-bold mb-8 text-center flex items-center justify-center">
             <Shield className="mr-3 text-primary-500" size={32} />
             Code of Conduct
@@ -111,7 +128,10 @@ export default function RulesPage() {
             {codeOfConduct.map((rule, index) => {
               const Icon = rule.icon;
               return (
-                <div key={index} className="card">
+                <div 
+                  key={index}
+                  className="card bg-dark-800 p-6 rounded-xl shadow-lg border border-dark-700"
+                >
                   <div className="flex items-center mb-4">
                     <Icon className="w-6 h-6 text-primary-500 mr-3" />
                     <h3 className="text-xl font-semibold">{rule.title}</h3>
@@ -124,14 +144,17 @@ export default function RulesPage() {
         </div>
 
         {/* Tournament Rules by Game */}
-        <div className="mb-16">
+        <div>
           <h2 className="text-3xl font-bold mb-8 text-center flex items-center justify-center">
             <Trophy className="mr-3 text-primary-500" size={32} />
             Tournament Rules by Game
           </h2>
           <div className="space-y-8">
             {tournamentRules.map((gameRules, index) => (
-              <div key={index} className="card">
+              <div 
+                key={index}
+                className="card bg-dark-800 p-6 rounded-xl shadow-lg border border-dark-700"
+              >
                 <h3 className="text-2xl font-bold mb-4 text-primary-400">{gameRules.game}</h3>
                 <ul className="space-y-2">
                   {gameRules.rules.map((rule, ruleIndex) => (
@@ -147,10 +170,10 @@ export default function RulesPage() {
         </div>
 
         {/* General Tournament Rules */}
-        <div className="mb-16">
+        <div>
           <h2 className="text-3xl font-bold mb-8 text-center">General Tournament Rules</h2>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <div className="card">
+            <div className="card bg-dark-800 p-6 rounded-xl shadow-lg border border-dark-700">
               <h3 className="text-xl font-semibold mb-4">Registration & Eligibility</h3>
               <ul className="space-y-2 text-gray-300">
                 <li>• Must be 13 years or older to participate</li>
@@ -161,7 +184,7 @@ export default function RulesPage() {
               </ul>
             </div>
             
-            <div className="card">
+            <div className="card bg-dark-800 p-6 rounded-xl shadow-lg border border-dark-700">
               <h3 className="text-xl font-semibold mb-4">Match Procedures</h3>
               <ul className="space-y-2 text-gray-300">
                 <li>• Players must check in 15 minutes before match time</li>
@@ -172,7 +195,7 @@ export default function RulesPage() {
               </ul>
             </div>
             
-            <div className="card">
+            <div className="card bg-dark-800 p-6 rounded-xl shadow-lg border border-dark-700">
               <h3 className="text-xl font-semibold mb-4">Prize Distribution</h3>
               <ul className="space-y-2 text-gray-300">
                 <li>• Prizes awarded within 7 days of tournament completion</li>
@@ -183,7 +206,7 @@ export default function RulesPage() {
               </ul>
             </div>
             
-            <div className="card">
+            <div className="card bg-dark-800 p-6 rounded-xl shadow-lg border border-dark-700">
               <h3 className="text-xl font-semibold mb-4">Appeals Process</h3>
               <ul className="space-y-2 text-gray-300">
                 <li>• Appeals must be submitted within 24 hours</li>
@@ -197,14 +220,17 @@ export default function RulesPage() {
         </div>
 
         {/* Violations and Penalties */}
-        <div className="mb-16">
+        <div>
           <h2 className="text-3xl font-bold mb-8 text-center flex items-center justify-center">
             <AlertTriangle className="mr-3 text-primary-500" size={32} />
             Violations & Penalties
           </h2>
           <div className="space-y-6">
             {violations.map((violation, index) => (
-              <div key={index} className="card">
+              <div 
+                key={index}
+                className="card bg-dark-800 p-6 rounded-xl shadow-lg border border-dark-700"
+              >
                 <div className="flex items-center mb-4">
                   <h3 className={`text-xl font-semibold ${violation.color}`}>
                     {violation.severity} Violations
@@ -230,15 +256,15 @@ export default function RulesPage() {
         </div>
 
         {/* Contact for Questions */}
-        <div className="card text-center">
+        <div className="card bg-dark-800 p-6 rounded-xl shadow-lg border border-dark-700 text-center">
           <h2 className="text-2xl font-bold mb-4">Questions About Rules?</h2>
           <p className="text-gray-300 mb-6">
             If you have any questions about our rules or need clarification on any policy, 
             don't hesitate to reach out to our support team.
           </p>
           <div className="flex justify-center gap-4">
-            <button className="btn-primary">Contact Support</button>
-            <button className="btn-secondary">View FAQ</button>
+            <Link to="/contact" className="btn-primary">Contact Support</Link>
+            {/* <button className="btn-secondary">View FAQ</button> */}
           </div>
         </div>
       </div>

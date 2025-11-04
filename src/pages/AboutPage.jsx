@@ -1,5 +1,7 @@
+// src/pages/AboutPage.jsx
 
 import { Target, Users, Trophy, Globe, Heart, Zap } from 'lucide-react';
+import AnimatedSection from '../components/AnimatedSection'; // Import AnimatedSection
 
 export default function AboutPage() {
   const values = [
@@ -25,48 +27,46 @@ export default function AboutPage() {
     }
   ];
 
+  // --- *** UPDATED TEAM SECTION *** ---
   const team = [
     {
-      name: 'Kwame Asante',
-      role: 'Founder & CEO',
-      bio: 'Former professional FIFA player turned entrepreneur, passionate about developing African esports.',
-      image: 'https://via.placeholder.com/200x200?text=KA'
+      name: 'NAMKE NIKHIL',
+      role: 'CEO OF ARE',
+      bio: 'Leading the charge in building the future of African esports and connecting gamers across the continent.',
+      image: '/images/ceo.jpg'
     },
     {
-      name: 'Amina Hassan',
-      role: 'Head of Operations',
-      bio: 'Tournament organizer with 8+ years experience in competitive gaming and event management.',
-      image: 'https://via.placeholder.com/200x200?text=AH'
+      name: 'TEEKAY PRINCE',
+      role: 'FOUNDER AND COMMUNITY MANAGER',
+      bio: 'The visionary founder focused on building a strong, inclusive, and passionate gaming community.',
+      image: '/images/founder.jpg'
     },
     {
-      name: 'David Okafor',
-      role: 'Community Manager',
-      bio: 'Gaming content creator and community builder focused on growing African esports presence.',
-      image: 'https://via.placeholder.com/200x200?text=DO'
-    },
-    {
-      name: 'Fatima Diallo',
-      role: 'Technical Director',
-      bio: 'Software engineer specializing in gaming platforms and esports technology solutions.',
-      image: 'https://via.placeholder.com/200x200?text=FD'
+      name: 'Ibekwe Isabel',
+      role: 'COMMUNITY MANAGER',
+      bio: 'Dedicated to engaging with players, supporting teams, and ensuring a vibrant community experience.',
+      image: '/images/community.jpg'
     }
   ];
+  // --- *** END UPDATE *** ---
 
   return (
-    <div className="pt-20 min-h-screen bg-dark-900">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    // Padding is handled by the LayoutWrapper in App.jsx
+    <div className="bg-dark-900 text-white min-h-screen">
+      <div className="max-w-7xl mx-auto py-8 space-y-16">
+        
         {/* Hero Section */}
-        <div className="text-center mb-16">
+        <AnimatedSection tag="div" className="text-center" delay={0}>
           <h1 className="text-4xl md:text-5xl font-bold mb-6">About Africa Rise Esports</h1>
           <p className="text-xl text-gray-300 max-w-3xl mx-auto leading-relaxed">
             We're more than just a platform – we're a movement dedicated to elevating African gaming 
             talent and creating opportunities for the next generation of esports champions.
           </p>
-        </div>
+        </AnimatedSection>
 
         {/* Mission & Vision */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-16">
-          <div className="card">
+        <AnimatedSection tag="div" className="grid grid-cols-1 lg:grid-cols-2 gap-8" delay={100}>
+          <div className="card bg-dark-800 p-6 rounded-xl shadow-lg border border-dark-700">
             <div className="flex items-center mb-4">
               <Heart className="w-8 h-8 text-primary-500 mr-3" />
               <h2 className="text-2xl font-bold">Our Mission</h2>
@@ -78,7 +78,7 @@ export default function AboutPage() {
             </p>
           </div>
           
-          <div className="card">
+          <div className="card bg-dark-800 p-6 rounded-xl shadow-lg border border-dark-700">
             <div className="flex items-center mb-4">
               <Zap className="w-8 h-8 text-primary-500 mr-3" />
               <h2 className="text-2xl font-bold">Our Vision</h2>
@@ -89,27 +89,32 @@ export default function AboutPage() {
               competitive gaming dreams.
             </p>
           </div>
-        </div>
+        </AnimatedSection>
 
         {/* Values */}
-        <div className="mb-16">
+        <AnimatedSection tag="div" delay={200}>
           <h2 className="text-3xl font-bold text-center mb-12">Our Values</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {values.map((value, index) => {
               const Icon = value.icon;
               return (
-                <div key={index} className="card text-center">
+                <AnimatedSection 
+                  key={index}
+                  tag="div"
+                  className="card bg-dark-800 p-6 rounded-xl shadow-lg border border-dark-700 text-center"
+                  delay={200 + (index * 100)}
+                >
                   <Icon className="w-12 h-12 text-primary-500 mx-auto mb-4" />
                   <h3 className="text-xl font-semibold mb-3">{value.title}</h3>
                   <p className="text-gray-300 text-sm">{value.description}</p>
-                </div>
+                </AnimatedSection>
               );
             })}
           </div>
-        </div>
+        </AnimatedSection>
 
         {/* Story */}
-        <div className="card mb-16">
+        <AnimatedSection tag="div" className="card bg-dark-800 p-6 rounded-xl shadow-lg border border-dark-700" delay={300}>
           <h2 className="text-3xl font-bold mb-6">Our Story</h2>
           <div className="prose prose-lg text-gray-300 max-w-none">
             <p className="mb-4">
@@ -118,7 +123,7 @@ export default function AboutPage() {
               Founded in 2024 by a group of passionate gamers and entrepreneurs, we set out to change that narrative.
             </p>
             <p className="mb-4">
-              Starting with our first FIFA tournament in Cape Town with just 32 participants, we've grown 
+              Starting with small community cups, we've grown 
               to host continental competitions featuring thousands of players across multiple games. 
               Our platform now connects gamers from over 20 African countries, providing them with 
               the tools and opportunities they need to compete at the highest levels.
@@ -129,49 +134,32 @@ export default function AboutPage() {
               but thrive as professional esports athletes, content creators, and industry leaders.
             </p>
           </div>
-        </div>
+        </AnimatedSection>
 
         {/* Team */}
-        <div className="mb-16">
+        <AnimatedSection tag="div" delay={400}>
           <h2 className="text-3xl font-bold text-center mb-12">Meet Our Team</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {team.map((member, index) => (
-              <div key={index} className="card text-center">
+              <AnimatedSection 
+                key={index} 
+                tag="div" 
+                className="card bg-dark-800 p-6 rounded-xl shadow-lg border border-dark-700 text-center"
+                delay={400 + (index * 100)}
+              >
                 <img 
                   src={member.image} 
                   alt={member.name}
-                  className="w-32 h-32 rounded-full mx-auto mb-4 object-cover"
+                  className="w-32 h-32 rounded-full mx-auto mb-4 object-cover border-4 border-primary-500/50"
                 />
                 <h3 className="text-xl font-semibold mb-2">{member.name}</h3>
                 <p className="text-primary-400 font-medium mb-3">{member.role}</p>
                 <p className="text-gray-300 text-sm">{member.bio}</p>
-              </div>
+              </AnimatedSection>
             ))}
           </div>
-        </div>
+        </AnimatedSection>
 
-        {/* Stats */}
-        <div className="card text-center">
-          <h2 className="text-3xl font-bold mb-8">Our Impact</h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
-            <div>
-              <div className="text-3xl md:text-4xl font-bold text-primary-500 mb-2">5000+</div>
-              <div className="text-gray-400">Active Gamers</div>
-            </div>
-            <div>
-              <div className="text-3xl md:text-4xl font-bold text-primary-500 mb-2">100+</div>
-              <div className="text-gray-400">Tournaments Hosted</div>
-            </div>
-            <div>
-              <div className="text-3xl md:text-4xl font-bold text-primary-500 mb-2">20+</div>
-              <div className="text-gray-400">Countries</div>
-            </div>
-            <div>
-              <div className="text-3xl md:text-4xl font-bold text-primary-500 mb-2">$50K+</div>
-              <div className="text-gray-400">Prize Money</div>
-            </div>
-          </div>
-        </div>
       </div>
     </div>
   );

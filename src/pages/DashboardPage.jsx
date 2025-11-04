@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabaseClient'; // Adjust path if needed
 import { useAuth } from '../contexts/AuthContext.jsx'; // Adjust path if needed
-import { Calendar, Trophy, Users, Bell, TrendingUp, Clock, Star, Loader2, AlertCircle } from 'lucide-react';
+import { Calendar, Trophy, Users, Bell, TrendingUp, Clock, Star, Loader2, AlertCircle, X } from 'lucide-react'; // Added X icon
 import AnimatedSection from '../components/AnimatedSection';
 import { Link } from 'react-router-dom'; // Import Link
 
@@ -11,6 +11,9 @@ export default function DashboardPage() {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // --- NEW: State for guidance alert ---
+  const [showGuidanceAlert, setShowGuidanceAlert] = useState(true);
 
   // --- NEW: State for dynamic stats ---
   const [stats, setStats] = useState({
@@ -23,7 +26,16 @@ export default function DashboardPage() {
   const [loadingStats, setLoadingStats] = useState(true);
   // ---
 
-  // --- Effect 1: Fetch Profile ---
+  // --- Effect 1: Hide guidance alert after 5 seconds ---
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setShowGuidanceAlert(false);
+    }, 10000); // 10 seconds
+
+    return () => clearTimeout(timer); // Cleanup timer on unmount
+  }, []);
+
+  // --- Effect 2: Fetch Profile ---
   useEffect(() => {
     const fetchProfile = async () => {
       if (!authUser) {
@@ -66,7 +78,7 @@ export default function DashboardPage() {
     fetchProfile();
   }, [authUser]); // Re-fetch if the authenticated user changes
 
-  // --- Effect 2: Fetch Dashboard Stats & Matches ---
+  // --- Effect 3: Fetch Dashboard Stats & Matches ---
   useEffect(() => {
       if (!authUser) {
         setLoadingStats(false);
@@ -76,7 +88,6 @@ export default function DashboardPage() {
       const fetchDashboardData = async () => {
           setLoadingStats(true);
           try {
-              // --- *** FIX IS HERE *** ---
               // --- 1. Fetch Team Count (Accurately) ---
               const { data: teamsAsMember, error: memberError } = await supabase
                   .from('team_members')
@@ -97,8 +108,6 @@ export default function DashboardPage() {
               // Combine and find unique team IDs
               const uniqueTeamIds = [...new Set([...memberTeamIds, ...ownerTeamIds])];
               const totalTeams = uniqueTeamIds.length;
-              // --- *** END FIX *** ---
-
 
               // --- 2. Fetch Stats (Wins, Matches) ---
               let tournamentsPlayed = 0;
@@ -209,6 +218,25 @@ export default function DashboardPage() {
   return (
     <div className="bg-dark-900 text-white">
       <div className="space-y-8">
+        
+        {/* --- *** NEW: GUIDANCE ALERT *** --- */}
+        {showGuidanceAlert && (
+          <div className="relative bg-primary-800 text-white p-4 rounded-lg shadow-lg flex items-center justify-between border border-primary-600 animate-fade-in">
+            <span className="font-medium text-sm sm:text-base">
+              New here? Check out the <Link to="/guidance" className="font-bold underline hover:text-primary-200">Guidance Page</Link> to learn how everything works!
+            </span>
+            <button 
+              onClick={() => setShowGuidanceAlert(false)} 
+              className="text-primary-200 hover:text-white rounded-full p-1"
+              aria-label="Dismiss"
+            >
+              <X size={20} />
+            </button>
+          </div>
+        )}
+        {/* --- *** END ALERT *** --- */}
+
+
         {/* Welcome Header */}
         <AnimatedSection tag="div" className="mb-8" delay={100}>
           <h1 className="text-3xl md:text-4xl font-bold mb-2">
