@@ -6,7 +6,7 @@ import {
     ArrowLeft, Loader2, AlertCircle, X, XCircle, UserCheck
 } from 'lucide-react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
-import AnimatedSection from '../components/AnimatedSection';
+import AnimatedSection from '../components/AnimatedSection'; // <-- RE-ADDED
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabaseClient'; // --- IMPORT SUPABASE ---
 import { useAuth } from '../contexts/AuthContext'; // --- IMPORT AUTH ---
@@ -54,11 +54,11 @@ export default function TournamentDetailsPage() {
 
     // --- Data States ---
     const [tournament, setTournament] = useState(null);
-    const [allTournamentParticipants, setAllTournamentParticipants] = useState([]); // <-- NEW: List of all teams in tourney
+    const [allTournamentParticipants, setAllTournamentParticipants] = useState([]); // <-- List of all teams in tourney
     const [participantCount, setParticipantCount] = useState(0);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    
+
     // --- User-specific States ---
     const [isRegistered, setIsRegistered] = useState(false); // True if *any* of user's teams are in
     const [eligibleTeams, setEligibleTeams] = useState([]); // User's owned teams that can join
@@ -84,17 +84,13 @@ export default function TournamentDetailsPage() {
             if (isMounted) setError(null);
             let tournamentData = null;
             let participants = [];
-            // --- *** FIX: Removed parseInt *** ---
-            // const numericTournamentId = parseInt(tournamentId, 10); // <--- REMOVED
-            // Use `tournamentId` (string) directly from useParams
-            // --- *** END FIX *** ---
 
             try {
                 // 1. Fetch tournament details
                 const { data: tourneyData, error: tournamentError } = await supabase
                     .from('tournaments')
                     .select('*')
-                    .eq('id', tournamentId) // <-- Use string tournamentId
+                    .eq('id', tournamentId) // Use string tournamentId
                     .single();
 
                 if (tournamentError) throw tournamentError;
@@ -135,10 +131,10 @@ export default function TournamentDetailsPage() {
                     const ownedTeamIds = ownedTeams.map(t => t.id);
                     const memberTeamIds = memberTeams ? memberTeams.map(t => t.team_id) : [];
                     const allUserTeamIds = [...new Set([...ownedTeamIds, ...memberTeamIds])];
-                    
+
                     // 3b. Check if ANY of these teams are already registered
                     const registeredTeam = participants.find(p => allUserTeamIds.includes(p.team_id));
-                    
+
                     if (registeredTeam) {
                         if (isMounted) {
                             setIsRegistered(true);
@@ -148,11 +144,11 @@ export default function TournamentDetailsPage() {
                     } else {
                         // 3c. User is not registered, so find eligible *owned* teams
                         if (isMounted) setIsRegistered(false);
-                        
+
                         const teamsForGame = ownedTeams.filter(t => t.game === tournamentData.game);
                         const isFull = participants.length >= tournamentData.max_participants;
                         const isClosed = new Date() > new Date(tournamentData.registration_deadline);
-                        
+
                         if (isFull) {
                             setJoinState('DISABLED');
                             setJoinMessage('Tournament Full');
@@ -209,31 +205,49 @@ export default function TournamentDetailsPage() {
         }
 
         try {
+            const gameName = tournament.game; // e.g., "Free Fire"
+
+            // --- Get all team member user IDs (including owner) ---
+            const { data: teamMembers } = await supabase.from('team_members').select('user_id').eq('team_id', teamToJoin.id);
+            const teamMemberUserIds = (teamMembers || []).map(m => m.user_id);
+            const allTeamUserIds = [...new Set([...teamMemberUserIds, user.id])]; // Add owner
+
             // --- Validation 1: Check Member Count ---
-            const { count: memberCount, error: memberCountError } = await supabase
-                .from('team_members')
-                .select('id', { count: 'exact', head: true })
-                .eq('team_id', teamToJoin.id);
-            
-            if (memberCountError) throw memberCountError;
-            
-            const totalMembers = (memberCount || 0) + 1; // +1 for owner
-            if (totalMembers < 4) { // --- YOUR RULE: Min 4 members ---
-                throw new Error(`Your team "${teamToJoin.name}" needs 4+ members (currently has ${totalMembers}).`);
+            if (allTeamUserIds.length < 4) { // --- YOUR RULE: Min 4 members ---
+                throw new Error(`Your team "${teamToJoin.name}" needs 4+ members (currently has ${allTeamUserIds.length}).`);
             }
+
+            // --- *** NEW: Validation 1.5: Check IGN/UID for all members *** ---
+            setJoinMessage('Checking player IGNs/UIDs...');
+            const { data: memberProfiles, error: profileError } = await supabase
+                .from('profiles')
+                .select('id, username, game_details')
+                .in('id', allTeamUserIds);
+
+            if (profileError) throw new Error(`Could not fetch team profiles: ${profileError.message}`);
+
+            const missingInfoPlayers = [];
+            for (const profile of memberProfiles) {
+                const gameInfo = profile.game_details ? profile.game_details[gameName] : null;
+                // Check if gameInfo exists, and if ign/uid are present and not empty
+                if (!gameInfo || !gameInfo.ign || gameInfo.ign.trim() === '' || !gameInfo.uid || gameInfo.uid.trim() === '') {
+                    missingInfoPlayers.push(profile.username);
+                }
+            }
+
+            if (missingInfoPlayers.length > 0) {
+                throw new Error(`Join failed: The following players must set their ${gameName} IGN and UID in their profile: ${missingInfoPlayers.join(', ')}`);
+            }
+            // --- *** END NEW VALIDATION *** ---
+
 
             // --- Validation 2: Check for Player Conflicts ---
             setJoinMessage('Checking for player conflicts...');
-            
-            // 2a. Get all user IDs from the team we want to register
-            const { data: selectedTeamMembers } = await supabase.from('team_members').select('user_id').eq('team_id', teamToJoin.id);
-            const selectedTeamUserIds = new Set((selectedTeamMembers || []).map(m => m.user_id));
-            selectedTeamUserIds.add(user.id); // Add the owner
 
             // 2b. Get all user IDs *already* in the tournament
             const participantTeamIds = allTournamentParticipants.map(p => p.team_id);
             const participantCaptainIds = allTournamentParticipants.map(p => p.captain_id);
-            
+
             let allRegisteredUserIds = new Set(participantCaptainIds);
 
             if (participantTeamIds.length > 0) {
@@ -244,12 +258,12 @@ export default function TournamentDetailsPage() {
                 if (pMemberError) throw pMemberError;
                 (participantMembers || []).forEach(m => allRegisteredUserIds.add(m.user_id));
             }
-           
+
             // 2c. Find the conflict
-            const conflictId = [...selectedTeamUserIds].find(id => allRegisteredUserIds.has(id));
+            const conflictId = allTeamUserIds.find(id => allRegisteredUserIds.has(id));
 
             if (conflictId) {
-                const { data: conflictProfile } = await supabase.from('profiles').select('username').eq('id', conflictId).single();
+                const conflictProfile = memberProfiles.find(p => p.id === conflictId);
                 throw new Error(`Join failed: Player "${conflictProfile?.username || conflictId}" (on your team) is already registered in this tournament.`);
             }
 
@@ -268,7 +282,7 @@ export default function TournamentDetailsPage() {
                 .single();
 
             if (insertError) throw insertError;
-            
+
             // Add new participant to local state
             setAllTournamentParticipants(prev => [...prev, newParticipant]);
 
@@ -281,6 +295,7 @@ export default function TournamentDetailsPage() {
 
         } catch (err) {
             console.error("Error during join validation/insert:", err.message);
+            // Show the specific validation error message
             setAlertModal({ isOpen: true, title: "Join Failed", message: err.message });
             setJoinState('READY'); // Reset button
             setJoinMessage('Select a team to join');
@@ -309,13 +324,34 @@ export default function TournamentDetailsPage() {
     }
 
     // --- Data processing for display ---
-    const prizeDistribution = tournament.prize_pool_amount >= 5000
-       ? [ { position: '1st Place', prize: '$2,500', percentage: '50%' }, { position: '2nd Place', prize: '$1,250', percentage: '25%' }, { position: '3rd Place', prize: '$750', percentage: '15%' }, { position: '4th Place', prize: '$500', percentage: '10%' } ]
-       : [ { position: '1st Place', prize: 'R500', percentage: '50%' }, { position: '2nd Place', prize: 'R250', percentage: '25%' }, { position: '3rd Place', prize: 'R150', percentage: '15%' }, { position: '4th Place', prize: 'R100', percentage: '10%' } ];
+    const isCash = tournament.prize_type === 'Cash (USD)';
+    const currencySymbol = isCash ? '$' : '';
+    const currencyName = isCash ? '' : ` ${tournament.prize_currency || 'Coins'}`;
+    const totalPrize = tournament.prize_pool_amount;
 
-    const prize = tournament.prize_type === 'Cash (USD)'
-        ? `$${tournament.prize_pool_amount.toLocaleString()}`
-        : `${tournament.prize_pool_amount.toLocaleString()} ${tournament.prize_currency || 'Coins'}`;
+    // Calculate Top 3 prizes
+    const prizeDistribution = [
+        {
+            position: '1st Place',
+            prize: `${currencySymbol}${(totalPrize * 0.50).toLocaleString()}${currencyName}`,
+            percentage: '50%'
+        },
+        {
+            position: '2nd Place',
+            prize: `${currencySymbol}${(totalPrize * 0.30).toLocaleString()}${currencyName}`,
+            percentage: '30%'
+        },
+        {
+            position: '3rd Place',
+            prize: `${currencySymbol}${(totalPrize * 0.20).toLocaleString()}${currencyName}`,
+            percentage: '20%'
+        }
+    ];
+
+    const prize = isCash
+        ? `$${totalPrize.toLocaleString()}`
+        : `${totalPrize.toLocaleString()}${currencyName}`;
+
 
     // --- Status Styling Helper ---
     const getStatusClasses = (status) => {
@@ -408,7 +444,7 @@ export default function TournamentDetailsPage() {
                                 <p><span className="text-gray-400 font-medium block">Teams Allowed:</span> <span className="font-semibold text-lg">Yes</span></p>
                             </div>
 
-                            {/* --- *** UPDATED: Action/Join Button Block *** --- */}
+                            {/* --- UPDATED: Action/Join Button Block --- */}
                             <div className="border-t border-dark-700 pt-6">
                                 {joinState === 'READY' ? (
                                     <div className="flex flex-col sm:flex-row gap-4">
@@ -491,7 +527,21 @@ export default function TournamentDetailsPage() {
                         <AnimatedSection tag="div" className="card bg-dark-800 p-6 rounded-xl shadow-lg" delay={500}>
                             <h2 className="text-2xl font-bold mb-4 flex items-center text-yellow-400"><Trophy className="mr-2" size={22} /> Prize Pool</h2>
                             <div className="text-center mb-5"><div className="text-4xl font-extrabold text-yellow-300 drop-shadow-lg">{prize}</div><div className="text-gray-400 text-sm uppercase tracking-wider">{tournament.prize_type === 'Cash (USD)' ? 'Total Cash Prize' : 'In-Game Currency'}</div></div>
-                            <div className="space-y-3 border-t border-dark-700 pt-4">{prizeDistribution.map((prize, index) => (<div key={index} className="flex justify-between items-center text-sm"><span className="text-gray-300 font-medium">{prize.position}</span><div className="text-right"><div className="font-semibold text-white">{prize.prize}</div><div className="text-xs text-gray-400">{prize.percentage}</div></div></div>))}</div>
+
+                            {/* --- *** UPDATED: Prize Distribution *** --- */}
+                            <div className="space-y-3 border-t border-dark-700 pt-4">
+                                {prizeDistribution.map((prize, index) => (
+                                    <div key={index} className="flex justify-between items-center text-sm">
+                                        <span className="text-gray-300 font-medium">{prize.position}</span>
+                                        <div className="text-right">
+                                            <div className="font-semibold text-white">{prize.prize}</div>
+                                            <div className="text-xs text-gray-400">{prize.percentage}</div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                            {/* --- *** END UPDATE *** --- */}
+
                         </AnimatedSection>
 
                         {/* Key Info */}

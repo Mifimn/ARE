@@ -9,7 +9,7 @@ import { useAuth } from '../contexts/AuthContext.jsx'; // --- IMPORT AUTH ---
 
 // --- Game-specific config ---
 const GAME_NAME = "Farlight 84";
-const GAME_BANNER_URL = "/images/lan_1.jpg"; // Using a generic action banner
+const GAME_BANNER_URL = "/images/far_lan.jpg"; // Using a generic action banner
 const GAME_CUP_THUMBNAIL = "/images/far_ban.jpeg"; // <-- YOUR REQUESTED IMAGE
 // ---
 

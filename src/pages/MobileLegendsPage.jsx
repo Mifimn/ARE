@@ -9,7 +9,7 @@ import { useAuth } from '../contexts/AuthContext.jsx'; // --- IMPORT AUTH ---
 
 // --- Game-specific config ---
 const GAME_NAME = "Mobile Legends";
-const GAME_BANNER_URL = "/images/1001350376.jpg"; // Use the uploaded ML image
+const GAME_BANNER_URL = "/images/ml_lan.jpg"; // Use the uploaded ML image
 const GAME_CUP_THUMBNAIL = "/images/ml_ban.jpeg"; // <-- YOUR REQUESTED IMAGE
 // ---
 
