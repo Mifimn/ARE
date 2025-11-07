@@ -550,7 +550,7 @@ export default function Farlight84Page() {
         <div className="bg-dark-900 text-white min-h-screen">
             <div className="max-w-full mx-auto space-y-10 pb-10">
                 <AnimatedSection delay={0} className="relative h-64 sm:h-80 w-full overflow-hidden shadow-xl">
-                    <img src={GAME_BANNER_URL} alt="Farlight 84 Banner" className="absolute inset-0 w-full h-full object-cover object-center scale-105 blur-sm opacity-40"/>
+                    <img src={GAME_BANNER_URL} alt="Farlight 84 Banner" className="absolute inset-0 w-full h-full object-cover object-center scale-105 opacity-80"/>
                     <div className="absolute inset-0 bg-gradient-to-t from-dark-900 via-dark-900/70 to-transparent"></div>
                     <div className="relative z-10 h-full flex flex-col justify-end max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-8 sm:pb-12">
                          <div className="flex items-center mb-4"><Gamepad2 className="w-10 h-10 sm:w-12 sm:h-12 mr-4 text-primary-400 bg-dark-800/50 p-2 rounded-lg border border-primary-500/30" /><h1 className="text-4xl md:text-6xl font-extrabold text-white drop-shadow-md">FARLIGHT 84 HUB</h1></div>

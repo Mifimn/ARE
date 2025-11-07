@@ -357,7 +357,7 @@ export default function TeamPage() {
 
                 {/* --- Hero Banner --- */}
                 <AnimatedSection delay={0} className="relative h-64 sm:h-80 w-full overflow-hidden shadow-xl bg-dark-800">
-                    <img src={teamData.banner_url || '/images/lan_9.jpg'} alt={`${teamData.name} Banner`} className="absolute inset-0 w-full h-full object-cover object-center opacity-30 blur-sm scale-105"/>
+                    <img src={teamData.banner_url || '/images/lan_9.jpg'} alt={`${teamData.name} Banner`} className="absolute inset-0 w-full h-full object-cover object-center opacity-80 scale-105"/>
                     <div className="absolute inset-0 bg-gradient-to-t from-dark-900 via-dark-900/80 to-transparent"></div>
                     <div className="relative z-10 h-full flex flex-col justify-end max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-6 sm:pb-8">
                          <div className="flex flex-col sm:flex-row items-center sm:items-end gap-4 sm:gap-6">

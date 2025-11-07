@@ -30,7 +30,7 @@ const getNavigation = (isAuthenticated, profile) => {
       { name: 'Leagues', href: '/leagues' },
       { name: 'Create Tournament', href: '/create-tournament' },
       { name: 'Manage Tournaments', href: '/update-tournament/manage' }, 
-      { name: 'Admin Guide', href: '/admin-guide' },
+      // *** REMOVED 'Admin Guide' from main nav ***
     ];
   }
 
@@ -156,15 +156,15 @@ export default function Header() {
                       <Settings className="mr-2" size={16} /> Settings
                     </Link>
 
-                    {/* Dynamic Admin Links in Dropdown */}
+                    {/* Dynamic Admin Links in Dropdown (KEEP THIS ONE) */}
                     {userProfile?.is_admin && (
                          <Link
-                            to="/admin-guide"
-                            className="flex items-center px-4 py-2 text-sm text-yellow-400 hover:text-white hover:bg-dark-700 border-t border-dark-700 mt-1 pt-1"
-                            onClick={() => setIsUserMenuOpen(false)}
-                        >
-                            <Trophy className="mr-2" size={16} /> Admin Guide
-                        </Link>
+                             to="/admin-guide"
+                             className="flex items-center px-4 py-2 text-sm text-yellow-400 hover:text-white hover:bg-dark-700 border-t border-dark-700 mt-1 pt-1"
+                             onClick={() => setIsUserMenuOpen(false)}
+                         >
+                             <Trophy className="mr-2" size={16} /> Admin Guide
+                         </Link>
                     )}
 
 
@@ -219,19 +219,19 @@ export default function Header() {
            <div className="md:hidden absolute top-16 inset-x-0 bg-dark-800 border-t border-dark-700 shadow-lg z-40">
              <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
                {navigation.map((item) => (
-                   <Link
-                       key={item.name} to={item.href}
-                       className={`block px-3 py-2 rounded-md text-base font-medium ${ 
-                         (location.pathname === item.href || 
-                          (item.name === 'Games' && location.pathname.startsWith('/tournaments')) || 
-                          (item.name === 'Leagues' && location.pathname.startsWith('/leagues')) || 
-                          (item.name === 'My Teams' && (location.pathname.startsWith('/my-teams') || location.pathname.startsWith('/manage-team'))) || 
-                          (item.name === 'Manage Tournaments' && location.pathname.startsWith('/update-tournament')) ||
-                          (item.name === 'Create Tournament' && location.pathname.startsWith('/create-tournament'))) 
-                          ? 'text-primary-500 bg-dark-700' 
-                          : 'text-gray-300 hover:text-white hover:bg-dark-700' 
-                       }`}
-                       onClick={() => setIsMenuOpen(false)}
+                    <Link
+                        key={item.name} to={item.href}
+                        className={`block px-3 py-2 rounded-md text-base font-medium ${ 
+                          (location.pathname === item.href || 
+                           (item.name === 'Games' && location.pathname.startsWith('/tournaments')) || 
+                           (item.name === 'Leagues' && location.pathname.startsWith('/leagues')) || 
+                           (item.name === 'My Teams' && (location.pathname.startsWith('/my-teams') || location.pathname.startsWith('/manage-team'))) || 
+                           (item.name === 'Manage Tournaments' && location.pathname.startsWith('/update-tournament')) ||
+                           (item.name === 'Create Tournament' && location.pathname.startsWith('/create-tournament'))) 
+                            ? 'text-primary-500 bg-dark-700' 
+                            : 'text-gray-300 hover:text-white hover:bg-dark-700' 
+                        }`}
+                        onClick={() => setIsMenuOpen(false)}
                    > {item.name} </Link>
                ))}
                <div className="border-t border-dark-600 pt-4 pb-3">
@@ -248,7 +248,7 @@ export default function Header() {
 
                            {/* Dynamic Admin Links in Mobile Dropdown */}
                             {userProfile?.is_admin && (
-                                 <Link to="/admin-guide" className="block px-3 py-2 rounded-md text-base font-medium text-yellow-400 hover:text-white hover:bg-dark-700" onClick={() => setIsMenuOpen(false)}>Admin Guide</Link>
+                                <Link to="/admin-guide" className="block px-3 py-2 rounded-md text-base font-medium text-yellow-400 hover:text-white hover:bg-dark-700" onClick={() => setIsMenuOpen(false)}>Admin Guide</Link>
                             )}
 
                            <button onClick={async () => { setIsMenuOpen(false); await supabase.auth.signOut(); }} className="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-gray-300 hover:text-white hover:bg-dark-700">Logout</button>
