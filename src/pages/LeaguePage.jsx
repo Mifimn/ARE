@@ -142,23 +142,46 @@ export default function LeaguePage() {
 
   // Helper component for the league linking UI
   const LeagueLinker = ({ league }) => {
-    // Filter tournaments to only show those for the correct game
-    const gameTournaments = tournaments.filter(t => t.game === league.game);
 
+    // --- FIX: DEFINITION MUST COME BEFORE USESTATE CALLS ---
     // Find the *full linked tournament object* for each stage
     const getLinkedTournament = (order) => {
         return linkedTournaments.find(lt => lt.league_id === league.id && lt.stage_order === order);
     };
 
-    // This component will manage its own internal state for the dropdowns
+    // --- LOCAL STATE HOOKS (USE) getLinkedTournament for initialization ---
     const [s1, setS1] = useState(getLinkedTournament(1)?.tournament_id || '');
     const [s2, setS2] = useState(getLinkedTournament(2)?.tournament_id || '');
     const [s3, setS3] = useState(getLinkedTournament(3)?.tournament_id || '');
     const [cup, setCup] = useState(getLinkedTournament(4)?.tournament_id || '');
+    // --- END FIX ---
+
+
+    // Collect all tournaments created by the organizer that are ML-related for filtering
+    const mlTournaments = tournaments.filter(t => 
+        t.game === 'Mobile Legends (Pro League)' || t.game === 'Mobile Legends'
+    );
 
     const renderDropdown = (value, setValue, stageName, stageOrder) => {
         const linked = getLinkedTournament(stageOrder);
         const isLinked = !!linked;
+
+        let filteredTournaments = [];
+
+        // --- FILTERING LOGIC ---
+        if (league.game === 'Mobile Legends (Pro League)') {
+            if (stageOrder <= 3) {
+                // S1, S2, S3 must be the Pro League format
+                filteredTournaments = mlTournaments.filter(t => t.game === 'Mobile Legends (Pro League)');
+            } else if (stageOrder === 4) {
+                // MASC Cup must be the Standard Mobile Legends format
+                filteredTournaments = mlTournaments.filter(t => t.game === 'Mobile Legends');
+            }
+        } else {
+            // For all other leagues (Free Fire, Farlight 84, etc.)
+            filteredTournaments = tournaments.filter(t => t.game === league.game);
+        }
+        // --- END FILTERING LOGIC ---
 
         return (
             <div className="flex items-center gap-2">
@@ -170,10 +193,10 @@ export default function LeaguePage() {
                 >
                     <option value="">Select Tournament...</option>
                     {/* Show the currently linked tournament even if it's not in the list */}
-                    {isLinked && !gameTournaments.some(t => t.id === linked.tournament_id) && (
+                    {isLinked && !filteredTournaments.some(t => t.id === linked.tournament_id) && (
                         <option value={linked.tournament_id}>{linked.tournaments.name} (Linked)</option>
                     )}
-                    {gameTournaments.map(t => (
+                    {filteredTournaments.map(t => (
                         <option key={t.id} value={t.id}>{t.name}</option>
                     ))}
                 </select>

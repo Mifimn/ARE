@@ -1,6 +1,11 @@
 // src/pages/AdminGuidePage.jsx
 
-import { HelpCircle, Trophy, Layers, Workflow, ListChecks, ArrowLeft, UserCheck, Lock, Send, BarChart, FileText, Gamepad2, Plus } from 'lucide-react';
+import { 
+    HelpCircle, Trophy, Layers, Workflow, ListChecks, ArrowLeft, 
+    UserCheck, Lock, Send, BarChart2, FileText, Gamepad2, Plus, 
+    AlertCircle, Save, Calendar, Clock, Edit3, Shuffle, UsersRound, 
+    Swords, Target // <<< FIXED: ADDED Swords and Target >>>
+} from 'lucide-react';
 import { Link } from 'react-router-dom';
 import AnimatedSection from '../components/AnimatedSection';
 
@@ -52,107 +57,79 @@ export default function AdminGuidePage() {
                 </AnimatedSection>
 
                 <div className="space-y-8">
-                    {/* --- Section 1: Standard Tournaments --- */}
-                    <GuideSection title="Standard Tournaments (One-Offs)" icon={Trophy}>
-                        <p>Use this for simple, single events like a **Free Fire** qualifier or a basic **Mobile Legends** Round Robin.</p>
-                        <ol className="list-decimal list-inside space-y-2 pl-2">
-                            <li>Go to <Link to="/create-tournament" className="text-primary-400 hover:underline">Create Tournament</Link>.</li>
-                            <li>Select the game (e.g., "Free Fire" or "Mobile Legends").</li>
-                            <li>Fill in all details (name, dates, prize pool, etc.).</li>
-                            <li>Configure the **Stage Configuration** (e.g., "Qualifier Matches per Group" for FF).</li>
-                            <li>Click "Create" and you will be taken to the management page.</li>
-                            <li>On the <Code>UpdateTournamentPage</Code>, you can run group draws, schedule matches, and enter results.</li>
-                        </ol>
+                    {/* --- Section 1: Standard Tournament Overview --- */}
+                    <GuideSection title="Tournament Creation Workflow" icon={Plus}>
+                        <p>All tournaments are created via the <Link to="/create-tournament" className="text-primary-400 hover:underline">Create Tournament</Link> page, which locks the format and initial stage settings upon creation.</p>
+                        <p>The core responsibility is to manage the flow of teams through stages on the <Code>/update-tournament/[id]</Code> page.</p>
                     </GuideSection>
 
-                    {/* --- Section 2: Pro League & Seeding System --- */}
-                    <GuideSection title="The Pro League & Seeding System" icon={Layers}>
-                        <p>This is the advanced 3-Season system for **"Mobile Legends (Pro League)"**. It requires three parts: creating the "League," creating the "Tournaments," and "Linking" them together.</p>
+                    {/* --- Section 2: Free Fire Management --- */}
+                    <GuideSection title="Free Fire (Grouped BR) Management" icon={Target}>
+                        <p className='font-bold text-white'>Game: Free Fire • Format: <Code>Grouped-Multi-Stage-BR</Code></p>
 
-                        <h3 className="text-xl font-semibold text-primary-300 pt-4 border-t border-dark-600">Part A: The Logic (Your 16 + 48 Model)</h3>
-                        <p>
-                            This is a **hybrid format**. The "Seeded" teams and "New" teams start at the same time, in the same stage.
-                        </p>
-                        <ul className="list-disc list-inside space-y-2 pl-2">
-                            <li><strong className="text-white">"Seeding"</strong> = An **automatic registration slot** for the next season. It is a reward, <strong className="text-red-400">NOT a stage skip</strong>.</li>
-                            <li><strong>Season 1:</strong> You run a 64-team tournament. The Top 16 are identified.</li>
-                            <li><strong>Season 2:</strong> You "Seed" the Top 16 from S1. They get 16 of the 64 slots. You open registration for the **remaining 48 slots**. All 64 teams start together in Stage 1.</li>
-                            <li><strong>Season 3:</strong> You "Seed" the Top 16 from S2. The same process repeats.</li>
-                            <li><strong>MASC Cup:</strong> The Top 16 from S3 are "seeded" into the final MASC cup, which *is* their qualification.</li>
+                        <h3 className="text-xl font-semibold text-primary-300 pt-4 border-t border-dark-600">Creation & Flow</h3>
+                        <ul className="list-disc list-inside space-y-1 pl-2">
+                            <li>Select **Free Fire**. Configure **Stage Configuration** numbers (e.g., 3 Qualifier Matches, 6 Playoff Matches).</li>
                         </ul>
 
-                        <h3 className="text-xl font-semibold text-primary-300 pt-4 border-t border-dark-600">Part B: How to Create a New League (e.g., "AML 2025")</h3>
-                        <ol className="list-decimal list-inside space-y-2 pl-2">
-                            <li>
-                                <strong>Step 1: Create the "League" (The Folder)</strong>
-                                <ul className="list-disc list-inside pl-6">
-                                    <li>Go to the <Link to="/leagues" className="text-primary-400 hover:underline">League Management</Link> page.</li>
-                                    <li>In the "Create New League" form, enter the name (e.g., "AML 2025") and select the game "Mobile Legends (Pro League)".</li>
-                                    <li>Click "Create League".</li>
-                                </ul>
-                            </li>
-                            <li>
-                                <strong>Step 2: Create the "Tournaments" (The Files)</strong>
-                                <ul className="list-disc list-inside pl-6">
-                                    <li>Go to <Link to="/create-tournament" className="text-primary-400 hover:underline">Create Tournament</Link> **four separate times**.</li>
-                                    <li>Create "AML 2025 - Season 1" (Select "Mobile Legends (Pro League)").</li>
-                                    <li>Create "AML 2025 - Season 2" (Select "Mobile Legends (Pro League)").</li>
-                                    <li>Create "AML 2025 - Season 3" (Select "Mobile Legends (Pro League)").</li>
-                                    <li>Create "MASC 2025" (Select "Mobile Legends (Pro League)", set Max Participants to 16).</li>
-                                    <li>For S1, S2, and S3, set the **"S1: Qualifier Teams"** to **48**. This is the number of *new* teams you will accept.</li>
-                                </ul>
-                            </li>
-                             <li>
-                                <strong>Step 3: Link Tournaments to the League</strong>
-                                <ul className="list-disc list-inside pl-6">
-                                    <li>Go back to the <Link to="/leagues" className="text-primary-400 hover:underline">League Management</Link> page.</li>
-                                    <li>Find your "AML 2025" league.</li>
-                                    <li>In the "Season 1" dropdown, find and select "AML 2025 - Season 1". Click "Link".</li>
-                                    <li>In the "Season 2" dropdown, find and select "AML 2025 - Season 2". Click "Link".</li>
-                                    <li>Repeat for "Season 3" and "MASC Cup".</li>
-                                </ul>
-                            </li>
+                        <h3 className="text-xl font-semibold text-primary-300 pt-4 border-t border-dark-600">Stage Management</h3>
+                        <ol className="list-decimal list-inside space-y-3 pl-2">
+                            <li>**Initial Draw:** Click the **<Lock size={14} className="inline-block mr-1"/> Lock Registration** button. Then, click **<Shuffle size={14} className="inline-block mr-1"/> Run Group Draw & Schedule**. This divides teams into groups and creates the schedule.</li>
+                            <li>**Schedule Update:** In the **Manage Schedule & Results** view, click the <Edit3 size={14} className="inline-block mx-1"/> icon to update the date/time. Click <Save size={14} className="inline-block mx-1"/> to save.</li>
+                            <li>**Result Entry:** Click **Enter Results** on a scheduled match. Enter a unique **Placement** (1 to 12) and **Kills** for every team in the lobby. The system handles point calculation.</li>
+                            <li>**Advancement:** After all matches are complete, click **<Send size={14} className="inline-block mr-1"/> Advance Top Teams** (from the Standings tab). The system calculates the top teams based on total points and moves them to the next stage.</li>
                         </ol>
-                        <p className="font-bold text-white">Your league is now fully set up and the "Seed Next Season" button will work automatically.</p>
                     </GuideSection>
 
-                    {/* --- Section 3: Managing the League --- */}
-                    <GuideSection title="How to Manage a Pro League Season" icon={Workflow}>
-                        <h3 className="text-xl font-semibold text-primary-300">1. Running Season 1</h3>
-                        <ol className="list-decimal list-inside space-y-2 pl-2">
-                            <li>Go to <Link to="/update-tournament/manage" className="text-primary-400 hover:underline">Manage Tournaments</Link> and open "AML 2025 - Season 1".</li>
-                            <li>Wait for teams to register. You can accept up to 64.</li>
-                            <li>Go to the "Stage 1: Open Qualifiers" tab.</li>
-                            <li>Click the <span className="font-bold text-red-400 p-1 rounded bg-dark-900"><Lock size={14} className="inline-block mr-1"/> Lock Registration</span> button. You can do this even with fewer than 64 teams (e.g., 50 teams).</li>
-                            <li>Click the <span className="font-bold text-primary-400 p-1 rounded bg-dark-900"><Workflow size={14} className="inline-block mr-1"/> Generate Bracket</span> button. The system will automatically calculate and assign "Byes" (free wins to Stage 2) to balance the bracket to 64.</li>
-                            <li>Run all 5 stages of the tournament by entering scores and clicking "Advance Winners".</li>
-                            <li>When the tournament is finished, set its status to "Completed".</li>
-                        </ol>
+                    {/* --- Section 3: Farlight 84 Management --- */}
+                    <GuideSection title="Farlight 84 (League BR) Management" icon={BarChart2}>
+                        <p className='font-bold text-white'>Game: Farlight 84 • Format: <Code>Multi-Stage-BR</Code></p>
 
-                        <div className="p-4 bg-dark-900/50 border border-yellow-700/50 rounded-lg">
-                            <h4 className="font-bold text-yellow-400 flex items-center"><AlertCircle size={16} className="mr-2"/> Important Manual Step</h4>
-                            <p className="text-sm text-yellow-300">
-                                The seeder needs to know the Top 16. Before clicking "Seed", you MUST manually enter the final 16 teams into the <Code>tournament_standings</Code> table in the Supabase dashboard.
-                                (We will build a UI for this later).
+                        <h3 className="text-xl font-semibold text-primary-300 pt-4 border-t border-dark-600">Weekly Management</h3>
+                        <ol className="list-decimal list-inside space-y-3 pl-2">
+                            <li>**Initial Setup:** Click **<Lock size={14} className="inline-block mr-1"/> Lock Registration**.</li>
+                            <li>**Generate Week:** On the **Active Stage** tab, click **<Calendar size={14} className="inline-block mr-1"/> Generate Match Schedule**. This creates all matches for the current week.</li>
+                            <li>**Enter Results:** Use the **BR Result Entry Modal**, logging Placement (1-20) and Kills.</li>
+                            <li>**Advancement:** Click **Advance** at the end of the week. Standings are cumulative across all weeks until the Finals.</li>
+                        </ol>
+                    </GuideSection>
+
+                    {/* --- Section 4: Mobile Legends (Round Robin) Management --- */}
+                    <GuideSection title="Mobile Legends (Round Robin MOBA) Management" icon={Swords}>
+                         <p className='font-bold text-white'>Game: Mobile Legends • Format: <Code>Round-Robin-to-Bracket</Code></p>
+
+                        <h3 className="text-xl font-semibold text-primary-300 pt-4 border-t border-dark-600">League Management Flow</h3>
+                        <ol className="list-decimal list-inside space-y-3 pl-2">
+                            <li>**Generate Schedule:** After locking registration, click **<Calendar size={14} className="inline-block mr-1"/> Generate League Schedule**. This creates all **Round Robin** matchups (Bo3 matches).</li>
+                            <li>**Result Entry:** Click **Enter Results** on a match. Use the **MOBA Result Modal** to enter the **score** for Team 1 and Team 2 (e.g., 2-1).</li>
+                            <li>**Advancement:** After all Round Robin matches are complete, click **Advance Winners to Playoffs**. The system ranks teams by wins/losses and creates the final bracket.</li>
+                        </ol>
+                    </GuideSection>
+
+                    {/* --- Section 5: MLBB Pro Series Management --- */}
+                    <GuideSection title="MLBB Pro Series (Automated Seeding)" icon={Layers}>
+                         <p className='font-bold text-white'>Game: MLBB Pro League • Format: <Code>mlbb-pro-series</Code> (Seasons)</p>
+
+                        <h3 className="text-xl font-semibold text-primary-300 pt-4 border-t border-dark-600">Creation & Seeding Flow</h3>
+
+                        <div className="p-4 bg-dark-900/50 border border-blue-700/50 rounded-lg">
+                            <h4 className="font-bold text-blue-400 flex items-center"><AlertCircle size={16} className="mr-2"/> CRITICAL: MASC Cup Creation</h4>
+                            <p className="text-sm text-blue-300">
+                                Create the **MASC Cup** using the **Standard Mobile Legends** format, not the Pro League format. Set **Max Participants to 16** to ensure a clean final bracket.
                             </p>
                         </div>
 
-                        <h3 className="text-xl font-semibold text-primary-300 pt-4 border-t border-dark-600">2. Seeding Season 2</h3>
-                         <ol className="list-decimal list-inside space-y-2 pl-2">
-                            <li>Go to the "Stage 5: Grand Finals" tab of your **completed "Season 1"** tournament.</li>
-                            <li>Click the <span className="font-bold text-white p-1 rounded bg-dark-900"><Send size={14} className="inline-block mr-1"/> Seed Top 16 to Next Season</span> button.</li>
-                            <li>The system will automatically find "AML 2025 - Season 2" (because you linked it!) and register the Top 16 teams with the "Seeded" tag.</li>
-                        </ol>
-
-                        <h3 className="text-xl font-semibold text-primary-300 pt-4 border-t border-dark-600">3. Running Season 2 (The 16 + 48 Flow)</h3>
-                         <ol className="list-decimal list-inside space-y-2 pl-2">
-                            <li>Go to the public `TournamentDetailsPage` for "Season 2". You will see 16 teams are already registered.</li>
-                            <li>The page will correctly show only **48 open slots** for new teams.</li>
-                            <li>Once 48 new teams join, go to the `UpdateTournamentPage` for "Season 2".</li>
-                            <li>You will see all **64 teams** in the participant list (16 "Seeded" and 48 "New").</li>
-                            <li>Click <span className="font-bold text-red-400 p-1 rounded bg-dark-900"><Lock size={14} className="inline-block mr-1"/> Lock Registration</span>.</li>
-                            <li>Click <span className="font-bold text-primary-400 p-1 rounded bg-dark-900"><Workflow size={14} className="inline-block mr-1"/> Generate Bracket</span>. A full 64-team bracket will be created for *all* teams (no Byes needed).</li>
-                            <li>Repeat the process to run the tournament and seed Season 3.</li>
+                        <h3 className="text-xl font-semibold text-primary-300 pt-4 border-t border-dark-600">Finalization & Seeding Steps</h3>
+                        <ol className="list-decimal list-inside space-y-3 pl-2">
+                            <li>**Run Tournament (S1, S2, S3):** Complete the season tournament through all 5 stages by advancing winners.</li>
+                            <li>**Finalize & Rank:** After the last match in **Stage 5 (Grand Finals)** is completed, click **<Send size={14} className="inline-block mr-1"/> Finalize & Rank**.
+                                <ul className='list-disc list-inside pl-6 text-sm text-yellow-400'>
+                                    <li>This automatically infers the Top 16 rankings and **saves the data** to the <Code>tournament_standings</Code> table.</li>
+                                    <li>The tournament status is automatically set to **Completed**.</li>
+                                </ul>
+                            </li>
+                            <li>**Seed Next Season:** Once the tournament status is <strong className='text-green-400'>Completed</strong>, click **<Send size={14} className="inline-block mr-1"/> Seed Top 16 to Next Season**. This action registers the Top 16 into the next tournament in the sequence (e.g., S2, S3, or the final MASC Cup).</li>
+                            <li>**MASC Cup Management:** When managing the MASC Cup, click **Generate Schedule** (since it's a standard MOBA format). This creates the 16-team elimination bracket instantly, ready for play.</li>
                         </ol>
                     </GuideSection>
                 </div>

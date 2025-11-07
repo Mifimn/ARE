@@ -6,8 +6,8 @@ import {
     ArrowLeft, Loader2, AlertCircle, X, XCircle, UserCheck
 } from 'lucide-react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
-import AnimatedSection from '../components/AnimatedSection'; // <-- RE-ADDED
-import { useState, useEffect } from 'react';
+import AnimatedSection from '../components/AnimatedSection';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabaseClient'; // --- IMPORT SUPABASE ---
 import { useAuth } from '../contexts/AuthContext'; // --- IMPORT AUTH ---
 
@@ -151,7 +151,22 @@ export default function TournamentDetailsPage() {
                     // 3b. Check if ANY of these teams are already registered
                     const registeredTeam = participants.find(p => allUserTeamIds.includes(p.team_id));
 
-                    if (registeredTeam) {
+                    // --- *** START NEW LOGIC: MASC Cup Final Check *** ---
+                    // Identify the MASC Cup: Game is 'Mobile Legends' AND max slots <= 16
+                    const isMascCupFinal = 
+                        tournamentData.game === 'Mobile Legends' && 
+                        tournamentData.max_participants <= 16; 
+
+                    if (isMascCupFinal) {
+                        if (isMounted) {
+                            setIsRegistered(false);
+                            setJoinState('DISABLED');
+                            setJoinMessage('Qualification Required: Teams must qualify via league season results.');
+                        }
+                    } 
+                    // --- *** END NEW LOGIC *** ---
+
+                    else if (registeredTeam) {
                         if (isMounted) {
                             setIsRegistered(true);
                             setJoinState('JOINED');
@@ -159,9 +174,7 @@ export default function TournamentDetailsPage() {
                         }
                     } else {
                         // 3c. User is not registered, so find eligible *owned* teams
-                        if (isMounted) setIsRegistered(false);
 
-                        // Use new "Full" logic
                         const isProLeague = tournamentData.format === 'mlbb-pro-series';
                         const newTeamSlots = isProLeague ? (tournamentData.stages[0]?.totalTeams || 0) : tournamentData.max_participants;
                         const newTeamsCount = participants.filter(p => !p.is_seeded).length;
@@ -169,17 +182,14 @@ export default function TournamentDetailsPage() {
                         const isFull = newTeamsCount >= newTeamSlots;
                         const isClosed = new Date() > new Date(tournamentData.registration_deadline);
 
-                        // --- *** THIS IS THE FIX *** ---
-                        // Check if the tournament is an ML tournament
+                        // Check for ML game variants
                         const isMLTournament = tournamentData.game.startsWith('Mobile Legends');
-                        // Define the games that are eligible to join
                         const eligibleGameNames = isMLTournament 
                             ? ["Mobile Legends", "Mobile Legends (Pro League)"] 
                             : [tournamentData.game];
 
                         // Filter user's owned teams by the eligible game names
                         const teamsForGame = ownedTeams.filter(t => eligibleGameNames.includes(t.game));
-                        // --- *** END OF FIX *** ---
 
                         if (isFull) {
                             setJoinState('DISABLED');
@@ -239,13 +249,11 @@ export default function TournamentDetailsPage() {
         }
 
         try {
-            // --- *** THIS IS THE SECOND FIX *** ---
             // Use the same logic as the filter to check IGNs/UIDs
             const isMLTournament = tournament.game.startsWith('Mobile Legends');
             const eligibleGameNames = isMLTournament 
                 ? ["Mobile Legends", "Mobile Legends (Pro League)"] 
                 : [tournament.game];
-            // --- *** END FIX *** ---
 
             // --- Get all team member user IDs (including owner) ---
             const { data: teamMembers } = await supabase.from('team_members').select('user_id').eq('team_id', teamToJoin.id);
@@ -352,7 +360,7 @@ export default function TournamentDetailsPage() {
 
     // --- Loading State ---
     if (loading) {
-        return ( <div className="flex justify-center items-center min-h-[calc(100vh-4rem)]"><div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-primary-500"></div></div> );
+        return ( <div className="flex justify-center items-center min-h-[calc(100vh-10rem)]"> <Loader2 className="w-16 h-16 text-primary-500 animate-spin" /> <p className="ml-4 text-xl text-gray-400">Loading Team...</p> </div> );
     }
 
     // --- Error State ---
@@ -414,12 +422,20 @@ export default function TournamentDetailsPage() {
     // --- UPDATED: Status Text Logic ---
     let statusText = tournament.status;
     const isProLeague = tournament.format === 'mlbb-pro-series';
+    const isMascCupFinal = tournament.game === 'Mobile Legends' && tournament.max_participants <= 16;
     const newTeamSlotsFull = newTeamCount >= qualifierSlotLimit;
 
-    if (isRegistered) statusText = 'JOINED';
-    else if (newTeamSlotsFull) statusText = 'Full';
-    else if (new Date() > new Date(tournament.registration_deadline)) statusText = 'Registration Closed';
-    else if (tournament.status === 'Draft' || tournament.status === 'Setup') statusText = 'Registration Open';
+    if (isMascCupFinal) {
+        statusText = 'Qualification Required';
+    } else if (isRegistered) {
+        statusText = 'JOINED';
+    } else if (newTeamSlotsFull) {
+        statusText = 'Full';
+    } else if (new Date() > new Date(tournament.registration_deadline)) {
+        statusText = 'Registration Closed';
+    } else if (tournament.status === 'Draft' || tournament.status === 'Setup') {
+        statusText = 'Registration Open';
+    }
     // --- END UPDATE ---
 
     // --- Helper function to get game-specific banner ---
@@ -472,7 +488,8 @@ export default function TournamentDetailsPage() {
                                 {/* --- UPDATED: Participant Count Display --- */}
                                 {isProLeague ? (
                                     <>
-                                        <span className="flex items-center"><UserPlus className="mr-1.5 text-primary-500" size={16} /> {newTeamCount}/{qualifierSlotLimit} New Teams</span>
+                                        {/* Only show slots if it's NOT a seeding-only final (like MASC Cup) */}
+                                        {!isMascCupFinal && <span className="flex items-center"><UserPlus className="mr-1.5 text-primary-500" size={16} /> {newTeamCount}/{qualifierSlotLimit} New Teams</span>}
                                         <span className="flex items-center"><UserCheck className="mr-1.5 text-yellow-400" size={16} /> {seededTeamCount} Seeded Teams</span>
                                     </>
                                 ) : (
@@ -508,7 +525,7 @@ export default function TournamentDetailsPage() {
 
                             {/* --- Action/Join Button Block --- */}
                             <div className="border-t border-dark-700 pt-6">
-                                {joinState === 'READY' ? (
+                                {joinState === 'READY' && !isMascCupFinal ? (
                                     <div className="flex flex-col sm:flex-row gap-4">
                                         <select 
                                             value={selectedTeamId}
@@ -536,11 +553,11 @@ export default function TournamentDetailsPage() {
                                             ${joinState === 'DISABLED' ? 'bg-gray-600 hover:bg-gray-600' : ''}
                                             ${joinState === 'LOADING' ? 'disabled:opacity-50' : ''}
                                         `}
-                                        disabled={true} // Disabled for JOINED, DISABLED, LOADING
+                                        disabled={true} // Disabled for JOINED, DISABLED, LOADING, and isMascCupFinal
                                     >
                                         {joinState === 'LOADING' && <Loader2 className="w-5 h-5 animate-spin" />}
                                         {joinState === 'JOINED' && <UserCheck size={20} className="mr-2" />}
-                                        {joinState === 'DISABLED' && <XCircle size={20} className="mr-2" />}
+                                        {(joinState === 'DISABLED' || isMascCupFinal) && <XCircle size={20} className="mr-2" />}
                                         {joinMessage}
                                     </button>
                                 )}
@@ -616,7 +633,7 @@ export default function TournamentDetailsPage() {
                              </div>
                         </AnimatedSection>
                     </div> {/* End Right Column */}
-                </div> {/* End Main Grid */}
+                 </div> {/* End Main Grid */}
             </div> {/* End Page Container */}
         </div>
     );

@@ -5,7 +5,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
     Settings, Trash2, Edit3, ListChecks, Shuffle, CalendarCheck, Eye, ArrowLeft, Users, AlertTriangle, Save,
     X, HelpCircle, Info, TrendingUp, Zap, Upload, CheckCircle, Target, Trophy, Swords, Send, BarChart2, Calendar, Clock, Edit, Loader2,
-    Workflow, UsersRound, Lock, UserCheck // --- NEW ICONS ---
+    Workflow, UsersRound, Lock, UserCheck 
 } from 'lucide-react';
 import AnimatedSection from '../components/AnimatedSection';
 import { supabase } from '../lib/supabaseClient'; // --- IMPORT SUPABASE ---
@@ -20,7 +20,7 @@ const calculateKillPoints = (kills) => {
     return kills * 2;
 };
 
-// --- HELPER: Round Robin Schedule Generator ---
+// --- HELPER: Round Robin Schedule Generator (Unchanged) ---
 const generateRoundRobinSchedule = (teams, totalWeeks) => {
     if (teams.length < 2) return [];
     const N = teams.length;
@@ -59,7 +59,59 @@ const generateRoundRobinSchedule = (teams, totalWeeks) => {
 };
 
 
-// --- HELPER: Custom Modal ---
+// --- HELPER: Automatically Calculates and Saves Final Top 16 Standings (NEW LOGIC) ---
+const calculateAndSaveFinalStandings = async (tournamentId, allMatches, allParticipants) => {
+    // 1. Get all participants who made it to Stage 3 (Group Stage) or beyond. 
+    // This is the pool of the Top 32 teams before further elimination.
+    const eligibleParticipants = allParticipants.filter(p => 
+        p.status && (p.status.startsWith('adv_stage_') || p.status === 'Registered')
+    );
+
+    // 2. Filter down to the final 16 teams based on the elimination history.
+    // We sort by the highest stage achieved (S5 > S4 > S3) to infer rank 1-16.
+    const top16Participants = eligibleParticipants.sort((a, b) => {
+        const getStage = (status) => {
+            // Find the stage ID they advanced *to*
+            const match = status.match(/adv_stage_(\d)/);
+            // S3 (Group Stage) is the key filter; S5 is the final target.
+            return match ? parseInt(match[1]) : 0; 
+        };
+        const statusA = getStage(a.status);
+        const statusB = getStage(b.status);
+
+        // Sort descending by highest stage advanced to (higher stage = better rank)
+        return statusB - statusA;
+    }).slice(0, 16); // Only take the top 16 inferred ranks
+
+    // 3. Prepare records for the tournament_standings table
+    const standingRecords = top16Participants.map((p, index) => ({
+        tournament_id: tournamentId,
+        participant_id: p.id,
+        team_id: p.team_id,
+        team_name: p.team_name,
+        rank: index + 1, // Auto-assign rank 1 to 16
+        total_points: 0, // Placeholder
+    }));
+
+    if (standingRecords.length === 0) {
+        throw new Error("No teams were ranked, unable to finalize standings.");
+    }
+
+    // 4. Upsert into tournament_standings table
+    const { error: upsertError } = await supabase
+        .from('tournament_standings')
+        .upsert(standingRecords, { 
+            onConflict: 'tournament_id, participant_id'
+        });
+
+    if (upsertError) throw upsertError;
+
+    return standingRecords.length;
+};
+// --- END HELPER ---
+
+
+// --- HELPER: Custom Modal (Unchanged) ---
 const CustomModal = ({ isOpen, onClose, title, children, promptLabel, onPromptSubmit, showCancel = true, confirmText = 'OK', onConfirm, customBody, large = false, isLoading = false }) => {
     const [inputValue, setInputValue] = useState('');
     useEffect(() => { if (isOpen) setInputValue(''); }, [isOpen, promptLabel]);
@@ -72,7 +124,7 @@ const CustomModal = ({ isOpen, onClose, title, children, promptLabel, onPromptSu
         // Let the onConfirm handler close the modal
     };
 
-    const Icon = isPrompt ? HelpCircle : (title && title.toLowerCase().includes('error')) ? AlertCircle : Info;
+    const Icon = isPrompt ? HelpCircle : (title && title.toLowerCase().includes('error')) ? AlertTriangle : Info;
     const iconColor = (title && title.toLowerCase().includes('error')) ? 'text-red-400' : 'text-primary-400';
 
     return (
@@ -100,7 +152,7 @@ const CustomModal = ({ isOpen, onClose, title, children, promptLabel, onPromptSu
     );
 };
 
-// --- UPDATED: Participant List ---
+// --- UPDATED: Participant List (Unchanged) ---
 const ParticipantList = ({ participants, maxParticipants }) => (
     <div className="card bg-dark-700/50 p-6 rounded-xl shadow-lg border border-dark-600">
         <h3 className="text-xl font-bold text-primary-300 mb-4 flex items-center justify-between">
@@ -144,7 +196,7 @@ const ParticipantList = ({ participants, maxParticipants }) => (
 );
 
 
-// --- Helper function to get game-specific card styles ---
+// --- Helper function to get game-specific card styles (Unchanged) ---
 const getGameCardStyles = (game) => {
     switch (game) {
         case 'Free Fire':
@@ -162,7 +214,7 @@ const getGameCardStyles = (game) => {
 
 
 // ------------------------------------------------------------------------------------
-// FORMAT 1: Grouped BR Stage Management (Free Fire Demo)
+// FORMAT 1: Grouped BR Stage Management (Free Fire Demo - Unchanged)
 // ------------------------------------------------------------------------------------
 const GroupedBRStageView = ({ tournament, participants, matches, results, onDataUpdate, openModal, setModalLoading }) => {
     const { stages, current_stage } = tournament;
@@ -184,7 +236,7 @@ const GroupedBRStageView = ({ tournament, participants, matches, results, onData
         return matches.filter(m => m.stage_id === current_stage);
     }, [matches, current_stage]);
 
-    // --- LIVE STANDINGS CALCULATION (Per Group) ---
+    // --- LIVE STANDINGS CALCULATION (Per Group - Unchanged) ---
     const groupedStandings = useMemo(() => {
         if (participants.length === 0) return {};
         const standings = {};
@@ -224,7 +276,7 @@ const GroupedBRStageView = ({ tournament, participants, matches, results, onData
         return standings;
     }, [results, teamsForThisStage, participants.length]);
 
-    // --- ACTION HANDLERS (DATABASE) ---
+    // --- ACTION HANDLERS (DATABASE - Unchanged) ---
     const handleGroupDraw = () => {
         if (groupNames.length > 0) {
             openModal({ title: "Groups Already Set", message: `Stage ${current_stage} groups are already set.`, showCancel: false }); return;
@@ -268,7 +320,7 @@ const GroupedBRStageView = ({ tournament, participants, matches, results, onData
                             matchParticipantsToInsert.push({
                                 match_id: matchData.id,
                                 participant_id: team.id,
-                                tournament_id: tournament.id // Add tournament_id
+                                tournament_id: tournament.id
                             });
                         });
                     }
@@ -348,10 +400,7 @@ const GroupedBRStageView = ({ tournament, participants, matches, results, onData
         openModal({ title: "Advancement Logic", message: "This function will calculate standings, advance winners, and update the tournament to the next stage.", showCancel: false });
     };
 
-    // --- UI RENDER (Omitted for brevity, it's unchanged) ---
-    // ... (ResultsEntryModalContent, ScheduleView, GroupedStandingsView, renderStageView) ...
-    // ... (The full code for these components is in your file history) ...
-    // ... (I am keeping them in the final code block, just collapsing here for readability) ...
+    // --- UI RENDER (Unchanged helper components for brevity) ---
     const ResultsEntryModalContent = () => {
         const [results, setResults] = useState(selectedMatch?.matchResults || []);
         const lobbySize = selectedMatch.matchResults.length;
@@ -372,7 +421,7 @@ const GroupedBRStageView = ({ tournament, participants, matches, results, onData
         return (
             <div className={`bg-dark-800 rounded-xl shadow-2xl w-full max-w-4xl border border-dark-600 relative`} onClick={(e) => e.stopPropagation()}>
                 <div className="flex items-center justify-between p-4 border-b border-dark-700">
-                    <h3 className="text-xl font-semibold text-white flex items-center"><Upload className='mr-2 size-5'/> Results Entry: {selectedMatch.id}</h3>
+                    <h3 className="text-xl font-semibold text-white flex items-center"><Upload size={20} className='mr-2'/> Results Entry: {selectedMatch.id}</h3>
                     <button onClick={() => setViewMode('schedule')} className="text-gray-400 hover:text-white rounded-full p-1 transition-colors" aria-label="Close modal"> <X size={20} /> </button>
                 </div>
                 <div className="p-6">
@@ -613,10 +662,9 @@ const GroupedBRStageView = ({ tournament, participants, matches, results, onData
 
 
 // ------------------------------------------------------------------------------------
-// FORMAT 2: League BR Stage Management (Farlight 84 Demo)
+// FORMAT 2: League BR Stage Management (Farlight 84 Demo - Unchanged)
 // ------------------------------------------------------------------------------------
 const LeagueBRStageView = ({ tournament, participants, matches, results, onDataUpdate, openModal, setModalLoading }) => {
-    // ... (This component is unchanged from the previous step) ...
     const { stages, current_stage } = tournament;
     const currentStageDetails = stages.find(s => s.id === current_stage);
     const [viewMode, setViewMode] = useState('overview'); 
@@ -656,10 +704,9 @@ const LeagueBRStageView = ({ tournament, participants, matches, results, onDataU
 
 
 // ------------------------------------------------------------------------------------
-// FORMAT 3: MOBA League Management (Mobile Legends Demo)
+// FORMAT 3: MOBA League Management (Mobile Legends Demo - Unchanged)
 // ------------------------------------------------------------------------------------
 const MLBBManagementView = ({ tournament, participants, matches, results, onDataUpdate, openModal, setModalLoading }) => {
-    // ... (This component is unchanged from the previous step) ...
     const { stages, current_stage, format } = tournament;
     const currentStageDetails = stages.find(s => s.id === current_stage);
     const [viewMode, setViewMode] = useState('overview'); 
@@ -725,7 +772,7 @@ const MLBBManagementView = ({ tournament, participants, matches, results, onData
 };
 
 
-// --- NEW: Helper Modal for MOBA (1v1) Match Results ---
+// --- NEW: Helper Modal for MOBA (1v1) Match Results (Unchanged) ---
 const MOBAMatchResultsModal = ({ isOpen, onClose, match, participants, onSubmit, isLoading }) => {
     const [team1Score, setTeam1Score] = useState(0);
     const [team2Score, setTeam2Score] = useState(0);
@@ -829,7 +876,7 @@ const MOBAMatchResultsModal = ({ isOpen, onClose, match, participants, onSubmit,
 // ------------------------------------------------------------------------------------
 // --- FORMAT 4: MLBB Pro Series Management (5-Stage) ---
 // ------------------------------------------------------------------------------------
-const MLBBProSeriesView = ({ tournament, participants, matches, results, onDataUpdate, openModal, setModalLoading, isModalLoading }) => {
+const MLBBProSeriesView = ({ tournament, participants, matches, results, onDataUpdate, openModal, setModalLoading, isModalLoading, currentTournamentData }) => {
     const { stages, current_stage } = tournament;
     const [viewStageId, setViewStageId] = useState(current_stage);
     const selectedStageDetails = stages.find(s => s.id === viewStageId);
@@ -842,19 +889,12 @@ const MLBBProSeriesView = ({ tournament, participants, matches, results, onDataU
 
     // --- UPDATED: Logic for teams in each stage (handles "seeded" vs "new") ---
     const teamsForThisStage = useMemo(() => {
-        // Stage 1: All participants who are 'Registered' (includes new AND seeded teams)
         if (viewStageId === 1) {
             return participants.filter(p => p.status === 'Registered' || p.status === null);
         }
 
-        // Stage 3 (Group Stage): A merge of S2 winners and S1 seeded teams
         if (viewStageId === 3) {
-            // Get teams that advanced from Stage 2
             const s2_winners = participants.filter(p => p.status === 'adv_stage_3');
-
-            // *** This is your "16 + 48" logic ***
-            // Get teams that were seeded *directly* to Stage 3 (if you use that model)
-            // For *your* model ("seeding = auto-slot"), this will be empty, which is correct.
             const s1_seeded = participants.filter(p => p.status === 'adv_stage_3' && p.is_seeded); 
 
             const allTeams = new Map();
@@ -864,14 +904,12 @@ const MLBBProSeriesView = ({ tournament, participants, matches, results, onDataU
             return Array.from(allTeams.values());
         }
 
-        // For all other stages (2, 4, 5), just get the teams that advanced to it
         return participants.filter(p => p.status === `adv_stage_${viewStageId}`);
 
     }, [viewStageId, participants]);
 
     // Get matches for the *selected* stage
     const matchesForThisStage = useMemo(() => {
-        // The matches array now has participant_ids from the top-level fetch
         return matches.filter(m => m.stage_id === viewStageId);
     }, [matches, viewStageId]);
 
@@ -902,14 +940,13 @@ const MLBBProSeriesView = ({ tournament, participants, matches, results, onDataU
         });
     };
 
-    // --- UPDATED: Bracket Generation with "Bye" Logic ---
+    // --- UPDATED: Bracket Generation with "Bye" Logic (Unchanged) ---
     const handleGenerateBracket = async () => {
         if (matchesForThisStage.length > 0) {
             openModal({ title: 'Error', message: 'Matches for this stage are already generated.' });
             return;
         }
 
-        // --- NEW: Check if tournament is locked ---
         if (tournament.status !== 'Running') {
              openModal({ title: 'Registration Not Locked', message: 'You must lock registration before generating a bracket.' });
             return;
@@ -918,12 +955,9 @@ const MLBBProSeriesView = ({ tournament, participants, matches, results, onDataU
         const currentTeams = teamsForThisStage; // e.g., 50 teams
         const bracketSize = selectedStageDetails.totalTeams; // e.g., 64
 
-        // Find the *next* power of 2 if teams > bracketSize (e.g., 70 teams for 64 bracket)
-        // For your case (50 teams, 64 bracket), this is fine.
         let actualBracketSize = bracketSize;
         if (currentTeams.length > actualBracketSize) {
             actualBracketSize = Math.pow(2, Math.ceil(Math.log2(currentTeams.length)));
-            // You might want to warn the admin here
         }
 
         const numByes = actualBracketSize - currentTeams.length; // e.g., 64 - 50 = 14 byes
@@ -1006,7 +1040,7 @@ const MLBBProSeriesView = ({ tournament, participants, matches, results, onDataU
         });
     };
 
-    // --- Update MOBA Match Schedule ---
+    // --- Update MOBA Match Schedule (Unchanged) ---
     const handleUpdateMobaSchedule = async (matchId, newDateTime) => {
         const { error } = await supabase.from('tournament_matches').update({ scheduled_time: newDateTime, status: 'Scheduled' }).eq('id', matchId);
         if (error) openModal({ title: 'Error', message: error.message, showCancel: false });
@@ -1014,7 +1048,7 @@ const MLBBProSeriesView = ({ tournament, participants, matches, results, onDataU
         setEditingMobaMatchId(null);
     };
 
-    // --- MOBA Results Handlers ---
+    // --- MOBA Results Handlers (Unchanged) ---
     const handleOpenMobaResults = (match) => {
         setSelectedMobaMatch(match);
         setIsMatchModalOpen(true);
@@ -1045,10 +1079,12 @@ const MLBBProSeriesView = ({ tournament, participants, matches, results, onDataU
         }
     };
 
-    // --- Advance Winners Function ---
+    // --- Advance Winners Function (MODIFIED FOR AUTO-RANKING) ---
     const handleAdvanceWinners = async () => {
         const nextStage = stages.find(s => s.id === viewStageId + 1);
-        if (!nextStage) {
+        const isFinalAdvancement = viewStageId === 5; 
+
+        if (!nextStage && !isFinalAdvancement) {
             openModal({ title: 'Error', message: 'This is the final stage.' });
             return;
         }
@@ -1059,64 +1095,83 @@ const MLBBProSeriesView = ({ tournament, participants, matches, results, onDataU
             return;
         }
 
-        // Get winners from matches
+        // Get winners from matches (used for next stage advancement)
         const winnerIds = new Set(completedMatches.map(m => m.winner_id));
-
-        // Find teams who already advanced (e.g., Byes)
-        const alreadyAdvanced = participants.filter(p => p.status === `adv_stage_${nextStage.id}`);
+        const alreadyAdvanced = participants.filter(p => p.status === `adv_stage_${nextStage?.id}`);
         alreadyAdvanced.forEach(p => winnerIds.add(p.id));
 
         const participantsToUpdate = Array.from(winnerIds).map(winnerId => ({
-            id: winnerId, // This must be the participant ID
-            status: `adv_stage_${nextStage.id}`
+            id: winnerId, 
+            status: `adv_stage_${nextStage?.id}`
         }));
 
-        if (participantsToUpdate.length === 0) {
-             openModal({ title: 'No Teams to Advance', message: 'No winners were found to advance. This may happen if only Byes were present.' });
+        if (participantsToUpdate.length === 0 && !isFinalAdvancement) {
+             openModal({ title: 'No Teams to Advance', message: 'No winners were found to advance.' });
              return;
         }
 
         openModal({
-            title: `Advance Teams to ${nextStage.name}?`,
-            message: `This will advance all ${winnerIds.size} teams (winners + byes) from ${selectedStageDetails.name} to ${nextStage.name}. This cannot be undone.`,
-            confirmText: 'Advance Teams',
+            title: isFinalAdvancement ? 'Finalizing Tournament' : `Advance Teams to ${nextStage.name}?`,
+            message: isFinalAdvancement 
+                ? `This will mark the tournament as 'Completed' and automatically calculate and save the Top 16 standings to the database.`
+                : `This will advance all ${winnerIds.size} teams (winners + byes) from ${selectedStageDetails.name} to ${nextStage.name}. This cannot be undone.`,
+            confirmText: isFinalAdvancement ? 'Finalize & Rank' : 'Advance Teams',
             showCancel: true,
             onConfirm: async () => {
                 setModalLoading(true);
                 try {
-                    // 1. Update all the participants
-                    const { error: partError } = await supabase
-                        .from('tournament_participants')
-                        .upsert(participantsToUpdate);
-                    if (partError) throw partError;
+                    // 1. Update participants (only necessary for non-final stages)
+                    if (!isFinalAdvancement) {
+                        const { error: partError } = await supabase
+                            .from('tournament_participants')
+                            .upsert(participantsToUpdate);
+                        if (partError) throw partError;
+                    }
 
-                    // 2. Update the tournament's current stage
+                    // 2. Update tournament status
+                    let tourneyUpdates = {};
+                    if (isFinalAdvancement) {
+                        tourneyUpdates.status = 'Completed';
+                        tourneyUpdates.current_stage = 5; 
+                    } else {
+                        tourneyUpdates.current_stage = nextStage.id;
+                    }
                     const { error: tourneyError } = await supabase
                         .from('tournaments')
-                        .update({ current_stage: nextStage.id })
+                        .update(tourneyUpdates)
                         .eq('id', tournament.id);
                     if (tourneyError) throw tourneyError;
 
+                    // 3. AUTO-CALCULATE STANDINGS IF FINAL STAGE
+                    if (isFinalAdvancement) {
+                        await calculateAndSaveFinalStandings(tournament.id, matches, participants);
+                    }
+
                     await onDataUpdate(); // Refresh all data
                     setModalLoading(false);
-                    setViewStageId(nextStage.id); // Move view to the new stage
-                    openModal({ title: 'Success', message: `${winnerIds.size} teams advanced to ${nextStage.name}!` });
+                    setViewStageId(isFinalAdvancement ? 5 : nextStage.id); 
+                    openModal({ 
+                        title: 'Success', 
+                        message: isFinalAdvancement 
+                            ? `Tournament finalized. Top 16 standings saved and ready for seeding.` 
+                            : `${winnerIds.size} teams advanced to ${nextStage.name}!` 
+                    });
                 } catch (err) {
                     setModalLoading(false);
-                    openModal({ title: 'Error Advancing Teams', message: err.message });
+                    openModal({ title: 'Error', message: err.message });
                 }
             }
         });
     };
 
 
-    // --- Seeding Function (Calls Edge Function) ---
+    // --- Seeding Function (Now just checks Completed status) ---
     const handleSeedNextSeason = async () => {
-        // This function is now correct based on our updated RPC
-        if (!tournament || tournament.status !== 'Completed') {
+        // Check if the auto-ranking step has run by looking at the tournament status
+        if (tournament.status !== 'Completed') {
             openModal({ 
-                title: 'Cannot Seed Yet', 
-                message: 'The tournament must be marked as "Completed" before you can seed the Top 16 into the next season.',
+                title: 'Tournament Not Completed', 
+                message: 'You must complete all stages and finalize the tournament status before seeding the next season.',
                 showCancel: false
             });
             return;
@@ -1124,7 +1179,7 @@ const MLBBProSeriesView = ({ tournament, participants, matches, results, onDataU
 
         openModal({
             title: 'Confirm Seeding',
-            message: `This will find the Top 16 from this tournament ("${tournament.name}") and register them for the next tournament in the league. This action cannot be undone.`,
+            message: `This will query the saved Top 16 standings and register them for the next league tournament. This action cannot be undone.`,
             confirmText: 'Seed Next Season',
             showCancel: true,
             onConfirm: async () => {
@@ -1132,6 +1187,7 @@ const MLBBProSeriesView = ({ tournament, participants, matches, results, onDataU
                 setIsSeeding(true);
 
                 try {
+                    // Assuming the Edge Function 'seed-league-tournament' now reads from 'tournament_standings'
                     const { data, error } = await supabase.functions.invoke('seed-league-tournament', {
                         body: { previous_tournament_id: tournament.id }
                     });
@@ -1160,7 +1216,7 @@ const MLBBProSeriesView = ({ tournament, participants, matches, results, onDataU
         });
     };
 
-    // --- UI Rendering function ---
+    // --- UI Rendering function (Unchanged) ---
     const renderStageContent = () => {
         if (!selectedStageDetails) {
             return <p>Error: Could not find details for stage {viewStageId}.</p>
@@ -1173,19 +1229,17 @@ const MLBBProSeriesView = ({ tournament, participants, matches, results, onDataU
              return { team1, team2 };
         }
 
-        // --- Reusable Bracket Match List UI ---
         const BracketMatchList = () => {
             const allMatchesDone = matchesForThisStage.length > 0 && matchesForThisStage.every(m => m.status === 'Completed');
 
             return (
                 <div className="space-y-4">
-                    {/* --- UPDATED: Show Lock Registration or Generate Bracket --- */}
                     {matchesForThisStage.length === 0 && (
                         tournament.status === 'Running' ? (
                             <div className='bg-yellow-900/30 border border-yellow-700/50 rounded-lg p-4 text-sm text-yellow-300 space-y-4'>
                                 <p>Tournament is locked with **{teamsForThisStage.length} teams**. Ready to generate bracket.</p>
-                                <button 
-                                    className='btn-primary' 
+                                <button 
+                                    className='btn-primary' 
                                     onClick={handleGenerateBracket}
                                 >
                                     <Workflow size={16} className='mr-2'/> Generate {selectedStageDetails.name} Bracket
@@ -1194,8 +1248,8 @@ const MLBBProSeriesView = ({ tournament, participants, matches, results, onDataU
                         ) : (
                              <div className='bg-blue-900/30 border border-blue-700/50 rounded-lg p-4 text-sm text-blue-300 space-y-4'>
                                 <p>Registration is currently open. You must lock registration before generating matches.</p>
-                                <button 
-                                    className='btn-danger' 
+                                <button 
+                                    className='btn-danger' 
                                     onClick={handleLockRegistration}
                                 >
                                     <Lock size={16} className='mr-2'/> Lock Registration & Start Tournament
@@ -1204,7 +1258,6 @@ const MLBBProSeriesView = ({ tournament, participants, matches, results, onDataU
                         )
                     )}
 
-                    {/* --- Match List (No Changes) --- */}
                     {matchesForThisStage.length > 0 && (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             {matchesForThisStage.map(match => {
@@ -1260,8 +1313,8 @@ const MLBBProSeriesView = ({ tournament, participants, matches, results, onDataU
 
                     {allMatchesDone && viewStageId < 5 && (
                         <div className="mt-6 pt-6 border-t border-dark-600">
-                             <button 
-                                onClick={handleAdvanceWinners} 
+                             <button 
+                                onClick={handleAdvanceWinners} 
                                 className="btn-primary w-full flex items-center justify-center"
                             >
                                 <Send size={16} className="mr-2"/> Advance Winners to Stage {viewStageId + 1}
@@ -1272,141 +1325,141 @@ const MLBBProSeriesView = ({ tournament, participants, matches, results, onDataU
             );
         };
 
-        switch (viewStageId) {
-            case 1: // Open Qualifiers
-                return (
-                    <div className='bg-dark-700/50 p-6 rounded-lg border border-dark-600 space-y-4'>
-                        <h3 className='text-xl font-bold text-white'>Stage 1: Open Qualifiers ({teamsForThisStage.length} / {selectedStageDetails.totalTeams} Teams)</h3>
-                        <p className='text-gray-400'>
-                            This stage is for all {teamsForThisStage.length} registered teams (new and seeded). 
-                            The bracket will be {selectedStageDetails.totalTeams} slots, with Byes assigned as needed.
-                        </p>
-                        <BracketMatchList />
-                    </div>
-                );
-            case 2: // Knockout Stage
-                return (
-                    <div className='bg-dark-700/50 p-6 rounded-lg border border-dark-600 space-y-4'>
-                        <h3 className='text-xl font-bold text-white'>Stage 2: Knockout Stage ({teamsForThisStage.length} / {selectedStageDetails.totalTeams} Teams)</h3>
-                        <p className='text-gray-400'>The {teamsForThisStage.length} winners and "Bye" teams from Stage 1 play. Advancing: {selectedStageDetails.advanceRule}</p>
-                        <BracketMatchList />
-                    </div>
-                );
-            case 3: // Group Stage
-                return (
-                    <div className='bg-dark-700/50 p-6 rounded-lg border border-dark-600 space-y-4'>
-                        <h3 className='text-xl font-bold text-white'>Stage 3: Group Stage ({teamsForThisStage.length} / {selectedStageDetails.totalTeams} Teams)</h3>
-                        <p className='text-gray-400'>The {teamsForThisStage.length} winners from Stage 2 merge here. Advancing: {selectedStageDetails.advanceRule}</p>
-                        <button className='btn-primary' onClick={() => openModal({title: 'Not Implemented', message: 'Group draw and match generation logic (like Free Fire) goes here.'})}>
-                            <UsersRound size={16} className='mr-2'/> Run Group Draw
-                        </button>
-                        {/* TODO: Add Group Stage match list / standings... */}
-                    </div>
-                );
-            case 4: // Playoffs
-                return (
-                    <div className='bg-dark-700/50 p-6 rounded-lg border border-dark-600 space-y-4'>
-                        <h3 className='text-xl font-bold text-white'>Stage 4: Playoffs ({teamsForThisStage.length} / {selectedStageDetails.totalTeams} Teams)</h3>
-                        <p className='text-gray-400'>The {teamsForThisStage.length} teams from the Group Stage play. Advancing: {selectedStageDetails.advanceRule}</p>
-                        <BracketMatchList />
-                    </div>
-                );
-            case 5: // Grand Finals
-                return (
-                    <div className='bg-dark-700/50 p-6 rounded-lg border border-dark-600 space-y-4'>
-                        <h3 className='text-xl font-bold text-white'>Stage 5: Grand Finals ({teamsForThisStage.length} / {selectedStageDetails.totalTeams} Teams)</h3>
-                        <p className='text-gray-400'>This is the final bracket for the top {selectedStageDetails.totalTeams} teams.</p>
-                        <BracketMatchList />
+switch (viewStageId) {
+case 1: // Open Qualifiers
+return (
+<div className='bg-dark-700/50 p-6 rounded-lg border border-dark-600 space-y-4'>
+<h3 className='text-xl font-bold text-white'>Stage 1: Open Qualifiers ({teamsForThisStage.length} / {selectedStageDetails.totalTeams} Teams)</h3>
+<p className='text-gray-400'>
+This stage is for all {teamsForThisStage.length} registered teams (new and seeded). 
+The bracket will be {selectedStageDetails.totalTeams} slots, with Byes assigned as needed.
+</p>
+<BracketMatchList />
+</div>
+);
+case 2: // Knockout Stage
+return (
+<div className='bg-dark-700/50 p-6 rounded-lg border border-dark-600 space-y-4'>
+<h3 className='text-xl font-bold text-white'>Stage 2: Knockout Stage ({teamsForThisStage.length} / {selectedStageDetails.totalTeams} Teams)</h3>
+<p className='text-gray-400'>The {teamsForThisStage.length} winners and "Bye" teams from Stage 1 play. Advancing: {selectedStageDetails.advanceRule}</p>
+<BracketMatchList />
+</div>
+);
+case 3: // Group Stage
+return (
+<div className='bg-dark-700/50 p-6 rounded-lg border border-dark-600 space-y-4'>
+<h3 className='text-xl font-bold text-white'>Stage 3: Group Stage ({teamsForThisStage.length} / {selectedStageDetails.totalTeams} Teams)</h3>
+<p className='text-gray-400'>The {teamsForThisStage.length} winners from Stage 2 merge here. Advancing: {selectedStageDetails.advanceRule}</p>
+<button className='btn-primary' onClick={() => openModal({title: 'Not Implemented', message: 'Group draw and match generation logic (like Free Fire) goes here.'})}>
+<UsersRound size={16} className='mr-2'/> Run Group Draw
+</button>
+{/* TODO: Add Group Stage match list / standings... */}
+</div>
+);
+case 4: // Playoffs
+return (
+<div className='bg-dark-700/50 p-6 rounded-lg border border-dark-600 space-y-4'>
+<h3 className='text-xl font-bold text-white'>Stage 4: Playoffs ({teamsForThisStage.length} / {selectedStageDetails.totalTeams} Teams)</h3>
+<p className='text-gray-400'>The {teamsForThisStage.length} teams from the Group Stage play. Advancing: {selectedStageDetails.advanceRule}</p>
+<BracketMatchList />
+</div>
+);
+case 5: // Grand Finals
+return (
+<div className='bg-dark-700/50 p-6 rounded-lg border border-dark-600 space-y-4'>
+<h3 className='text-xl font-bold text-white'>Stage 5: Grand Finals ({teamsForThisStage.length} / {selectedStageDetails.totalTeams} Teams)</h3>
+<p className='text-gray-400'>This is the final bracket for the top {selectedStageDetails.totalTeams} teams.</p>
+<BracketMatchList />
 
-                        {/* --- Seeding Button --- */}
-                        <div className='mt-8 pt-6 border-t border-dark-600'>
-                             <h4 className='text-lg font-bold text-yellow-400'>League Seeding</h4>
-                             <p className='text-sm text-gray-400 mb-3'>Once this tournament is "Completed", you can seed the Top 16 into the next season.</p>
-                             <button 
-                                onClick={handleSeedNextSeason} 
-                                disabled={isSeeding || tournament.status !== 'Completed'} 
-                                className="btn-secondary flex items-center disabled:opacity-50 disabled:cursor-not-allowed"
-                                title={tournament.status !== 'Completed' ? 'Tournament must be "Completed" to seed' : 'Seed Top 16 to Next Season'}
-                            >
-                                {isSeeding ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin"/> : <Send size={16} className="mr-2"/>}
-                                {isSeeding ? 'Seeding...' : 'Seed Top 16 to Next Season'}
-                            </button>
-                        </div>
-                    </div>
-                );
-            default:
-                return <p>Unknown stage selected.</p>;
-        }
-    };
-
-    return (
-        <AnimatedSection className="card bg-dark-800 p-6 rounded-xl shadow-lg space-y-8">
-            <h2 className="text-3xl font-bold text-primary-300 flex items-center border-b border-dark-700 pb-3">
-                <Swords className="mr-3" size={24}/> {tournament.name}
-            </h2>
-            <p className="text-gray-400">
-                Format: <span className='font-bold text-primary-400'>MLBB Pro Series (5-Stage)</span>.
-                Current Active Stage: <span className='font-bold text-primary-400'>{stages.find(s => s.id === current_stage)?.name}</span>
-            </p>
-
-            <div className='mb-6'>
-                <label className='block text-sm font-medium text-gray-300 mb-2'>Select Stage to Manage</label>
-                <div className="flex flex-wrap gap-2 bg-dark-700 p-2 rounded-lg border border-dark-600">
-                    {stages.map((stage) => {
-                        const isCurrent = stage.id === current_stage;
-                        const isViewing = stage.id === viewStageId;
-                        return (
-                            <button 
-                                key={stage.id} 
-                                onClick={() => setViewStageId(stage.id)}
-                                className={`px-3 py-1.5 rounded-md text-sm font-semibold transition-all ${ 
-                                    isViewing 
-                                        ? 'bg-primary-600 text-white shadow' 
-                                        : isCurrent 
-                                            ? 'bg-blue-800 text-blue-100 hover:bg-blue-700' 
-                                            : 'text-gray-300 hover:bg-dark-600' 
-                                }`}
-                            >
-                                {stage.id}: {stage.name} {isCurrent && "(Active)"}
-                            </button>
-                        );
-                    })}
-                </div>
-            </div>
-
-            <ParticipantList participants={participants} maxParticipants={tournament.max_participants} />
-
-            {renderStageContent()}
-
-            <MOBAMatchResultsModal
-                isOpen={isMatchModalOpen}
-                onClose={() => setIsMatchModalOpen(false)}
-                match={selectedMobaMatch}
-                participants={participants}
-                onSubmit={handleSubmitMobaResults}
-                isLoading={isModalLoading}
-            />
-        </AnimatedSection>
-    );
+{/* --- Seeding Section (Automated) --- */}
+<div className='mt-8 pt-6 border-t border-dark-600'>
+<h4 className='text-lg font-bold text-yellow-400'>League Seeding</h4>
+<p className='text-sm text-gray-400 mb-3'>Once this tournament is "Completed" (by advancing winners from the final bracket), the Top 16 standings will be automatically saved for the next season's seeding.</p>
+<button 
+onClick={handleSeedNextSeason} 
+disabled={isSeeding || tournament.status !== 'Completed'} 
+className="btn-primary flex items-center disabled:opacity-50 disabled:cursor-not-allowed w-full justify-center"
+title={tournament.status !== 'Completed' ? 'Tournament must be "Completed" before seeding' : 'Seed Top 16 to Next Season'}
+>
+{isSeeding ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin"/> : <Send size={16} className="mr-2"/>}
+{isSeeding ? 'Seeding...' : 'Seed Top 16 to Next Season'}
+</button>
+</div>
+</div>
+);
+default:
+return <p>Unknown stage selected.</p>;
+}
 };
-// --- END NEW FORMAT ---
+
+return (
+<AnimatedSection className="card bg-dark-800 p-6 rounded-xl shadow-lg space-y-8">
+<h2 className="text-3xl font-bold text-primary-300 flex items-center border-b border-dark-700 pb-3">
+<Swords className="mr-3" size={24}/> {tournament.name}
+</h2>
+<p className="text-gray-400">
+Format: <span className='font-bold text-primary-400'>MLBB Pro Series (5-Stage)</span>.
+Current Active Stage: <span className='font-bold text-primary-400'>{stages.find(s => s.id === current_stage)?.name}</span>
+</p>
+
+<div className='mb-6'>
+<label className='block text-sm font-medium text-gray-300 mb-2'>Select Stage to Manage</label>
+<div className="flex flex-wrap gap-2 bg-dark-700 p-2 rounded-lg border border-dark-600">
+{stages.map((stage) => {
+const isCurrent = stage.id === current_stage;
+const isViewing = stage.id === viewStageId;
+return (
+<button 
+key={stage.id} 
+onClick={() => setViewStageId(stage.id)}
+className={`px-3 py-1.5 rounded-md text-sm font-semibold transition-all ${ 
+isViewing 
+? 'bg-primary-600 text-white shadow' 
+: isCurrent 
+? 'bg-blue-800 text-blue-100 hover:bg-blue-700' 
+: 'text-gray-300 hover:bg-dark-600' 
+}`}
+>
+{stage.id}: {stage.name} {isCurrent && "(Active)"}
+</button>
+);
+})}
+</div>
+</div>
+
+<ParticipantList participants={participants} maxParticipants={tournament.max_participants} />
+
+{renderStageContent()}
+
+<MOBAMatchResultsModal
+isOpen={isMatchModalOpen}
+onClose={() => setIsMatchModalOpen(false)}
+match={selectedMobaMatch}
+participants={participants}
+onSubmit={handleSubmitMobaResults}
+isLoading={isModalLoading}
+/>
+</AnimatedSection>
+);
+};
 
 
 // ------------------------------------------------------------------------------------
 // --- MAIN PAGE COMPONENT ---
 // ------------------------------------------------------------------------------------
 export default function UpdateTournamentPage() {
-    const { tournamentId } = useParams(); // Can be "manage" or a UUID
+    const { tournamentId } = useParams();
     const { user, loading: authLoading } = useAuth(); 
     const navigate = useNavigate();
 
-    const [viewMode, setViewMode] = useState('loading'); // 'loading', 'list', 'manage', 'error'
+    const [viewMode, setViewMode] = useState('loading');
     const [tournamentsList, setTournamentsList] = useState([]);
     const [currentTournamentData, setCurrentTournamentData] = useState({
         tournament: null,
         participants: [],
         matches: [],
-        results: []
+        results: [],
+        standings: []
     });
     const [error, setError] = useState(null);
 
@@ -1442,20 +1495,24 @@ export default function UpdateTournamentPage() {
             if (tourneyError) throw tourneyError;
             if (!tourneyData) throw new Error("Tournament not found.");
 
-            // 2. Fetch all participants, matches, and match_participants in parallel
-            const [partRes, matchRes, matchPartRes] = await Promise.all([
+            // 2. Fetch all data streams in parallel
+            const [partRes, matchRes, matchPartRes, standingsRes] = await Promise.all([
                 supabase.from('tournament_participants').select('*').eq('tournament_id', id),
                 supabase.from('tournament_matches').select('*').eq('tournament_id', id),
-                supabase.from('match_participants').select('*').eq('tournament_id', id) 
+                supabase.from('match_participants').select('*').eq('tournament_id', id), 
+                // NEW: FETCH STANDINGS DATA from the dedicated table
+                supabase.from('tournament_standings').select('rank, team_id, participant_id, team_name').eq('tournament_id', id).order('rank', { ascending: true })
             ]);
 
             if (partRes.error) throw partRes.error;
             if (matchRes.error) throw matchRes.error;
             if (matchPartRes.error) throw matchPartRes.error; 
+            if (standingsRes.error) throw standingsRes.error;
 
             const participants = partRes.data || [];
             let matches = matchRes.data || [];
             const matchParticipants = matchPartRes.data || []; 
+            const standings = standingsRes.data || [];
 
             // --- Combine matches with their participants ---
             matches = matches.map(match => {
@@ -1487,8 +1544,9 @@ export default function UpdateTournamentPage() {
             setCurrentTournamentData({
                 tournament: tourneyData,
                 participants: participants,
-                matches: matches, // This now contains matches with participant_ids
-                results: results
+                matches: matches,
+                results: results,
+                standings: standings, // SET STANDINGS
             });
             setViewMode('manage');
 
@@ -1637,6 +1695,7 @@ export default function UpdateTournamentPage() {
                             openModal={openModal} 
                             setModalLoading={setModalLoading}
                             isModalLoading={isModalLoading}
+                            currentTournamentData={currentTournamentData}
                         />;
             default:
                 return (
