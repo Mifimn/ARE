@@ -41,8 +41,13 @@ export default function LoginPage() {
       <div className="max-w-md w-full mx-4">
         <div className="bg-dark-800 p-8 rounded-lg shadow-lg border border-dark-700">
           <div className="text-center mb-8">
-             <div className="w-16 h-16 bg-primary-600 rounded-lg flex items-center justify-center mx-auto mb-4">
-              <span className="text-white font-bold text-2xl">ARE</span>
+             {/* --- UPDATED LOGO BLOCK: Replaced text 'ARE' with image --- */}
+             <div className="w-16 h-16 rounded-lg flex items-center justify-center mx-auto mb-4 bg-dark-700 p-1">
+              <img
+                src="/images/logo.png"
+                alt="ARE Logo"
+                className="w-full h-full object-contain"
+              />
             </div>
             <h2 className="text-3xl font-bold text-white">Welcome Back</h2>
             <p className="text-gray-400 mt-2">Sign in to your account</p>

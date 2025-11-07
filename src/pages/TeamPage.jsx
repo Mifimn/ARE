@@ -10,9 +10,49 @@ import {
 } from 'lucide-react';
 import AnimatedSection from '../components/AnimatedSection';
 
-// --- NEW: Helper function to fetch team stats, matches, and events ---
+// --- SCORING ENGINE (BR - Free Fire Standard) ---
+const calculatePlacementPoints = (placement) => {
+    if (placement < 1 || placement > 12) return 0;
+    return 39 - (3 * (placement - 1)); 
+};
+const calculateKillPoints = (kills) => {
+    return kills * 2;
+};
+// ---
+
+// --- NEW: Helper function to fetch a Team's Achievements ---
+const fetchTeamAchievements = async (teamId) => {
+    try {
+        const { data: achievementsData, error: achievementError } = await supabase
+            .from('tournament_standings')
+            .select(`
+                rank,
+                team_name,
+                tournaments(id, name, game, start_date)
+            `)
+            .eq('team_id', teamId) // Filter directly by teamId
+            .lte('rank', 3) // Filter for Top 3 only
+            .order('start_date', { ascending: false, referencedTable: 'tournaments' });
+
+        if (achievementError) throw achievementError;
+
+        return (achievementsData || []).map(a => ({
+            ...a,
+            tournamentName: a.tournaments.name,
+            tournamentId: a.tournaments.id,
+            game: a.tournaments.game,
+            date: a.tournaments.start_date,
+        }));
+    } catch (error) {
+        console.error("Error fetching team achievements:", error.message);
+        return [];
+    }
+};
+// ---
+
+// --- UPDATED: Helper function to fetch team stats, matches, events, and ACHIEVEMENTS ---
 const fetchTeamPerformance = async (teamId) => {
-    if (!teamId) return { stats: null, recentMatches: [], upcomingEvents: [] };
+    if (!teamId) return { stats: null, recentMatches: [], upcomingEvents: [], achievements: [] };
 
     try {
         // 1. Get all participant records for this team
@@ -20,25 +60,22 @@ const fetchTeamPerformance = async (teamId) => {
             .from('tournament_participants')
             .select('id, team_name, tournaments!inner(id, name, game, start_date, status)') // inner join to only get participants in tournaments
             .eq('team_id', teamId);
-        
+
         if (pError) throw pError;
-        if (!participantRecords || participantRecords.length === 0) {
-            console.log("No participant records found for team:", teamId);
-            return { stats: null, recentMatches: [], upcomingEvents: [] };
+
+        const allResults = [];
+        if (participantRecords && participantRecords.length > 0) {
+             const participantIds = participantRecords.map(p => p.id);
+             // 2. Fetch all match results for these participant records
+             const { data: results, error: resultsError } = await supabase
+                 .from('match_results')
+                 .select('id, created_at, placement, kills, participant_id')
+                 .in('participant_id', participantIds)
+                 .order('created_at', { ascending: false });
+
+             if (resultsError) throw resultsError;
+             allResults.push(...(results || []));
         }
-
-        const participantIds = participantRecords.map(p => p.id);
-
-        // 2. Fetch all match results for these participant records
-        const { data: results, error: resultsError } = await supabase
-            .from('match_results')
-            .select('id, created_at, placement, kills, participant_id')
-            .in('participant_id', participantIds)
-            .order('created_at', { ascending: false });
-
-        if (resultsError) throw resultsError;
-        
-        const allResults = results || [];
 
         // 3. Calculate Stats
         let totalKills = 0;
@@ -49,7 +86,7 @@ const fetchTeamPerformance = async (teamId) => {
             totalPlacementSum += r.placement || 0;
             if (r.placement === 1) totalWins++;
         });
-        
+
         const totalMatches = allResults.length;
         const totalLosses = totalMatches - totalWins;
         const stats = {
@@ -75,7 +112,7 @@ const fetchTeamPerformance = async (teamId) => {
         });
 
         // 5. Format Upcoming Events
-        const upcomingEvents = participantRecords
+        const upcomingEvents = (participantRecords || [])
             .filter(p => p.tournaments.status === 'Draft' || p.tournaments.status === 'In Progress')
             .map(p => ({
                 id: p.tournaments.id,
@@ -86,12 +123,14 @@ const fetchTeamPerformance = async (teamId) => {
             .filter((event, index, self) => self.findIndex(e => e.id === event.id) === index)
             .sort((a, b) => new Date(a.startDate) - new Date(b.startDate));
 
+        // 6. Fetch Achievements
+        const achievements = await fetchTeamAchievements(teamId);
 
-        return { stats, recentMatches, upcomingEvents };
+        return { stats, recentMatches, upcomingEvents, achievements };
 
     } catch (error) {
         console.error("Error in fetchTeamPerformance:", error.message);
-        return { stats: null, recentMatches: [], upcomingEvents: [] };
+        return { stats: null, recentMatches: [], upcomingEvents: [], achievements: [] };
     }
 };
 // ---
@@ -99,6 +138,7 @@ const fetchTeamPerformance = async (teamId) => {
 export default function TeamPage() {
     const { teamId } = useParams();
     const { user: authUser } = useAuth();
+    // --- State declarations ---
     const [teamData, setTeamData] = useState(null);
     const [members, setMembers] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -106,29 +146,94 @@ export default function TeamPage() {
     const [isOwner, setIsOwner] = useState(false);
     const [isMember, setIsMember] = useState(false);
 
-    // --- State for Liking (Single Like Logic) ---
-    const [hasLiked, setHasLiked] = useState(false); // Track if current user liked
+    const [hasLiked, setHasLiked] = useState(false); 
     const [isLiking, setIsLiking] = useState(false);
     const [likeError, setLikeError] = useState(null);
-    // ---
 
-    // State for Join Requests
     const [hasPendingRequest, setHasPendingRequest] = useState(false);
     const [isRequestingJoin, setIsRequestingJoin] = useState(false);
     const [joinRequestError, setJoinRequestError] = useState(null);
-    // ---
 
-    // --- NEW: State for dynamic data ---
     const [teamStats, setTeamStats] = useState(null);
     const [recentMatches, setRecentMatches] = useState([]);
     const [upcomingEvents, setUpcomingEvents] = useState([]);
-    // ---
+    const [teamAchievements, setTeamAchievements] = useState([]); // <-- NEW STATE
+    // --- End State declarations ---
+
+
+    // --- CRITICAL FIX: Handlers defined up front to ensure scope ---
+    const handleLikeTeam = async () => {
+        if (!authUser) { setLikeError("You must be logged in to like a team."); return; }
+        if (!teamData || !teamData.id || isOwner) { setLikeError("Cannot like this team."); return; }
+        if (hasLiked) { setLikeError("You have already liked this team."); return; }
+
+        setIsLiking(true); setLikeError(null);
+
+        try {
+            const { data, error: rpcError } = await supabase.rpc('increment_team_like', {
+                target_team_id: teamData.id
+            });
+
+            if (rpcError) throw rpcError;
+
+            if (data && data.success) {
+                setTeamData(prev => ({ ...prev, likes: (prev?.likes ?? 0) + 1 }));
+                setHasLiked(true);
+            } else {
+                setLikeError(data?.message || "Could not like team.");
+                if (data?.message?.includes("already liked")) { setHasLiked(true); }
+            }
+
+        } catch (err) {
+            setLikeError(`Failed to like team: ${err.message}`);
+        } finally { setIsLiking(false); }
+    };
+
+    const handleRequestToJoin = async () => {
+        if (!authUser) { setJoinRequestError("You must be logged in to request to join."); return; }
+        if (!teamData || !teamData.id || isOwner || isMember || hasPendingRequest) {
+            setJoinRequestError("Cannot send join request."); return;
+        }
+
+        setIsRequestingJoin(true); setJoinRequestError(null);
+        const targetTeamId = teamData.id;
+
+        try {
+            const { error: insertError } = await supabase
+                .from('team_join_requests')
+                .insert({
+                    team_id: targetTeamId,
+                    user_id: authUser.id,
+                    status: 'pending'
+                });
+
+            if (insertError) {
+                 if (insertError.message.includes('unique_pending_request')) {
+                     setHasPendingRequest(true);
+                     throw new Error("You already have a pending request for this team.");
+                 } else if (insertError.message.includes('violates row-level security policy')) {
+                     const { data: memberCheck } = await supabase.from('team_members').select('user_id').eq('team_id', targetTeamId).eq('user_id', authUser.id).maybeSingle();
+                     if (memberCheck) setIsMember(true);
+                     throw new Error("Cannot send request (already owner/member or permission issue).");
+                 }
+                throw insertError;
+            }
+
+            setHasPendingRequest(true);
+
+        } catch (err) {
+            setJoinRequestError(`Failed to send request: ${err.message}`);
+        } finally {
+            setIsRequestingJoin(false);
+        }
+    };
+    // --- End Handlers ---
+
 
     // --- Fetch Team Data, Members, Like Status, and Join Request Status ---
     useEffect(() => {
         let isMounted = true;
         const fetchData = async () => {
-            // Ensure teamId is a number for Supabase bigint comparison
             const numericTeamId = parseInt(teamId, 10);
             if (isNaN(numericTeamId)) {
                  if (isMounted) { setError("Invalid Team ID provided."); setLoading(false); }
@@ -137,12 +242,9 @@ export default function TeamPage() {
 
             if (!isMounted) return;
             setLoading(true); setError(null); setLikeError(null);
-            setJoinRequestError(null); setHasPendingRequest(false); setHasLiked(false); // Reset all relevant states
-            // --- NEW: Reset dynamic state ---
+            setJoinRequestError(null); setHasPendingRequest(false); setHasLiked(false);
             setTeamStats(null); setRecentMatches([]); setUpcomingEvents([]);
-            // ---
-
-            console.log(`TeamPage: Fetching data for team ID: ${numericTeamId}`);
+            setTeamAchievements([]); // <-- RESET NEW STATE
 
             try {
                 // Fetch team data (including owner and likes column)
@@ -158,7 +260,6 @@ export default function TeamPage() {
                 if (teamError) throw teamError;
                 if (!teamResult) throw new Error(`Team with ID ${numericTeamId} not found.`);
                 if (!isMounted) return;
-                console.log("TeamPage: Fetched team data:", teamResult);
                 setTeamData(teamResult);
 
                 // Check ownership
@@ -166,7 +267,6 @@ export default function TeamPage() {
                 setIsOwner(ownerCheck);
 
                 // Fetch members
-                // --- UPDATED: Fetch all profile data (*) for members ---
                 const { data: membersResult, error: membersError } = await supabase
                     .from('team_members')
                     .select(`
@@ -176,26 +276,24 @@ export default function TeamPage() {
                     .eq('team_id', numericTeamId).order('joined_at');
                 if (membersError) throw membersError;
                 if (!isMounted) return;
-                console.log("TeamPage: Fetched members:", membersResult);
                 setMembers(membersResult || []);
 
                 // Check membership
                 const memberCheck = authUser && membersResult?.some(m => m.user_id === authUser.id);
                 setIsMember(memberCheck);
 
-                // --- NEW: Fetch Stats, Matches, and Events ---
-                const { stats, recentMatches, upcomingEvents } = await fetchTeamPerformance(numericTeamId);
+                // --- UPDATED: Fetch Stats, Matches, Events, and ACHIEVEMENTS ---
+                const { stats, recentMatches, upcomingEvents, achievements } = await fetchTeamPerformance(numericTeamId);
                 if (isMounted) {
                     setTeamStats(stats);
                     setRecentMatches(recentMatches);
                     setUpcomingEvents(upcomingEvents);
+                    setTeamAchievements(achievements); // <-- SET NEW STATE
                 }
                 // ---
 
                 // --- Fetch Like & Join Request Status (only if logged in and not owner/member) ---
                 if (authUser && !ownerCheck && !memberCheck) {
-                    // Check Like Status
-                    console.log(`[TeamPage] Checking like status for team ${numericTeamId} by user ${authUser.id}`);
                     const { data: likeData, error: likeCheckError } = await supabase
                         .from('team_likes')
                         .select('team_id')
@@ -203,10 +301,8 @@ export default function TeamPage() {
                         .eq('liker_id', authUser.id)
                         .maybeSingle();
                     if (likeCheckError && isMounted) console.error("Error checking like status:", likeCheckError);
-                    else if (likeData && isMounted) { console.log("[TeamPage] User has liked this team."); setHasLiked(true); }
+                    else if (likeData && isMounted) { setHasLiked(true); }
 
-                    // Check Join Request Status
-                    console.log(`[TeamPage] Checking join request status for team ${numericTeamId} by user ${authUser.id}`);
                     const { data: requestData, error: requestError } = await supabase
                         .from('team_join_requests')
                         .select('id')
@@ -215,22 +311,19 @@ export default function TeamPage() {
                         .eq('status', 'pending')
                         .maybeSingle();
                     if (requestError && isMounted) console.error("Error checking join request status:", requestError);
-                    else if (requestData && isMounted) { console.log("[TeamPage] User has a pending join request."); setHasPendingRequest(true); }
+                    else if (requestData && isMounted) { setHasPendingRequest(true); }
                 }
                 // --- End Status Fetches ---
 
-                // Placeholders (Only achievements left)
+                // Remove placeholder achievements since we have dynamic data now
                 if(isMounted){
                     setTeamData(prev => ({
                         ...(prev || {}),
-                         achievements: prev?.achievements || [
-                              { title: 'Local Champions', description: 'Won City League 2024', icon: Trophy, date: '2024-12-15' },
-                         ]
+                        achievements: undefined
                     }));
                 }
 
             } catch (err) {
-                console.error("TeamPage: Error fetching data:", err.message);
                  if (isMounted) setError(`Failed to load team data: ${err.message}`);
             } finally {
                  if (isMounted) setLoading(false);
@@ -240,94 +333,7 @@ export default function TeamPage() {
         fetchData();
         return () => { isMounted = false };
 
-    }, [teamId, authUser]); // Rerun if teamId or authUser changes
-
-    // --- Handle Like Button Click (Use RPC) ---
-    const handleLikeTeam = async () => {
-        if (!authUser) { setLikeError("You must be logged in to like a team."); return; }
-        if (!teamData || !teamData.id || isOwner) { setLikeError("Cannot like this team."); return; } // Prevent owner liking
-        if (hasLiked) { setLikeError("You have already liked this team."); return; } // Prevent double liking
-
-        setIsLiking(true); setLikeError(null);
-        console.log(`[TeamPage] Calling RPC 'increment_team_like' for team ID: ${teamData.id}`);
-
-        try {
-            // Call the Supabase RPC function
-            const { data, error: rpcError } = await supabase.rpc('increment_team_like', {
-                target_team_id: teamData.id // Pass the team ID to the function
-            });
-
-            if (rpcError) throw rpcError; // Throw DB errors
-
-            console.log("RPC Response:", data);
-
-            // Check the response from the function
-            if (data && data.success) {
-                // Optimistic UI update for the count
-                setTeamData(prev => ({ ...prev, likes: (prev?.likes ?? 0) + 1 }));
-                setHasLiked(true); // Update UI state
-            } else {
-                // Show message from function if like wasn't successful
-                setLikeError(data?.message || "Could not like team.");
-                // Re-check like status if message indicates already liked
-                if (data?.message?.includes("already liked")) { setHasLiked(true); }
-            }
-
-        } catch (err) {
-            console.error("Error calling increment_team_like function:", err);
-            setLikeError(`Failed to like team: ${err.message}`);
-        } finally { setIsLiking(false); }
-    };
-    // ---
-
-    // --- Handle Request to Join Button Click ---
-    const handleRequestToJoin = async () => {
-        if (!authUser) { setJoinRequestError("You must be logged in to request to join."); return; }
-        if (!teamData || !teamData.id || isOwner || isMember || hasPendingRequest) {
-            setJoinRequestError("Cannot send join request."); return;
-        }
-
-        setIsRequestingJoin(true); setJoinRequestError(null);
-        const targetTeamId = teamData.id;
-        console.log(`[TeamPage] User ${authUser.id} requesting to join team ${targetTeamId}`);
-
-        try {
-            const { error: insertError } = await supabase
-                .from('team_join_requests')
-                .insert({
-                    team_id: targetTeamId,
-                    user_id: authUser.id, // RLS policy checks this
-                    status: 'pending'
-                });
-
-            if (insertError) {
-                 if (insertError.message.includes('unique_pending_request')) {
-                     setHasPendingRequest(true); // Ensure UI reflects existing request
-                     throw new Error("You already have a pending request for this team.");
-                 } else if (insertError.message.includes('violates row-level security policy')) {
-                     // RLS blocked it - maybe user became member/owner somehow? Recheck state.
-                     const { data: memberCheck } = await supabase.from('team_members').select('user_id').eq('team_id', targetTeamId).eq('user_id', authUser.id).maybeSingle();
-                     if (memberCheck) setIsMember(true);
-                     else { // Check if owner just in case
-                         const { data: ownerCheckData } = await supabase.from('teams').select('owner_id').eq('id', targetTeamId).eq('owner_id', authUser.id).maybeSingle();
-                         if (ownerCheckData) setIsOwner(true);
-                     }
-                     throw new Error("Cannot send request (already owner/member or permission issue).");
-                 }
-                throw insertError; // Other DB errors
-            }
-
-            console.log("[TeamPage] Join request sent successfully.");
-            setHasPendingRequest(true); // Update UI state
-
-        } catch (err) {
-            console.error("Error sending join request:", err);
-            setJoinRequestError(`Failed to send request: ${err.message}`);
-        } finally {
-            setIsRequestingJoin(false);
-        }
-    };
-    // ---
+    }, [teamId, authUser]);
 
      // --- Render Loading State ---
      if (loading) {
@@ -340,10 +346,6 @@ export default function TeamPage() {
     }
 
      if (!teamData) { return <Navigate to="/players?view=teams" replace />; } // Redirect if no team data after loading
-
-    // --- Calculations ---
-    const teamGame = teamData.game;
-    const currentLikes = teamData.likes ?? 0;
 
     return (
         <div className="bg-gradient-to-br from-dark-900 via-dark-800 to-primary-900 text-white min-h-screen relative overflow-hidden z-10">
@@ -370,17 +372,16 @@ export default function TeamPage() {
                                 <div className="flex flex-wrap justify-center sm:justify-start gap-x-4 gap-y-1 text-gray-400 text-sm">
                                     {(teamData.city || teamData.country) && ( <span className="flex items-center"><MapPin size={14} className="mr-1 text-red-500" /> {teamData.city ? `${teamData.city}, ` : ''}{teamData.country || ''}</span> )}
                                     {teamData.created_at && ( <span className="flex items-center"><Calendar size={14} className="mr-1" /> Founded {new Date(teamData.created_at).toLocaleDateString()}</span> )}
-                                    <span className="flex items-center"> <Heart size={14} className="mr-1 text-red-500 fill-current"/> {currentLikes} Likes </span>
+                                    <span className="flex items-center"> <Heart size={14} className="mr-1 text-red-500 fill-current"/> {teamData.likes ?? 0} Likes </span>
                                 </div>
                              </div>
                              {/* Action Buttons Container */}
                              <div className="flex flex-col items-center sm:items-end gap-3 flex-shrink-0 mt-3 sm:mt-0">
                                 <div className="flex gap-3">
-                                    {/* Manage/Leave/Join/Pending Button */}
                                     {isOwner ? (
                                         <Link to={`/manage-team/${teamData.id}`} className="btn-primary text-sm flex items-center"><Settings className="mr-1.5" size={16} /> Manage</Link>
                                     ) : isMember ? (
-                                        <button className="btn-danger text-sm flex items-center"><LogOut className="mr-1.5 rotate-180" size={16} /> Leave</button> // TODO: Leave logic
+                                        <button className="btn-danger text-sm flex items-center"><LogOut className="mr-1.5 rotate-180" size={16} /> Leave</button> 
                                     ) : authUser ? (
                                         hasPendingRequest ? (
                                             <button className="btn-secondary text-sm flex items-center italic opacity-70 cursor-default" disabled> <ClockIcon className="mr-1.5" size={16} /> Pending</button>
@@ -396,11 +397,10 @@ export default function TeamPage() {
                                         )
                                     ) : null /* Not logged in */}
 
-                                     {/* Like Button (Show if logged in AND not owner) */}
                                      {authUser && !isOwner && (
                                          <button
                                              onClick={handleLikeTeam}
-                                             disabled={isLiking || hasLiked} // Disable if liking or already liked
+                                             disabled={isLiking || hasLiked}
                                              className={`btn-secondary text-sm flex items-center px-3 py-1.5 rounded-lg transition-colors duration-200 disabled:opacity-60 disabled:cursor-not-allowed group ${
                                                  hasLiked ? 'bg-red-600/30 border border-red-500/50 text-red-300 pointer-events-none' : 'hover:bg-red-500/20 hover:text-red-300'
                                              }`}
@@ -424,7 +424,6 @@ export default function TeamPage() {
                      <div className="lg:col-span-2 space-y-8 lg:space-y-10">
                         {/* Team Stats Overview */}
                         <AnimatedSection delay={100} className="card bg-dark-800 p-5 rounded-xl shadow-lg">
-                           {/* --- UPDATED: "Quick Stats" is now "Overall Stats" --- */}
                            <h2 className="text-2xl font-bold text-primary-300 mb-4">Overall Stats</h2>
                            {teamStats ? (
                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
@@ -451,13 +450,13 @@ export default function TeamPage() {
                                          const profile = member.profiles;
                                          if (!profile) return null; // Skip if profile is missing
 
-                                         const memberGameDetails = profile.game_details?.[teamGame];
+                                         const memberGameDetails = profile.game_details?.[teamData.game];
                                          const memberWins = profile.total_wins ?? 0;
                                          const memberLosses = profile.total_losses ?? 0;
                                          const memberTotal = memberWins + memberLosses;
                                          const memberWinRate = memberTotal > 0 ? Math.round((memberWins / memberTotal) * 100) : 0;
                                          // ---
-                                         
+
                                          return (
                                              <AnimatedSection key={member.user_id || index} delay={index * 50} className="bg-dark-700/50 rounded-lg p-4 transition-all duration-300 hover:bg-dark-700/80 border border-dark-600 hover:border-primary-600/50">
                                                  <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-3">
@@ -468,32 +467,31 @@ export default function TeamPage() {
                                                              <span className="text-primary-400 font-medium text-sm block">{member.role}</span>
                                                          </div>
                                                      </Link>
-                                                     
+
                                                      <div className="text-left sm:text-right text-sm w-full sm:w-auto flex-shrink-0">
                                                         <p className="text-xs text-gray-500">Joined: {new Date(member.joined_at).toLocaleDateString()}</p>
                                                      </div>
                                                  </div>
-                                                 
-                                                 {/* --- REPLACEMENT: Show IGN/UID and Personal Stats --- */}
+
                                                  <div className="space-y-2 border-t border-dark-600 pt-3">
                                                      {(memberGameDetails?.ign || memberGameDetails?.uid) ? (
                                                         <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
                                                             {memberGameDetails.ign && (
-                                                                <div className="flex items-center text-gray-300" title={`${teamGame} In-Game Name`}> <Gamepad2 size={14} className="mr-1.5 text-primary-400 flex-shrink-0"/> <span className="font-medium">{memberGameDetails.ign}</span> </div>
+                                                                <div className="flex items-center text-gray-300" title={`${teamData.game} In-Game Name`}> <Gamepad2 size={14} className="mr-1.5 text-primary-400 flex-shrink-0"/> <span className="font-medium">{memberGameDetails.ign}</span> </div>
                                                             )}
                                                             {memberGameDetails.uid && (
-                                                                <div className="flex items-center text-gray-300" title={`${teamGame} User ID`}> <User size={14} className="mr-1.5 text-primary-400 flex-shrink-0"/> <span className="font-medium">{memberGameDetails.uid}</span> </div>
+                                                                <div className="flex items-center text-gray-300" title={`${teamData.game} User ID`}> <User size={14} className="mr-1.5 text-primary-400 flex-shrink-0"/> <span className="font-medium">{memberGameDetails.uid}</span> </div>
                                                             )}
                                                         </div>
                                                      ) : (
-                                                        <p className="text-gray-500 italic text-sm">No {teamGame} IGN/UID provided.</p>
+                                                        <p className="text-gray-500 italic text-sm">No {teamData.game} IGN/UID provided.</p>
                                                      )}
-                                                     
+
                                                      {/* Personal Profile Stats */}
                                                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm pt-2 border-t border-dark-600/50">
                                                         <div className="flex items-center text-gray-300" title="Personal Profile Win Rate">
                                                             <BarChart size={14} className="mr-1.5 text-blue-400"/>
-                                                            <span className="font-bold text-blue-400">{memberWinRate}%</span>&nbsp;Win Rate
+                                                            <span className="font-bold text-blue-400">{memberWinRate}</span>&nbsp;% Win Rate
                                                         </div>
                                                         <div className="flex items-center text-gray-300" title="Personal Profile Wins">
                                                             <Trophy size={14} className="mr-1.5 text-green-400"/>
@@ -505,7 +503,6 @@ export default function TeamPage() {
                                                         </div>
                                                      </div>
                                                  </div>
-                                                 {/* --- End Replacement --- */}
 
                                              </AnimatedSection>
                                          );
@@ -547,7 +544,7 @@ export default function TeamPage() {
 
                      {/* Right Column */}
                      <div className="space-y-8 lg:sticky lg:top-24 self-start">
-                         
+
                          {/* --- UPDATED: Upcoming Events --- */}
                          <AnimatedSection delay={500} className="card bg-dark-800 p-6 rounded-xl shadow-lg">
                              <h2 className="text-xl font-bold mb-4 text-primary-300 border-b border-dark-700 pb-2">Upcoming Events</h2>
@@ -583,29 +580,87 @@ export default function TeamPage() {
                      </div> {/* End Right Column */}
                  </div> {/* End Main Grid */}
 
-                 {/* Achievements */}
-                 {teamData.achievements && teamData.achievements.length > 0 && (
+                 {/* Achievements (UPDATED SECTION) */}
+                 {teamAchievements.length > 0 ? (
                      <AnimatedSection delay={700} className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 card bg-dark-800 mt-8 p-6 rounded-xl shadow-lg">
                          <h2 className="text-2xl font-bold mb-6 text-primary-300 border-b border-dark-700 pb-3">Team Achievements</h2>
                          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                             {teamData.achievements.map((achievement, index) => {
-                                 const IconComponent = achievement.icon || Star;
+                             {teamAchievements.map((achievement, index) => {
+                                 // Determine styling based on rank
+                                 const isFirst = achievement.rank === 1;
+                                 const mainStyles = isFirst
+                                     ? "bg-dark-700/50 border-yellow-500/70 border-t-4 border-l-4"
+                                     : achievement.rank === 2
+                                     ? "bg-dark-700/30 border-gray-400/50 border-l-4"
+                                     : "bg-dark-700/20 border-amber-700/50 border-l-4";
+
+                                 const rankTextColor = isFirst
+                                     ? "text-yellow-400"
+                                     : achievement.rank === 2
+                                     ? "text-gray-400"
+                                     : "text-amber-500";
+
+                                 const iconClass = rankTextColor;
+
                                  return (
-                                     <div key={index} className="bg-dark-700/50 p-4 rounded-lg flex flex-col justify-between border-l-4 border-yellow-500/70 shadow-md">
-                                         <div className="flex items-start space-x-3 mb-2">
-                                             <IconComponent className="w-6 h-6 text-yellow-400 flex-shrink-0 mt-1" />
-                                             <div>
-                                                 <p className="font-semibold text-lg text-white leading-tight">{achievement.title}</p>
-                                                 <p className="text-sm text-gray-400">{achievement.description}</p>
-                                             </div>
-                                         </div>
-                                         <p className="text-xs text-gray-500 italic text-right">Achieved: {new Date(achievement.date).toLocaleDateString()}</p>
-                                     </div>
+                                    <AnimatedSection
+                                        key={index}
+                                        delay={50 + index * 100}
+                                        className={`
+                                            relative p-5 rounded-xl transition-all duration-500 
+                                            border-2 transform hover:scale-[1.02] cursor-pointer
+                                            ${mainStyles}
+                                        `}
+                                    >
+                                        <div 
+                                            className="absolute inset-0 bg-cover opacity-[0.05] mix-blend-lighten" 
+                                            style={{ backgroundImage: "url('/images/lan_6.jpg')" }}
+                                        ></div>
+                                        <div className="relative z-10 flex items-start justify-between">
+
+                                            {/* Left: Rank and Details */}
+                                            <div className="flex items-center space-x-4 flex-1">
+                                                {/* RankBadge component logic inline */}
+                                                <div className={`p-1 w-10 h-10 rounded-full flex items-center justify-center font-extrabold text-xl border-2 ${isFirst ? "bg-yellow-700/50 border-yellow-500 text-yellow-300 shadow-lg shadow-yellow-500/40" : achievement.rank === 2 ? "bg-gray-700/50 border-gray-400 text-gray-300 shadow-md shadow-gray-500/30" : "bg-amber-800/50 border-amber-600 text-amber-300 shadow-md shadow-amber-600/30"}`}>
+                                                    <Star size={20} className={`${iconClass} fill-current`} />
+                                                </div>
+
+                                                <div>
+                                                    <p className="text-sm text-gray-400 uppercase tracking-wider">
+                                                        {achievement.game} Championship
+                                                    </p>
+                                                    <h3 className="text-xl font-bold text-white leading-tight mb-1">
+                                                        {achievement.tournamentName}
+                                                    </h3>
+                                                    <p className={`text-base font-semibold ${rankTextColor}`}>
+                                                        {/* Team Name is implicit on team page */}
+                                                        Finished #{achievement.rank}
+                                                    </p>
+                                                </div>
+                                            </div>
+
+                                            {/* Right: Rank and Date */}
+                                            <div className="flex flex-col items-end flex-shrink-0">
+                                                <p className="text-xs text-gray-500">
+                                                    Date: {new Date(achievement.date).toLocaleDateString()}
+                                                </p>
+                                                <p className={`mt-2 text-2xl font-extrabold ${rankTextColor}`}>
+                                                    {isFirst ? 'CHAMPION' : achievement.rank === 2 ? 'RUNNER-UP' : 'THIRD PLACE'}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </AnimatedSection>
                                  );
                              })}
                          </div>
                      </AnimatedSection>
+                 ) : (
+                     <AnimatedSection delay={700} className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 card bg-dark-800 mt-8 p-6 rounded-xl shadow-lg text-center">
+                         <h2 className="text-xl font-bold mb-3 text-primary-300">Team Achievements</h2>
+                         <p className="text-gray-400">No top 3 tournament achievements recorded yet.</p>
+                     </AnimatedSection>
                  )}
+
 
             </div> {/* End Page Container */}
         </div>

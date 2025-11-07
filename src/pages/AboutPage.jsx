@@ -30,7 +30,7 @@ export default function AboutPage() {
   // --- *** UPDATED TEAM SECTION *** ---
   const team = [
     {
-      name: 'NAMKE NIKHIL',
+      name: 'NIKHIL SINGH BURAQ',
       role: 'CEO OF ARE',
       bio: 'Leading the charge in building the future of African esports and connecting gamers across the continent.',
       image: '/images/ceo.jpg'
@@ -42,7 +42,7 @@ export default function AboutPage() {
       image: '/images/founder.jpg'
     },
     {
-      name: 'Ibekwe Isabel',
+      name: 'IBEKWE ISABEL',
       role: 'COMMUNITY MANAGER',
       bio: 'Dedicated to engaging with players, supporting teams, and ensuring a vibrant community experience.',
       image: '/images/community.jpg'

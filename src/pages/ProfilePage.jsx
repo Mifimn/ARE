@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { useAuth } from '../contexts/AuthContext.jsx';
 // Import Heart icon and ThumbsUp (optional alternative)
-import { User, Edit3, Trophy, Users, Calendar, MapPin, Star, Mail, Phone, Clock, Coins, Percent, Gamepad2, FileText, Eye, Search, ArrowRight, Loader2, AlertCircle, Heart, BarChart, Crosshair } from 'lucide-react'; // Added BarChart, Crosshair
+import { User, Edit3, Trophy, Users, Calendar, MapPin, Star, Mail, Phone, Clock, Coins, Percent, Gamepad2, FileText, Eye, Search, ArrowRight, Loader2, AlertCircle, Heart, BarChart, Crosshair, UserX } from 'lucide-react'; // Added UserX
 import { Link, Navigate, useParams } from 'react-router-dom';
 import AnimatedSection from '../components/AnimatedSection';
 
@@ -16,7 +16,7 @@ const normalizeUrl = (url) => {
     return url;
 };
 
-// --- NEW: Helper function to fetch user's teams (owned & member) ---
+// --- Helper function to fetch user's teams (owned & member) ---
 const fetchUserTeams = async (userId) => {
     try {
         // 1. Get teams user owns
@@ -32,7 +32,7 @@ const fetchUserTeams = async (userId) => {
             .from('team_members')
             .select('role, teams(*)') // Fetches role and all team data
             .eq('user_id', userId);
-        
+
         if (memberError) console.error('Error fetching member teams:', memberError.message);
 
         // 3. Combine and deduplicate
@@ -53,13 +53,13 @@ const fetchUserTeams = async (userId) => {
     }
 };
 
-// --- NEW: Helper function to fetch all tournament stats & matches ---
-const fetchUserStats = async (userId) => {
+// --- UPDATED: Helper function to fetch all tournament stats, matches, AND ACHIEVEMENTS ---
+const fetchUserPerformance = async (userId) => {
     try {
         // 1. Get all team IDs for the user
         const { data: teamsAsMember } = await supabase.from('team_members').select('team_id').eq('user_id', userId);
         const { data: teamsAsOwner } = await supabase.from('teams').select('id').eq('owner_id', userId);
-        
+
         const allTeamIds = [
             ...(teamsAsMember ? teamsAsMember.map(t => t.team_id) : []),
             ...(teamsAsOwner ? teamsAsOwner.map(t => t.id) : [])
@@ -67,8 +67,7 @@ const fetchUserStats = async (userId) => {
         const uniqueTeamIds = [...new Set(allTeamIds)];
 
         if (uniqueTeamIds.length === 0) {
-            // No teams, so no stats
-            return { recentMatches: [], stats: null };
+            return { recentMatches: [], stats: null, achievements: [] };
         }
 
         // 2. Get all participant records for those teams
@@ -76,10 +75,10 @@ const fetchUserStats = async (userId) => {
             .from('tournament_participants')
             .select('id, team_name, tournaments(id, game, name)') // Get tournament info
             .in('team_id', uniqueTeamIds);
-        
+
         if (pError) throw pError;
         if (!participantRecords || participantRecords.length === 0) {
-            return { recentMatches: [], stats: null };
+            return { recentMatches: [], stats: null, achievements: [] };
         }
 
         const participantIds = participantRecords.map(p => p.id);
@@ -92,31 +91,28 @@ const fetchUserStats = async (userId) => {
             .order('created_at', { ascending: false }); // Order by creation date for "recent"
 
         if (resultsError) throw resultsError;
-        
+
         const results = matchResults || [];
 
-        // 4. Calculate Stats
+        // 4. Calculate Stats (Simplified as requested)
         let totalKills = 0;
-        let totalPlacementSum = 0;
         let totalWins = 0;
         results.forEach(r => {
-            totalKills += r.kills || 0;
-            totalPlacementSum += r.placement || 0;
+            totalKills += r.kills || 0; 
             if (r.placement === 1) totalWins++;
         });
-        
+
         const totalMatches = results.length;
         const totalLosses = totalMatches - totalWins;
         const stats = {
-            totalKills: totalKills,
             totalMatches: totalMatches,
-            avgPlacement: totalMatches > 0 ? (totalPlacementSum / totalMatches).toFixed(1) : 0,
             totalWins: totalWins,
             totalLosses: totalLosses,
-            winRate: totalMatches > 0 ? Math.round((totalWins / totalMatches) * 100) : 0
+            totalKills: totalKills, // Kept this metric internal
+            winRate: totalMatches > 0 ? Math.round((totalWins / totalMatches) * 100) : 0,
         };
 
-        // 5. Format Recent Matches
+        // 5. Format Recent Matches (Top 5)
         const recentMatches = results.slice(0, 5).map(r => {
             const participant = participantRecords.find(p => p.id === r.participant_id);
             return {
@@ -129,12 +125,35 @@ const fetchUserStats = async (userId) => {
                 date: r.created_at
             };
         });
-        
-        return { recentMatches, stats };
+
+        // 6. Fetch Achievements
+        const { data: achievementsData, error: achievementError } = await supabase
+            .from('tournament_standings')
+            .select(`
+                rank,
+                team_name,
+                tournaments(id, name, game, start_date)
+            `)
+            .in('team_id', uniqueTeamIds) // Filter by user's teams
+            .lte('rank', 3) // Filter for Top 3 only
+            .order('start_date', { ascending: false, referencedTable: 'tournaments' });
+
+        if (achievementError) console.error("Error fetching user achievements:", achievementError.message);
+
+        const achievements = (achievementsData || []).map(a => ({
+            ...a,
+            tournamentName: a.tournaments.name,
+            tournamentId: a.tournaments.id,
+            game: a.tournaments.game,
+            date: a.tournaments.start_date,
+        }));
+
+
+        return { recentMatches, stats, achievements };
 
     } catch (error) {
-        console.error("Error in fetchUserStats:", error.message);
-        return { recentMatches: [], stats: null };
+        console.error("Error in fetchUserPerformance:", error.message);
+        return { recentMatches: [], stats: null, achievements: [] };
     }
 };
 
@@ -151,148 +170,15 @@ export default function ProfilePage() {
     const [isLiking, setIsLiking] = useState(false);
     const [likeError, setLikeError] = useState(null);
     // ---
-    
+
     // --- NEW: State for dynamic data ---
     const [teams, setTeams] = useState([]);
     const [recentMatches, setRecentMatches] = useState([]);
-    const [gameStats, setGameStats] = useState(null); // For stats from tournaments
+    const [gameStats, setGameStats] = useState(null); 
+    const [achievements, setAchievements] = useState([]); // <--- NEW STATE
     // ---
 
-    useEffect(() => {
-        let isMounted = true;
-
-        const fetchAllProfileData = async () => {
-             if (!isMounted) return;
-            setLoading(true);
-            setError(null);
-            setLikeError(null);
-            setHasLiked(false);
-            setProfile(null);
-            // --- NEW: Reset dynamic state ---
-            setTeams([]);
-            setRecentMatches([]);
-            setGameStats(null);
-            // ---
-
-            try {
-                let query;
-                let targetUserId = null;
-
-                // Determine target profile ID
-                if (usernameParam) {
-                    console.log(`[ProfilePage] Fetching profile ID for username: ${usernameParam}`);
-                    const { data: profileDataMinimal, error: findError } = await supabase
-                        .from('profiles')
-                        .select('id')
-                        .eq('username', usernameParam)
-                        .maybeSingle();
-
-                    if (findError && !(findError.message.includes('0 rows'))) throw findError;
-                    if (!profileDataMinimal) throw new Error(`Profile not found for user "${usernameParam}".`);
-                    targetUserId = profileDataMinimal.id;
-
-                } else if (authUser) {
-                    console.log(`[ProfilePage] Using logged-in user ID: ${authUser.id}`);
-                    targetUserId = authUser.id;
-                } else {
-                    throw new Error("User not logged in."); // Cannot view any profile if not logged in and no username given
-                }
-
-                 // Fetch full profile data using the determined targetUserId
-                console.log(`[ProfilePage] Fetching full profile for ID: ${targetUserId}`);
-                query = supabase.from('profiles').select('*').eq('id', targetUserId).single();
-                const { data, error: profileError } = await query;
-
-                // Handle profile fetch errors (including not found after ID lookup)
-                if (profileError && !(profileError.message.includes('0 rows'))) throw profileError;
-                if (!data) throw new Error("Profile data could not be loaded.");
-
-
-                 if (isMounted) {
-                    console.log("[ProfilePage] Fetched profile data:", data);
-                    const isCurrentUserProfile = authUser && data.id === authUser.id;
-                    setIsOwnProfile(isCurrentUserProfile);
-
-                    const enhancedData = {
-                        ...data,
-                        email: isCurrentUserProfile ? authUser.email : 'Protected',
-                        joinDate: isCurrentUserProfile ? authUser.created_at : data.created_at,
-                        favoriteGames: data.favorite_games || [],
-                        gameDetails: data.game_details || {}, // --- This is for Game Profiles
-                        socialLinks: data.social_links || {},
-                        credits: data.credits ?? 0,
-                        totalWins: data.total_wins ?? 0, // Fallback stats
-                        totalLosses: data.total_losses ?? 0, // Fallback stats
-                        avatar: data.avatar_url || '/images/ava_m_1.png',
-                        banner: data.banner_url || '/images/lan_3.jpg',
-                    };
-                    setProfile(enhancedData);
-
-                    // --- NEW: Fetch Teams and Stats in parallel ---
-                    const [teamsResult, statsResult] = await Promise.all([
-                        fetchUserTeams(targetUserId),
-                        fetchUserStats(targetUserId)
-                    ]);
-            
-                    if (isMounted) {
-                        console.log("[ProfilePage] Fetched Teams:", teamsResult);
-                        setTeams(teamsResult);
-                        
-                        console.log("[ProfilePage] Fetched Stats:", statsResult);
-                        setRecentMatches(statsResult.recentMatches);
-                        setGameStats(statsResult.stats);
-                    }
-                    // ---
-
-                    // Fetch Like Status if applicable
-                    if (authUser && !isCurrentUserProfile && targetUserId) {
-                         console.log(`[ProfilePage] Checking like status for profile ${targetUserId} by user ${authUser.id}`);
-                         const { data: likeData, error: likeError } = await supabase
-                            .from('profile_likes')
-                            .select('profile_id')
-                            .eq('profile_id', targetUserId)
-                            .eq('liker_id', authUser.id)
-                            .maybeSingle();
-
-                         if (likeError && isMounted) {
-                            console.error("Error checking like status:", likeError);
-                         } else if (likeData && isMounted) {
-                             console.log("[ProfilePage] User has already liked this profile.");
-                             setHasLiked(true);
-                         } else if(isMounted) {
-                             console.log("[ProfilePage] User has not liked this profile.");
-                             setHasLiked(false);
-                         }
-                    }
-                 }
-
-            } catch (err) {
-                console.error('[ProfilePage] Error during fetch:', err.message);
-                 if (isMounted) setError(err.message === "User not logged in." ? err.message : `Failed to load profile: ${err.message}`);
-            } finally {
-                 if (isMounted) setLoading(false);
-            }
-        };
-
-        // Trigger fetch only when auth state is resolved and we have a target (param or logged-in user)
-        if (!authLoading && (usernameParam || authUser)) {
-            fetchAllProfileData();
-        } else if (!authLoading && !usernameParam && !authUser) {
-            // No target and not logged in - error state handled by redirect check later
-             if(isMounted) {
-                 setError("User not logged in.");
-                 setLoading(false);
-             }
-        }
-
-        return () => { isMounted = false; };
-
-    }, [authUser, authLoading, usernameParam]);
-
-    // --- (Placeholder Teams/Matches removed) ---
-    // ---
-
-    // --- Handle Like Button Click (Use RPC) ---
+    // --- Handlers ---
     const handleLikeProfile = async () => {
         if (!authUser) {
             setLikeError("You must be logged in to like a profile.");
@@ -349,14 +235,139 @@ export default function ProfilePage() {
             setIsLiking(false);
         }
     };
-    // ---
+    // --- End Handlers ---
 
-    // --- Render Loading State ---
+
+    useEffect(() => {
+        let isMounted = true;
+
+        const fetchAllProfileData = async () => {
+            if (!isMounted) return;
+            setLoading(true);
+            setError(null);
+            setLikeError(null);
+            setHasLiked(false);
+            setProfile(null);
+            setTeams([]);
+            setRecentMatches([]);
+            setGameStats(null);
+            setAchievements([]); 
+
+            try {
+                let query;
+                let targetUserId = null;
+
+                // Determine target profile ID
+                if (usernameParam) {
+                    const { data: profileDataMinimal, error: findError } = await supabase
+                        .from('profiles')
+                        .select('id')
+                        .eq('username', usernameParam)
+                        .maybeSingle();
+
+                    if (findError && !(findError.message.includes('0 rows'))) throw findError;
+                    if (!profileDataMinimal) throw new Error(`Profile not found for user "${usernameParam}".`);
+                    targetUserId = profileDataMinimal.id;
+
+                } else if (authUser) {
+                    targetUserId = authUser.id;
+                } else {
+                    throw new Error("User not logged in."); 
+                }
+
+                 // Fetch full profile data
+                query = supabase.from('profiles').select('*').eq('id', targetUserId).single();
+                const { data, error: profileError } = await query;
+
+                if (profileError && !(profileError.message.includes('0 rows'))) throw profileError;
+                if (!data) throw new Error("Profile data could not be loaded.");
+
+
+                 if (isMounted) {
+                    const isCurrentUserProfile = authUser && data.id === authUser.id;
+                    setIsOwnProfile(isCurrentUserProfile);
+
+                    const enhancedData = {
+                        ...data,
+                        email: isCurrentUserProfile ? authUser.email : 'Protected',
+                        joinDate: isCurrentUserProfile ? authUser.created_at : data.created_at,
+                        favoriteGames: data.favorite_games || [],
+                        gameDetails: data.game_details || {},
+                        socialLinks: data.social_links || {},
+                        credits: data.credits ?? 0,
+                        totalWins: data.total_wins ?? 0, 
+                        totalLosses: data.total_losses ?? 0, 
+                        avatar: data.avatar_url || '/images/ava_m_1.png',
+                        banner: data.banner_url || '/images/lan_3.jpg',
+                    };
+                    setProfile(enhancedData);
+
+                    // --- Fetch Teams, Stats, AND Achievements in parallel ---
+                    const [teamsResult, performanceResult] = await Promise.all([
+                        fetchUserTeams(targetUserId),
+                        fetchUserPerformance(targetUserId)
+                    ]);
+
+                    if (isMounted) {
+                        setTeams(teamsResult);
+                        setRecentMatches(performanceResult.recentMatches);
+                        setGameStats(performanceResult.stats);
+                        setAchievements(performanceResult.achievements);
+                    }
+                    // ---
+
+                    // Fetch Like Status if applicable
+                    if (authUser && !isCurrentUserProfile && targetUserId) {
+                         const { data: likeData, error: likeError } = await supabase
+                            .from('profile_likes')
+                            .select('profile_id')
+                            .eq('profile_id', targetUserId)
+                            .eq('liker_id', authUser.id)
+                            .maybeSingle();
+
+                         if (likeError && isMounted) {
+                            console.error("Error checking like status:", likeError);
+                         } else if (likeData && isMounted) {
+                             setHasLiked(true);
+                         } else if(isMounted) {
+                             setHasLiked(false);
+                         }
+                    }
+                 }
+
+            } catch (err) {
+                 if (isMounted) setError(err.message === "User not logged in." ? err.message : `Failed to load profile: ${err.message}`);
+            } finally {
+                 if (isMounted) setLoading(false);
+            }
+        };
+
+        if (!authLoading && (usernameParam || authUser)) {
+            fetchAllProfileData();
+        } else if (!authLoading && !usernameParam && !authUser) {
+             if(isMounted) {
+                 setError("User not logged in.");
+                 setLoading(false);
+             }
+        }
+
+        return () => { isMounted = false; };
+
+    }, [authUser, authLoading, usernameParam]);
+
+    // --- Calculate Win Rate (Fixed Error with optional chaining) ---
+    const totalWins = gameStats ? gameStats.totalWins : (profile?.totalWins ?? 0);
+    const totalLosses = gameStats ? gameStats.totalLosses : (profile?.totalLosses ?? 0);
+    const winRate = totalWins + totalLosses > 0
+      ? Math.round((totalWins / (totalWins + totalLosses)) * 100)
+      : 0;
+    // --- End Fix ---
+
+    // --- Render Loading/Error States ---
     if (loading) {
          return ( <div className="flex justify-center items-center min-h-[calc(100vh-10rem)]"> <Loader2 className="w-16 h-16 text-primary-500 animate-spin" /> <p className="ml-4 text-xl">Loading Profile...</p> </div> );
     }
 
-    // --- Render Error State / Redirect ---
     if (error || !profile) {
         if (error === "User not logged in.") {
             return <Navigate to="/login" replace />;
@@ -364,13 +375,6 @@ export default function ProfilePage() {
         return <div className="flex flex-col justify-center items-center min-h-[calc(100vh-10rem)] text-center px-4"> <AlertCircle className="w-16 h-16 text-red-500 mb-4" /> <h2 className="text-2xl font-semibold text-red-400 mb-2">Error Loading Profile</h2> <p className="text-gray-400">{error || 'Profile data unavailable.'}</p> <Link to="/players" className="mt-6 btn-secondary"> Back to Players </Link> </div>;
     }
 
-
-    // --- Calculate Win Rate (Use new stats if available, else fallback) ---
-    const totalWins = gameStats ? gameStats.totalWins : (profile.totalWins ?? 0);
-    const totalLosses = gameStats ? gameStats.totalLosses : (profile.totalLosses ?? 0);
-    const winRate = totalWins + totalLosses > 0
-      ? Math.round((totalWins / (totalWins + totalLosses)) * 100)
-      : 0;
 
     // --- Render Profile ---
     return (
@@ -417,7 +421,6 @@ export default function ProfilePage() {
                                                     // Show filled heart if liked
                                                     <Heart className={`w-5 h-5 mr-2 ${hasLiked ? 'fill-current text-red-500' : 'text-gray-400'}`} />
                                                 )}
-                                                {/* Change text based on liked state */}
                                                 {hasLiked ? 'Liked' : 'Like'}
                                             </button>
                                         ) : null }
@@ -426,7 +429,7 @@ export default function ProfilePage() {
                                     {likeError && !isOwnProfile && <p className="text-xs text-red-400 mt-1 text-center md:text-right">{likeError}</p>}
                                 </div>
                             </div>
-                            {/* Stats Section (Using Heart for Likes/Credits) --- UPDATED with dynamic stats --- */}
+                            {/* Stats Section (Using Heart for Likes/Credits) */}
                             <AnimatedSection tag="div" className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6 text-center bg-dark-800/80 p-4 rounded-lg border border-dark-700/50" delay={50}>
                                 <div>
                                     <div className="text-2xl font-bold text-primary-400 flex items-center justify-center">
@@ -462,9 +465,88 @@ export default function ProfilePage() {
                  {/* Main Content & Sidebar Grid */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 pt-8">
                     <div className="lg:col-span-2 space-y-8">
-                        
-                        {/* --- UPDATED: Recent Matches --- */}
+
+                        {/* --- NEW: Achievements Section (Epic Design) --- */}
                         <AnimatedSection tag="div" className="card bg-dark-800 p-6 rounded-xl shadow-lg" delay={200}>
+                            <h2 className="text-2xl font-bold mb-6 text-primary-300 flex items-center">
+                                <Trophy size={24} className="mr-3"/> Top 3 Achievements ({achievements.length})
+                            </h2>
+                            {achievements.length > 0 ? (
+                                <div className="space-y-4">
+                                    {achievements.map((achievement, index) => {
+                                         const isFirst = achievement.rank === 1;
+                                         const mainStyles = isFirst
+                                             ? "bg-dark-700/50 border-yellow-500/70 border-t-4 border-l-4"
+                                             : achievement.rank === 2
+                                             ? "bg-dark-700/30 border-gray-400/50 border-l-4"
+                                             : "bg-dark-700/20 border-amber-700/50 border-l-4";
+
+                                         const rankTextColor = isFirst
+                                             ? "text-yellow-400"
+                                             : achievement.rank === 2
+                                             ? "text-gray-400"
+                                             : "text-amber-500";
+
+                                         const iconClass = rankTextColor;
+
+                                         return (
+                                            <AnimatedSection
+                                                key={index}
+                                                delay={50 + index * 100}
+                                                className={`
+                                                    relative p-5 rounded-xl transition-all duration-500 
+                                                    border-2 transform hover:scale-[1.02] cursor-pointer
+                                                    ${mainStyles}
+                                                `}
+                                            >
+                                                <div 
+                                                    className="absolute inset-0 bg-cover opacity-[0.05] mix-blend-lighten" 
+                                                    style={{ backgroundImage: "url('/images/lan_6.jpg')" }}
+                                                ></div>
+                                                <div className="relative z-10 flex items-start justify-between">
+
+                                                    {/* Left: Rank and Details */}
+                                                    <div className="flex items-center space-x-4 flex-1">
+                                                        {/* RankBadge component logic inline */}
+                                                        <div className={`p-1 w-10 h-10 rounded-full flex items-center justify-center font-extrabold text-xl border-2 ${isFirst ? "bg-yellow-700/50 border-yellow-500 text-yellow-300 shadow-lg shadow-yellow-500/40" : achievement.rank === 2 ? "bg-gray-700/50 border-gray-400 text-gray-300 shadow-md shadow-gray-500/30" : "bg-amber-800/50 border-amber-600 text-amber-300 shadow-md shadow-amber-600/30"}`}>
+                                                            <Star size={20} className={`${iconClass} fill-current`} />
+                                                        </div>
+
+                                                        <div>
+                                                            <p className="text-sm text-gray-400 uppercase tracking-wider">
+                                                                {achievement.game} Championship
+                                                            </p>
+                                                            <h3 className="text-xl font-bold text-white leading-tight mb-1">
+                                                                {achievement.tournamentName}
+                                                            </h3>
+                                                            <p className={`text-base font-semibold ${rankTextColor}`}>
+                                                                Team: {achievement.team_name}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Right: Rank and Date */}
+                                                    <div className="flex flex-col items-end flex-shrink-0">
+                                                        <p className="text-xs text-gray-500">
+                                                            Date: {new Date(achievement.date).toLocaleDateString()}
+                                                        </p>
+                                                        <p className={`mt-2 text-2xl font-extrabold ${rankTextColor}`}>
+                                                            {isFirst ? 'CHAMPION' : achievement.rank === 2 ? 'RUNNER-UP' : 'THIRD PLACE'}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            </AnimatedSection>
+                                         );
+                                    })}
+                                </div>
+                             ) : (
+                                <p className="text-gray-400 text-center py-4">No top 3 tournament achievements recorded yet.</p>
+                             )}
+                        </AnimatedSection>
+                        {/* --- END NEW SECTION --- */}
+
+                        {/* Recent Matches */}
+                        <AnimatedSection tag="div" className="card bg-dark-800 p-6 rounded-xl shadow-lg" delay={300}>
                             <h2 className="text-2xl font-bold mb-6 text-primary-300">Recent Matches</h2>
                             {recentMatches.length > 0 ? (
                                 <div className="space-y-4">
@@ -484,7 +566,7 @@ export default function ProfilePage() {
                                                     Placement: <span className="text-primary-400 font-bold text-base">#{match.placement}</span>
                                                 </p>
                                                 <p className="text-sm">
-                                                    Kills: <span className="text-red-400 font-bold text-base">{match.kills}</span>
+                                                    Kills: <span className="font-bold text-lg text-red-400">{match.kills}</span>
                                                 </p>
                                              </div>
                                          </div>
@@ -494,8 +576,8 @@ export default function ProfilePage() {
                             {recentMatches.length > 0 && profile.username && ( <div className="text-center mt-4"> <Link to={`/profile/${profile.username}/matches`} className="text-primary-400 hover:text-primary-300 text-sm font-medium"> View All Matches </Link> </div> )}
                         </AnimatedSection>
 
-                        {/* --- UPDATED: Teams Section --- */}
-                        <AnimatedSection tag="div" className="card bg-dark-800 p-6 rounded-xl shadow-lg" delay={300}>
+                        {/* Teams Section */}
+                        <AnimatedSection tag="div" className="card bg-dark-800 p-6 rounded-xl shadow-lg" delay={400}>
                             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 border-b border-dark-700 pb-3">
                                 <h2 className="text-2xl font-bold text-primary-300 mb-3 sm:mb-0">Teams</h2>
                                 {isOwnProfile && (
@@ -529,8 +611,8 @@ export default function ProfilePage() {
                         </AnimatedSection>
 
 
-                         {/* --- UPDATED: Game Profiles --- */}
-                        <AnimatedSection tag="div" className="card bg-dark-800 p-6 rounded-xl shadow-lg" delay={400}>
+                         {/* Game Profiles */}
+                        <AnimatedSection tag="div" className="card bg-dark-800 p-6 rounded-xl shadow-lg" delay={500}>
                             <h2 className="text-2xl font-bold mb-6 text-primary-300 flex items-center"><Gamepad2 size={20} className="mr-2"/> Game Profiles</h2>
                             {profile.gameDetails && Object.keys(profile.gameDetails).length > 0 && Object.values(profile.gameDetails).some(d => d.ign || d.uid) ? (
                                 <div className="space-y-4">
@@ -555,7 +637,7 @@ export default function ProfilePage() {
                     {/* Sidebar */}
                     <div className="space-y-8">
                         {/* Contact Information */}
-                        <AnimatedSection tag="div" className="card bg-dark-800 p-6 rounded-xl shadow-lg" delay={500}>
+                        <AnimatedSection tag="div" className="card bg-dark-800 p-6 rounded-xl shadow-lg" delay={600}>
                            <h2 className="text-xl font-bold mb-4 text-primary-300">Contact & Info</h2>
                             <div className="space-y-3 text-sm">
                                 <p className="flex items-center"><Mail size={14} className="mr-2 text-primary-400"/> {profile.email}</p>
@@ -564,20 +646,20 @@ export default function ProfilePage() {
                            </div>
                         </AnimatedSection>
                         {/* Social Links */}
-                        <AnimatedSection tag="div" className="card bg-dark-800 p-6 rounded-xl shadow-lg" delay={600}>
+                        <AnimatedSection tag="div" className="card bg-dark-800 p-6 rounded-xl shadow-lg" delay={700}>
                            <h2 className="text-xl font-bold mb-4 text-primary-300">Social Links</h2>
                            <p className="text-gray-400 text-sm">Social media links will appear here.</p>
                            {/* TODO: Render profile.socialLinks */}
                         </AnimatedSection>
-                         {/* --- UPDATED: Game Stats (Sidebar) --- */}
-                        <AnimatedSection tag="div" className="card bg-dark-800 p-6 rounded-xl shadow-lg" delay={700}>
+                         {/* Tournament Statistics (REMOVED KILLS/PLACEMENT) */}
+                        <AnimatedSection tag="div" className="card bg-dark-800 p-6 rounded-xl shadow-lg" delay={800}>
                              <h2 className="text-xl font-bold mb-4 text-primary-300">Tournament Statistics</h2>
                              {gameStats ? (
                                 <div className="space-y-3 text-sm">
                                     <p className="flex items-center justify-between"><span className="text-gray-400 flex items-center"><BarChart size={14} className="mr-1.5"/>Total Matches:</span> <span className="font-bold text-lg text-white">{gameStats.totalMatches}</span></p>
                                     <p className="flex items-center justify-between"><span className="text-gray-400 flex items-center"><Trophy size={14} className="mr-1.5"/>Total Wins:</span> <span className="font-bold text-lg text-green-400">{gameStats.totalWins}</span></p>
-                                    <p className="flex items-center justify-between"><span className="text-gray-400 flex items-center"><Crosshair size={14} className="mr-1.5"/>Total Kills:</span> <span className="font-bold text-lg text-red-400">{gameStats.totalKills}</span></p>
-                                    <p className="flex items-center justify-between"><span className="text-gray-400 flex items-center"><Percent size={14} className="mr-1.5"/>Avg. Placement:</span> <span className="font-bold text-lg text-blue-400">#{gameStats.avgPlacement}</span></p>
+                                    <p className="flex items-center justify-between"><span className="text-gray-400 flex items-center"><UserX size={14} className="mr-1.5"/>Total Losses:</span> <span className="font-bold text-lg text-red-400">{gameStats.totalLosses}</span></p>
+                                    <p className="flex items-center justify-between"><span className="text-gray-400 flex items-center"><Percent size={14} className="mr-1.5"/>Win Rate:</span> <span className="font-bold text-lg text-blue-400">{gameStats.winRate}%</span></p>
                                 </div>
                             ) : (
                                 <p className="text-gray-400 text-sm italic text-center py-2">No tournament statistics found.</p>
