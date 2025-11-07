@@ -214,7 +214,7 @@ const getGameCardStyles = (game) => {
 
 
 // ------------------------------------------------------------------------------------
-// FORMAT 1: Grouped BR Stage Management (Free Fire Demo - Unchanged)
+// FORMAT 1: Grouped BR Stage Management (Free Fire Demo - MODIFIED)
 // ------------------------------------------------------------------------------------
 const GroupedBRStageView = ({ tournament, participants, matches, results, onDataUpdate, openModal, setModalLoading }) => {
     const { stages, current_stage } = tournament;
@@ -276,13 +276,13 @@ const GroupedBRStageView = ({ tournament, participants, matches, results, onData
         return standings;
     }, [results, teamsForThisStage, participants.length]);
 
-    // --- ACTION HANDLERS (DATABASE - Unchanged) ---
+    // --- MODIFIED: handleGroupDraw now uses RPC for batch insert (RPC 3) ---
     const handleGroupDraw = () => {
         if (groupNames.length > 0) {
             openModal({ title: "Groups Already Set", message: `Stage ${current_stage} groups are already set.`, showCancel: false }); return;
         }
-        if (teamsForThisStage.length < currentStageDetails.totalTeams) {
-            openModal({ title: "Missing Teams", message: `Cannot start stage. Only ${teamsForThisStage.length} teams available, need ${currentStageDetails.totalTeams}.`, showCancel: false }); return;
+        if (teamsForThisStage.length < currentStageDetails.groupSize * currentStageDetails.groups) { // Check against total expected participants for a clean draw
+             openModal({ title: "Missing Teams", message: `Cannot start stage. Only ${teamsForThisStage.length} teams available, need ${currentStageDetails.groupSize * currentStageDetails.groups} teams for a clean draw.`, showCancel: false }); return;
         }
 
         openModal({
@@ -291,50 +291,33 @@ const GroupedBRStageView = ({ tournament, participants, matches, results, onData
             confirmText: 'Execute Draw & Create Schedule',
             onConfirm: async () => {
                 setModalLoading(true);
-                const shuffledTeams = [...teamsForThisStage].sort(() => 0.5 - Math.random());
-                const participantsToUpdate = [];
-                const matchParticipantsToInsert = [];
+                const participantIds = teamsForThisStage.map(t => t.id);
 
-                for (let gIndex = 0; gIndex < currentStageDetails.groups; gIndex++) {
-                    const groupName = `Group ${String.fromCharCode(65 + gIndex)}`;
-                    const groupTeams = shuffledTeams.slice(gIndex * currentStageDetails.groupSize, (gIndex + 1) * currentStageDetails.groupSize);
-
-                    groupTeams.forEach(team => {
-                        participantsToUpdate.push({ id: team.id, current_group: groupName });
+                try {
+                    // --- Call the new RPC function (RPC 3: generate_br_groups_and_schedule) ---
+                    const { data: rpcData, error: rpcError } = await supabase.rpc('generate_br_groups_and_schedule', {
+                        p_tournament_id: tournament.id,
+                        p_stage_id: current_stage,
+                        p_groups: currentStageDetails.groups,
+                        p_group_size: currentStageDetails.groupSize,
+                        p_matches_per_group: currentStageDetails.matchesPerGroup,
+                        p_participant_ids: participantIds
                     });
 
-                    for (let mIndex = 0; mIndex < currentStageDetails.matchesPerGroup; mIndex++) {
-                        const newMatch = {
-                            tournament_id: tournament.id,
-                            stage_id: current_stage,
-                            group_name: groupName,
-                            match_number: mIndex + 1,
-                            status: 'Scheduled',
-                            scheduled_time: new Date(Date.now() + 24*60*60*1000).toISOString()
-                        };
+                    if (rpcError) throw rpcError;
 
-                        const { data: matchData, error: matchError } = await supabase.from('tournament_matches').insert(newMatch).select('id').single();
-                        if (matchError) throw matchError;
+                    // The RPC returns a JSON string response we need to parse
+                    const response = JSON.parse(rpcData); 
+                    if (!response.success) throw new Error(response.message);
 
-                        groupTeams.forEach(team => {
-                            matchParticipantsToInsert.push({
-                                match_id: matchData.id,
-                                participant_id: team.id,
-                                tournament_id: tournament.id
-                            });
-                        });
-                    }
+                    await onDataUpdate(); // Refresh all data
+                    setModalLoading(false);
+                    openModal({ title: "Draw & Schedule Complete", message: `Teams successfully drawn and matches scheduled.`, showCancel: false, onClose: () => setViewMode('schedule') });
+
+                } catch (err) {
+                    setModalLoading(false);
+                    openModal({ title: 'Error Executing Draw', message: err.message });
                 }
-
-                const { error: updateError } = await supabase.from('tournament_participants').upsert(participantsToUpdate);
-                if (updateError) throw updateError;
-
-                const { error: matchPartError } = await supabase.from('match_participants').insert(matchParticipantsToInsert);
-                if (matchPartError) throw matchPartError;
-
-                await onDataUpdate(); 
-                setModalLoading(false);
-                openModal({ title: "Draw & Schedule Complete", message: `Teams successfully drawn and matches scheduled.`, showCancel: false, onClose: () => setViewMode('schedule') });
             }
         });
     };
@@ -356,43 +339,53 @@ const GroupedBRStageView = ({ tournament, participants, matches, results, onData
         setSelectedMatch({...match, matchResults: initialResults});
         setViewMode('resultsEntry');
     };
+
+    // --- MODIFIED: handleSubmitResults now uses RPC for validation and upsert (RPC 2) ---
     const handleSubmitResults = (updatedResults) => {
-        const placements = updatedResults.map(r => r.placement).filter(p => p !== null && p > 0).map(p => parseInt(p));
-        const uniquePlacements = new Set(placements);
-        if (placements.length !== uniquePlacements.size || placements.length !== selectedMatch.matchResults.length) {
-            openModal({ title: "Validation Error", message: `Duplicate or missing placements. All ${selectedMatch.matchResults.length} teams must have a unique placement number.`, showCancel: false });
+        // Client-side check for form completeness (UX)
+        const placements = updatedResults.map(r => r.placement).filter(p => p !== null && p > 0);
+        if (placements.length !== selectedMatch.matchResults.length) {
+            openModal({ title: "Validation Error", message: `All ${selectedMatch.matchResults.length} teams must have a placement number.`, showCancel: false });
             return;
         }
+        // Further validation (unique placement, non-negative kills) is handled by the RPC.
 
         openModal({
             title: 'Confirm Results',
-            message: `Are you sure you want to submit these results for ${selectedMatch.id}?`,
+            message: `Are you sure you want to submit these results for ${selectedMatch.group_name} - Match ${selectedMatch.match_number}?`,
             confirmText: 'Submit',
             onConfirm: async () => {
                 setModalLoading(true);
 
-                const resultsToInsert = updatedResults.map(r => {
-                    const pPoints = calculatePlacementPoints(r.placement);
-                    const kPoints = calculateKillPoints(r.kills);
-                    return {
-                        match_id: selectedMatch.id,
-                        participant_id: r.participant_id,
-                        placement: parseInt(r.placement),
-                        kills: parseInt(r.kills),
-                        total_points: pPoints + kPoints
-                    };
-                });
+                // Prepare data structure for the RPC (RPC 2)
+                const resultsToInsert = updatedResults.map(r => ({
+                    participant_id: r.participant_id,
+                    placement: parseInt(r.placement),
+                    kills: parseInt(r.kills),
+                }));
 
-                const { error: resultsError } = await supabase.from('match_results').upsert(resultsToInsert, { onConflict: 'match_id, participant_id' });
-                if (resultsError) throw resultsError;
-                const { error: matchError } = await supabase.from('tournament_matches').update({ status: 'Completed' }).eq('id', selectedMatch.id);
-                if (matchError) throw matchError;
+                try {
+                    // --- Call the RPC function (RPC 2: submit_match_results_br) ---
+                    const { data: rpcData, error: rpcError } = await supabase.rpc('submit_match_results_br', {
+                        p_match_id: selectedMatch.id,
+                        p_results: resultsToInsert 
+                    });
 
-                await onDataUpdate(); 
-                setModalLoading(false);
-                setViewMode('schedule');
-                setSelectedMatch(null);
-                openModal({ title: "Results Submitted", message: `Results for Match ${selectedMatch.id} successfully recorded.`, showCancel: false });
+                    if (rpcError) throw rpcError;
+
+                    const response = JSON.parse(rpcData);
+                    if (!response.success) throw new Error(response.message); // Will display server-side validation error
+
+                    await onDataUpdate(); 
+                    setModalLoading(false);
+                    setViewMode('schedule');
+                    setSelectedMatch(null);
+                    openModal({ title: "Results Submitted", message: `Results for Match ${selectedMatch.match_number} successfully recorded.`, showCancel: false });
+
+                } catch (err) {
+                    setModalLoading(false);
+                    openModal({ title: "Results Submission Failed", message: err.message });
+                }
             }
         });
     };
@@ -438,9 +431,9 @@ const GroupedBRStageView = ({ tournament, participants, matches, results, onData
                                     <th className="px-3 py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Team</th>
                                     <th className="px-3 py-2 text-center text-xs font-medium text-gray-400 uppercase tracking-wider">Placement (1-{lobbySize})</th>
                                     <th className="px-3 py-2 text-center text-xs font-medium text-gray-400 uppercase tracking-wider">Kills</th>
-                                    <th className="px-3 py-2 text-center text-xs font-medium text-gray-400 uppercase tracking-wider">P. Pts</th>
-                                    <th className="px-3 py-2 text-center text-xs font-medium text-gray-400 uppercase tracking-wider">K. Pts</th>
-                                    <th className="px-3 py-2 text-center text-xs font-medium text-gray-400 uppercase tracking-wider">Total</th>
+                                    <th className="px-3 py-2 text-center text-xs font-medium text-yellow-400 uppercase tracking-wider">P. Pts</th>
+                                    <th className="px-3 py-2 text-center text-xs font-medium text-red-400 uppercase tracking-wider">K. Pts</th>
+                                    <th className="px-3 py-2 text-center text-xs font-medium text-primary-400 uppercase tracking-wider">Total</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-dark-700 text-sm">
@@ -665,7 +658,7 @@ const GroupedBRStageView = ({ tournament, participants, matches, results, onData
 // FORMAT 2: League BR Stage Management (Farlight 84 Demo - Unchanged)
 // ------------------------------------------------------------------------------------
 const LeagueBRStageView = ({ tournament, participants, matches, results, onDataUpdate, openModal, setModalLoading }) => {
-    const { stages, current_stage } = tournament;
+    const { stages, current_stage, format } = tournament;
     const currentStageDetails = stages.find(s => s.id === current_stage);
     const [viewMode, setViewMode] = useState('overview'); 
 
@@ -1084,14 +1077,14 @@ const MLBBProSeriesView = ({ tournament, participants, matches, results, onDataU
         const nextStage = stages.find(s => s.id === viewStageId + 1);
         const isFinalAdvancement = viewStageId === 5; 
 
-        if (!nextStage && !isFinalAdvancement) {
-            openModal({ title: 'Error', message: 'This is the final stage.' });
-            return;
-        }
-
         const completedMatches = matchesForThisStage.filter(m => m.status === 'Completed');
         if (matchesForThisStage.length > 0 && completedMatches.length !== matchesForThisStage.length) {
             openModal({ title: 'Stage Not Complete', message: `All ${matchesForThisStage.length} matches in this stage must be "Completed" before advancing winners.` });
+            return;
+        }
+
+        if (!nextStage && !isFinalAdvancement) {
+            openModal({ title: 'Error', message: 'This is the final stage.' });
             return;
         }
 

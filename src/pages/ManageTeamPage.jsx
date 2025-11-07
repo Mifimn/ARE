@@ -7,9 +7,10 @@ import { useAuth } from '../contexts/AuthContext.jsx';
 // Icons needed for this version
 import {
     Settings, Users, Edit3, Trash2, Shield, PlusCircle, ArrowLeft, Save, XCircle, UserX, UserCheck,
-    Loader2, AlertCircle, MapPin, Image, UploadCloud, Check, ChevronDown, ImagePlus, Mail
+    Loader2, AlertCircle, MapPin, Image, UploadCloud, Check, ChevronDown, ImagePlus, Mail, Info, X as CloseIcon, CheckCircle as CheckCircleIcon, HelpCircle
 } from 'lucide-react';
 import AnimatedSection from '../components/AnimatedSection';
+import { useTeamUpdate } from '../contexts/TeamUpdateContext.jsx'; // <<< REQUIRED IMPORT >>>
 
 // --- Constants ---
 const MAX_TEAM_MEMBERS = 6; // Set the team limit
@@ -28,19 +29,48 @@ const africanCountries = [
 const availableGames = ['Free Fire', 'Farlight84', 'COD Warzone', 'Bloodstrike', 'Mobile Legends'].sort();
 const possibleRoles = ['Captain', 'Co-Captain', 'Member', 'Substitute'];
 
+// --- Custom Modal Component (REQUIRED FIX) ---
+const CustomModal = ({ isOpen, onClose, title, children, confirmText = 'OK', onConfirm, showCancel = true, isLoading = false }) => {
+    if (!isOpen) return null;
+
+    const Icon = (title && title.toLowerCase().includes('error')) ? AlertCircle : (title && title.toLowerCase().includes('success')) ? CheckCircleIcon : Info;
+    const iconColor = (title && title.toLowerCase().includes('error')) ? 'text-red-400' : (title && title.toLowerCase().includes('success')) ? 'text-green-400' : 'text-primary-400';
+
+    const handleConfirm = () => {
+        if (onConfirm) onConfirm();
+        else onClose(); 
+    };
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={() => !isLoading && onClose()}>
+            <div className="bg-dark-800 rounded-xl shadow-2xl w-full max-w-md border border-dark-600 relative animate-fade-in" onClick={(e) => e.stopPropagation()}>
+                <div className="flex items-center justify-between p-4 border-b border-dark-700">
+                    <div className="flex items-center"> <Icon className={`w-5 h-5 mr-3 ${iconColor}`} /> <h3 className="text-lg font-semibold text-white">{title}</h3> </div>
+                    <button onClick={() => !isLoading && onClose()} className="text-gray-400 hover:text-white rounded-full p-1 transition-colors" disabled={isLoading}> <CloseIcon size={20} /> </button>
+                </div>
+                <div className="p-6 space-y-4">
+                    <div className="text-gray-300 text-sm">{children}</div>
+                </div>
+                <div className="flex justify-end gap-3 p-4 bg-dark-700/50 border-t border-dark-700 rounded-b-xl">
+                    {showCancel && (<button onClick={() => !isLoading && onClose()} className="btn-secondary text-sm" disabled={isLoading}>Cancel</button>)}
+                    <button onClick={handleConfirm} className="btn-primary text-sm flex items-center justify-center" disabled={isLoading}>
+                        {isLoading && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}
+                        {confirmText}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+// --- End Custom Modal ---
+
+
 // --- Helper: Roster Member Item ---
 const RosterItem = ({ member, isOwner, onKick, onChangeRole, authUser }) => {
     // Handler for role change selection
     const handleRoleSave = (newRole) => {
         console.log(`Changing role for ${member.profiles?.username} to ${newRole}`);
         onChangeRole(member.user_id, newRole); // Call parent handler
-    };
-
-    // Handler for kick button confirmation
-    const handleKick = () => {
-        if (window.confirm(`Are you sure you want to remove ${member.profiles?.username || 'this user'} from the team?`)) {
-            onKick(member.user_id); // Call parent handler
-        }
     };
 
     return (
@@ -69,7 +99,7 @@ const RosterItem = ({ member, isOwner, onKick, onChangeRole, authUser }) => {
                          {possibleRoles.map(role => ( <option key={role} value={role}>{role}</option> ))}
                      </select>
                      {/* Kick Button */}
-                    <button onClick={handleKick} className="btn-danger btn-xs flex items-center" title="Remove Member">
+                    <button onClick={() => onKick(member.user_id, member.profiles?.username)} className="btn-danger btn-xs flex items-center" title="Remove Member">
                         <UserX size={14} className="mr-1 sm:mr-0"/> <span className="sm:hidden">Kick</span>
                     </button>
                  </div>
@@ -80,8 +110,6 @@ const RosterItem = ({ member, isOwner, onKick, onChangeRole, authUser }) => {
 
 // --- Helper: Join Request Item ---
 const JoinRequestItem = ({ request, onAccept, onDecline, isProcessing, isTeamFull }) => {
-    const handleAccept = () => onAccept(request);
-    const handleDecline = () => onDecline(request.id);
     const processingThis = isProcessing === request.id;
 
     return (
@@ -99,7 +127,7 @@ const JoinRequestItem = ({ request, onAccept, onDecline, isProcessing, isTeamFul
             </div>
             <div className="flex gap-2 flex-shrink-0 w-full sm:w-auto justify-end">
                 <button 
-                    onClick={handleDecline} 
+                    onClick={() => onDecline(request.id, request.profiles?.username)} 
                     disabled={processingThis} 
                     className="btn-danger btn-xs flex items-center" 
                     title="Decline Request"
@@ -107,7 +135,7 @@ const JoinRequestItem = ({ request, onAccept, onDecline, isProcessing, isTeamFul
                     {processingThis ? <Loader2 size={14} className="animate-spin" /> : <XCircle size={14} />}
                 </button>
                 <button
-                    onClick={handleAccept}
+                    onClick={() => onAccept(request)}
                     disabled={processingThis || isTeamFull}
                     className="btn-success btn-xs flex items-center disabled:opacity-50 disabled:cursor-not-allowed"
                     title={isTeamFull ? "Team is full" : "Accept Request"}
@@ -125,6 +153,7 @@ export default function ManageTeamPage() {
     const { teamId } = useParams(); // Get team ID from URL
     const navigate = useNavigate();
     const { user: authUser, loading: authLoading } = useAuth(); // Get current user
+    const { triggerTeamUpdate } = useTeamUpdate(); // <<< CONSUME NEW CONTEXT >>>
 
     // --- State variables ---
     const [teamData, setTeamData] = useState(null);
@@ -145,12 +174,24 @@ export default function ManageTeamPage() {
     const [inviteUsername, setInviteUsername] = useState('');
     const [inviteLoading, setInviteLoading] = useState(false);
 
-    // --- NEW: State for Join Requests ---
+    // --- State for Join Requests ---
     const [joinRequests, setJoinRequests] = useState([]);
     const [loadingRequests, setLoadingRequests] = useState(true);
     const [requestError, setRequestError] = useState(null);
     const [processingId, setProcessingId] = useState(null); // For accept/decline buttons
-    // ---
+
+    // --- Modal State ---
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [modalContent, setModalContent] = useState({});
+
+    const openModal = (content) => { 
+        setModalContent(content); 
+        setIsModalOpen(true); 
+    };
+    const closeModal = () => {
+        setIsModalOpen(false);
+        setModalContent({});
+    };
 
     // --- Fetch Team Data, Members, and Requests useEffect ---
     useEffect(() => {
@@ -199,14 +240,13 @@ export default function ManageTeamPage() {
                 if (membersError) throw membersError;
                 if (isMounted) setMembers(membersResult || []);
 
-                // --- *** THIS IS THE FIX *** ---
-                // --- NEW: Fetch Join Requests (Manual Join) ---
+                // --- Fetch Join Requests (Manual Join) ---
                 setLoadingRequests(true);
-                
-                // 1. Fetch the requests
+
+                // 1. Fetch the requests (CRITICAL: Only fetching 'pending')
                 const { data: requestsResult, error: requestsError } = await supabase
                     .from('team_join_requests')
-                    .select('id, user_id, created_at, team_id') // Select only what's in this table
+                    .select('id, user_id, created_at, team_id') 
                     .eq('team_id', numericTeamId)
                     .eq('status', 'pending');
 
@@ -233,7 +273,7 @@ export default function ManageTeamPage() {
                             // Find the profile that matches the request's user_id
                             profiles: profilesData.find(p => p.id === req.user_id) || null
                         }));
-                        
+
                         if (isMounted) {
                             console.log("Fetched and combined join requests:", combinedRequests);
                             setJoinRequests(combinedRequests);
@@ -243,7 +283,7 @@ export default function ManageTeamPage() {
                      if (isMounted) setJoinRequests([]); // No requests found
                 }
                 if (isMounted) setLoadingRequests(false);
-                // --- *** END OF FIX *** ---
+                // --- END OF FIX ---
 
 
             } catch (err) {
@@ -348,39 +388,65 @@ export default function ManageTeamPage() {
     // --- Delete Team Handler ---
     const handleDeleteTeam = async () => {
         if (!isOwner || isSaving || !teamData) return;
-        const confirmName = prompt(`Confirm deletion by typing the team name: "${teamData.name}"`);
-        if (confirmName !== teamData.name) { alert("Confirmation failed."); return; }
-        setIsSaving(true); setError(null);
-        try {
-            console.log(`Deleting team ${teamData.id}`); // Use teamData.id
-            const { error: deleteTeamError } = await supabase.from('teams').delete().eq('id', teamData.id); // Use teamData.id
-            if (deleteTeamError) throw deleteTeamError;
-            try {
-                const bucketName = 'team-assets';
-                const teamIdStr = teamData.id.toString(); // Use teamData.id
-                const { data: files } = await supabase.storage.from(bucketName).list(teamIdStr);
-                if (files && files.length > 0) {
-                    const filePaths = files.map(file => `${teamIdStr}/${file.name}`);
-                    await supabase.storage.from(bucketName).remove(filePaths);
-                    console.log(`Deleted storage for team ${teamIdStr}.`);
-                }
-            } catch (storageErr) { console.warn("Could not delete team storage:", storageErr.message); }
-            alert(`Team "${teamData.name}" deleted.`); navigate('/my-teams');
-        } catch (err) { console.error("Delete Error:", err); setError(err.message || "Deletion failed."); }
-        finally { setIsSaving(false); }
+
+        openModal({
+            title: "Confirm Team Deletion",
+            message: `Are you sure you want to permanently delete the team "${teamData.name}"? This action cannot be undone and will affect all members.`,
+            confirmText: 'Delete Team',
+            showCancel: true,
+            onConfirm: async () => {
+                setIsSaving(true); setError(null);
+                try {
+                    console.log(`Deleting team ${teamData.id}`); 
+                    const { error: deleteTeamError } = await supabase.from('teams').delete().eq('id', teamData.id); 
+                    if (deleteTeamError) throw deleteTeamError;
+
+                    try {
+                        const bucketName = 'team-assets';
+                        const teamIdStr = teamData.id.toString(); 
+                        const { data: files } = await supabase.storage.from(bucketName).list(teamIdStr);
+                        if (files && files.length > 0) {
+                            const filePaths = files.map(file => `${teamIdStr}/${file.name}`);
+                            await supabase.storage.from(bucketName).remove(filePaths);
+                            console.log(`Deleted storage for team ${teamIdStr}.`);
+                        }
+                    } catch (storageErr) { console.warn("Could not delete team storage:", storageErr.message); }
+
+                    triggerTeamUpdate(); // Global sync
+                    closeModal();
+                    navigate('/my-teams');
+                } catch (err) { 
+                    closeModal();
+                    openModal({ title: "Deletion Failed", message: err.message || "Deletion failed.", showCancel: false });
+                } finally { setIsSaving(false); }
+            }
+        });
     };
 
     // --- Roster Action Handlers ---
-    const handleKickMember = async (userIdToKick) => {
-        if (!isOwner || !teamData) return; setError(null);
-        const numericTeamId = parseInt(teamId, 10); // Ensure numeric ID
-        console.log(`Kicking user ${userIdToKick} from team ${numericTeamId}`);
-        try {
-            const { error } = await supabase.from('team_members').delete().match({ team_id: numericTeamId, user_id: userIdToKick });
-            if (error) throw error;
-            setMembers(prev => prev.filter(m => m.user_id !== userIdToKick));
-            alert('Member removed.');
-        } catch (err) { setError(`Failed to remove member: ${err.message}`); }
+    const handleKickMember = (userIdToKick, username) => {
+         openModal({
+            title: "Confirm Kick",
+            message: `Are you sure you want to remove ${username} from the team?`,
+            confirmText: 'Kick Member',
+            showCancel: true,
+            onConfirm: async () => {
+                setProcessingId(userIdToKick);
+                if (!isOwner || !teamData) return; setError(null);
+                const numericTeamId = parseInt(teamId, 10); 
+                try {
+                    const { error } = await supabase.from('team_members').delete().match({ team_id: numericTeamId, user_id: userIdToKick });
+                    if (error) throw error;
+                    setMembers(prev => prev.filter(m => m.user_id !== userIdToKick));
+                    closeModal();
+                    setSuccessMessage(`${username} removed from the roster.`);
+                    triggerTeamUpdate(); // Global sync
+                } catch (err) { 
+                    closeModal();
+                    openModal({ title: "Kick Failed", message: `Failed to remove member: ${err.message}`, showCancel: false });
+                } finally { setProcessingId(null); }
+            }
+        });
     };
 
     // --- *** CORRECTED handleChangeMemberRole *** ---
@@ -392,7 +458,6 @@ export default function ManageTeamPage() {
         setError(null); setSuccessMessage('');
         const numericTeamId = parseInt(teamId, 10);
         if (isNaN(numericTeamId)) { setError("Invalid Team ID."); return; }
-        console.log(`Attempting to change role for user ${userIdToChange} to ${newRole} in team ${numericTeamId}`);
         const originalMembers = [...members];
         setMembers(prev => prev.map(m => m.user_id === userIdToChange ? { ...m, role: newRole } : m));
         try {
@@ -403,13 +468,9 @@ export default function ManageTeamPage() {
                 .eq('user_id', userIdToChange);
             if (updateError) {
                 console.error("Supabase role update error:", updateError);
-                if (updateError.message.includes('violates row-level security policy')) {
-                    throw new Error("Permission denied by database policy.");
-                }
-                throw updateError;
+                throw new Error("Permission denied by database policy.");
             }
-            console.log(`Role successfully updated for user ${userIdToChange} to ${newRole}.`);
-            const updatedMember = originalMembers.find(m => m.user_id === userIdToChange); // Use original to get name before potential rollback
+            const updatedMember = originalMembers.find(m => m.user_id === userIdToChange);
             setSuccessMessage(`Role for ${updatedMember?.profiles?.username || 'user'} updated to ${newRole}.`);
         } catch (err) {
             console.error("Failed to change role:", err);
@@ -435,8 +496,7 @@ export default function ManageTeamPage() {
          }
          // ---
 
-         const numericTeamId = parseInt(teamId, 10); // Use numeric ID
-         console.log(`Inviting user "${inviteUsername}" to team ${numericTeamId}`);
+         const numericTeamId = parseInt(teamId, 10);
          setInviteLoading(true);
          try {
             const { data: profileData, error: profileError } = await supabase.from('profiles').select('id').eq('username', inviteUsername.trim()).single();
@@ -449,96 +509,91 @@ export default function ManageTeamPage() {
              if (existingInvite) throw new Error(`Invite already pending.`);
              const { error: inviteError } = await supabase.from('team_invites').insert({ team_id: numericTeamId, invited_user_id: userIdToInvite, inviter_user_id: authUser.id, status: 'pending' });
              if (inviteError) throw inviteError;
-             alert(`Invite sent to ${inviteUsername.trim()}!`);
+             openModal({ title: "Invite Sent", message: `Invite sent to ${inviteUsername.trim()}!`, showCancel: false });
              setInviteUsername('');
          } catch (err) { setError(`${err.message}`); } finally { setInviteLoading(false); }
     };
 
-    // --- NEW: Join Request Handlers ---
-    const handleAcceptRequest = async (request) => {
+    // --- NEW: Join Request Handlers (FIXED ACCEPT/DECLINE LOGIC) ---
+    const handleAcceptRequest = (request) => {
         setError(null); setRequestError(null);
         if (!isOwner || !teamData) return;
+        if (isTeamFull) { setRequestError(`Team is full (${MAX_TEAM_MEMBERS} members max). Cannot accept request.`); return; }
 
-        // --- NEW: Check team limit ---
-        if (isTeamFull) {
-            setRequestError(`Team is full (${MAX_TEAM_MEMBERS} members max). Cannot accept request.`);
-            return;
-        }
-        // ---
+        openModal({
+            title: "Confirm Acceptance",
+            message: `Are you sure you want to accept ${request.profiles.username} into the team?`,
+            confirmText: 'Accept & Add Member',
+            showCancel: true,
+            onConfirm: async () => {
+                const numericTeamId = parseInt(teamId, 10);
+                setProcessingId(request.id); // Start spinner
+                try {
+                    // Step 1: Insert into team_members (Requires RLS: INSERT on team_members)
+                    const { data: newMember, error: insertError } = await supabase
+                        .from('team_members')
+                        .insert({ team_id: numericTeamId, user_id: request.user_id, role: 'Member' })
+                        .select()
+                        .single();
 
-        setProcessingId(request.id);
-        const numericTeamId = parseInt(teamId, 10);
+                    if (insertError && !insertError.message.includes('unique constraint')) throw insertError;
 
-        try {
-            // Step 1: Insert into team_members
-            const { data: newMember, error: insertError } = await supabase
-                .from('team_members')
-                .insert({
-                    team_id: numericTeamId,
-                    user_id: request.user_id,
-                    role: 'Member'
-                })
-                .select()
-                .single();
+                    // Step 2: Delete the join request (Requires RLS: DELETE on team_join_requests)
+                    const { error: deleteError } = await supabase.from('team_join_requests').delete().eq('id', request.id);
+                    if (deleteError) { console.error("Failed to delete join request after accepting:", deleteError); }
 
-            if (insertError) {
-                 if (insertError.message.includes('unique constraint')) {
-                     // User is already a member, just delete the request
-                 } else {
-                     throw insertError;
-                 }
+                    // Step 3: Update UI state (Crucial fix for UI desync)
+                    setJoinRequests(prev => prev.filter(r => r.id !== request.id)); 
+                    if (!members.some(m => m.user_id === request.user_id)) {
+                        setMembers(prev => [...prev, { ...newMember, profiles: request.profiles }]); 
+                    }
+                    setSuccessMessage(`Accepted ${request.profiles.username} into the team!`);
+                    triggerTeamUpdate(); // Global sync
+                    closeModal();
+
+                } catch (err) {
+                    closeModal();
+                    openModal({ title: "Acceptance Failed", message: `Error adding member: ${err.message}`, showCancel: false });
+                } finally {
+                    setProcessingId(null); // Stop spinner
+                }
             }
-
-            // Step 2: Delete the join request
-            const { error: deleteError } = await supabase
-                .from('team_join_requests')
-                .delete()
-                .eq('id', request.id);
-
-            if (deleteError) {
-                // This is problematic (user is a member, but request still shows)
-                // Log it, but proceed with UI update
-                console.error("Failed to delete join request after accepting:", deleteError);
-                setRequestError("Failed to delete request, but user was added. Please refresh.");
-            }
-
-            // Step 3: Update UI state
-            setJoinRequests(prev => prev.filter(r => r.id !== request.id));
-            // Add member to list *only if* they weren't already there
-            if (!members.some(m => m.user_id === request.user_id)) {
-                setMembers(prev => [...prev, { ...newMember, profiles: request.profiles }]); // Add new member to list
-            }
-            setSuccessMessage(`Accepted ${request.profiles.username} into the team!`);
-
-        } catch (err) {
-            console.error("Error accepting request:", err);
-            setRequestError(`Failed to accept: ${err.message}`);
-        } finally {
-            setProcessingId(null);
-        }
+        });
     };
 
-    const handleDeclineRequest = async (requestId) => {
+    const handleDeclineRequest = (requestId, username) => {
         setError(null); setRequestError(null);
         if (!isOwner) return;
 
-        setProcessingId(requestId);
-        try {
-            const { error } = await supabase
-                .from('team_join_requests')
-                .delete()
-                .eq('id', requestId);
+        openModal({
+            title: "Confirm Decline",
+            message: `Are you sure you want to decline ${username}'s request? The user will be on a 24-hour cooldown.`,
+            confirmText: 'Decline Request',
+            showCancel: true,
+            onConfirm: async () => {
+                setProcessingId(requestId); // Start spinner
+                try {
+                    // CRITICAL FIX: UPDATE status to 'declined' (Requires RLS: UPDATE on team_join_requests)
+                    const { error } = await supabase
+                        .from('team_join_requests')
+                        .update({ status: 'declined', updated_at: new Date().toISOString() }) 
+                        .eq('id', requestId);
 
-            if (error) throw error;
-            
-            // Update UI
-            setJoinRequests(prev => prev.filter(r => r.id !== requestId));
-        } catch (err) {
-            console.error("Error declining request:", err);
-            setRequestError(`Failed to decline: ${err.message}`);
-        } finally {
-            setProcessingId(null);
-        }
+                    if (error) throw error;
+
+                    // Update UI (Crucial fix for UI desync)
+                    setJoinRequests(prev => prev.filter(r => r.id !== requestId));
+                    setSuccessMessage(`${username}'s request was declined.`);
+                    closeModal(); // Close modal only on success
+
+                } catch (err) {
+                    closeModal();
+                    openModal({ title: "Decline Failed", message: `Error declining request: ${err.message}`, showCancel: false });
+                } finally {
+                    setProcessingId(null); // Stop spinner
+                }
+            }
+        });
     };
     // --- End Join Request Handlers ---
 
@@ -636,7 +691,7 @@ export default function ManageTeamPage() {
                             <div className="flex-grow w-full"> <label htmlFor="inviteUsername" className="block text-sm font-medium text-gray-300 mb-1.5">Invite by Username</label> <input type="text" id="inviteUsername" value={inviteUsername} onChange={(e) => setInviteUsername(e.target.value)} className="input-field w-full" placeholder="Enter exact username" disabled={inviteLoading || isTeamFull} required /> </div>
                             <button type="submit" className="btn-primary flex items-center w-full sm:w-auto flex-shrink-0" disabled={inviteLoading || !inviteUsername.trim() || isTeamFull}> {inviteLoading ? <Loader2 className="animate-spin h-4 w-4 mr-2"/> : <PlusCircle size={16} className="mr-2"/>} {inviteLoading ? 'Sending...' : 'Send Invite'} </button>
                         </form>
-                        
+
                         {/* --- NEW: Pending Join Requests --- */}
                         <div className="mb-6">
                             <h3 className="text-xl font-semibold mb-3 text-yellow-400 flex items-center">
@@ -697,6 +752,19 @@ export default function ManageTeamPage() {
                  )}
 
             </div>
+
+            {/* --- Modal Implementation --- */}
+            <CustomModal
+                isOpen={isModalOpen}
+                onClose={closeModal}
+                title={modalContent.title}
+                confirmText={modalContent.confirmText}
+                onConfirm={modalContent.onConfirm}
+                showCancel={modalContent.showCancel}
+                isLoading={isSaving || processingId} // Use processingId for modal loading indicator
+            >
+                {modalContent.message}
+            </CustomModal>
         </div>
     );
 }

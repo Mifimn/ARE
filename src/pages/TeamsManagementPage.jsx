@@ -3,45 +3,95 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 // Added Mail, Check, XCircle, Loader2, LogOut icons
-import { PlusCircle, Eye, Users, ArrowRight, X, Image, Gamepad2, Edit3, Settings, AlertCircle, Loader2, Mail, Check as CheckIcon, XCircle as XCircleIcon, LogOut } from 'lucide-react';
+import { PlusCircle, Eye, Users, ArrowRight, X, Image, Gamepad2, Edit3, Settings, AlertCircle, Loader2, Mail, Check as CheckIcon, XCircle as XCircleIcon, LogOut, Info, CheckCircle as CheckCircleIcon, X as CloseIcon } from 'lucide-react';
 import AnimatedSection from '../components/AnimatedSection.jsx'; //
 import { supabase } from '../lib/supabaseClient.js'; //
 import { useAuth } from '../contexts/AuthContext.jsx'; //
+import { useTeamUpdate } from '../contexts/TeamUpdateContext.jsx'; // <<< NEW IMPORT >>>
+
+
+// --- Custom Modal Component (Added to this file) ---
+const CustomModal = ({ isOpen, onClose, title, children, confirmText = 'OK', onConfirm, showCancel = true, isLoading = false }) => {
+    if (!isOpen) return null;
+
+    const Icon = (title && title.toLowerCase().includes('error')) ? AlertCircle : (title && title.toLowerCase().includes('success')) ? CheckCircleIcon : Info;
+    const iconColor = (title && title.toLowerCase().includes('error')) ? 'text-red-400' : (title && title.toLowerCase().includes('success')) ? 'text-green-400' : 'text-primary-400';
+
+    const handleConfirm = () => {
+        if (onConfirm) onConfirm();
+        else onClose(); 
+    };
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={() => !isLoading && onClose()}>
+            <div className="bg-dark-800 rounded-xl shadow-2xl w-full max-w-md border border-dark-600 relative animate-fade-in" onClick={(e) => e.stopPropagation()}>
+                <div className="flex items-center justify-between p-4 border-b border-dark-700">
+                    <div className="flex items-center"> <Icon className={`w-5 h-5 mr-3 ${iconColor}`} /> <h3 className="text-lg font-semibold text-white">{title}</h3> </div>
+                    <button onClick={() => !isLoading && onClose()} className="text-gray-400 hover:text-white rounded-full p-1 transition-colors" disabled={isLoading}> <CloseIcon size={20} /> </button>
+                </div>
+                <div className="p-6 space-y-4">
+                    <div className="text-gray-300 text-sm">{children}</div>
+                </div>
+                <div className="flex justify-end gap-3 p-4 bg-dark-700/50 border-t border-dark-700 rounded-b-xl">
+                    {showCancel && (<button onClick={() => !isLoading && onClose()} className="btn-secondary text-sm" disabled={isLoading}>Cancel</button>)}
+                    <button onClick={handleConfirm} className="btn-primary text-sm flex items-center justify-center" disabled={isLoading}>
+                        {isLoading && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}
+                        {confirmText}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+// --- End Custom Modal ---
+
 
 // --- TeamListItem Component ---
-const TeamListItem = ({ team, delay, authUser, refreshTeams }) => { // Added refreshTeams prop
-    // Determine if the current user owns this team
+const TeamListItem = ({ team, delay, authUser, refreshTeams, openModal, closeModal }) => { // Added modal handlers
+    // --- USE NEW CONTEXT ---
+    const { triggerTeamUpdate } = useTeamUpdate(); 
     const isOwner = authUser && team.owner_id === authUser.id;
     const [isLeaving, setIsLeaving] = useState(false); // State for leave button loading
 
-    // Function for leaving team
-    const handleLeaveTeam = async () => {
+    // Check if team has pending invites for notification badge
+    const hasPendingInvites = team.pending_invites > 0;
+
+    // Function for leaving team (Uses CustomModal)
+    const handleLeaveTeam = () => {
         if (!authUser || isOwner) return; // Prevent owner from leaving via this button
-        if (window.confirm(`Are you sure you want to leave the team "${team.name}"?`)) {
-            setIsLeaving(true);
-            console.log(`Leaving team ${team.id}`);
-            try {
-                // Delete the member entry from team_members table
-                const { error } = await supabase
-                    .from('team_members')
-                    .delete()
-                    .eq('team_id', team.id)
-                    .eq('user_id', authUser.id); // Delete the row matching team and current user
 
-                if (error) throw error;
+        openModal({
+            title: `Confirm Leave Team`,
+            message: `Are you sure you want to leave the team "${team.name}"? You will need an invite to rejoin.`,
+            confirmText: 'Yes, Leave Team',
+            showCancel: true,
+            onConfirm: async () => {
+                setIsLeaving(true);
+                try {
+                    // Delete the member entry from team_members table
+                    const { error } = await supabase
+                        .from('team_members')
+                        .delete()
+                        .eq('team_id', team.id)
+                        .eq('user_id', authUser.id);
 
-                alert(`You have left ${team.name}.`);
-                if (authUser?.id) { // Check if authUser.id exists before calling
-                 refreshTeams(authUser.id); // Call refresh function passed from parent
+                    if (error) throw error;
+
+                    closeModal(); // Close modal on success
+                    alert(`You have left ${team.name}.`); // Use native alert for final feedback
+                    if (authUser?.id) { 
+                     refreshTeams(authUser.id);
+                     triggerTeamUpdate(); // <-- 🟢 TRIGGER GLOBAL REFRESH
+                    }
+
+                } catch (err) {
+                    closeModal();
+                    openModal({ title: "Error", message: `Failed to leave team: ${err.message}`, showCancel: false });
+                } finally {
+                    setIsLeaving(false); // Reset loading state
                 }
-
-            } catch (err) {
-                console.error("Error leaving team:", err);
-                alert(`Failed to leave team: ${err.message}`);
-                setIsLeaving(false); // Ensure button is re-enabled on error
             }
-            // No need to setIsLeaving(false) on success as component will re-render/disappear
-        }
+        });
     };
 
     return (
@@ -58,7 +108,6 @@ const TeamListItem = ({ team, delay, authUser, refreshTeams }) => { // Added ref
                     <p className="text-sm text-gray-400">{team.game}</p>
                     {/* Display 'Owner' role if applicable */}
                     {isOwner && <p className="text-xs text-yellow-400 mt-1">Role: Owner</p>}
-                     {/* TODO: Add logic to display actual role from team_members when member data is fetched for this list */}
                 </div>
             </div>
             {/* Action Buttons */}
@@ -66,10 +115,15 @@ const TeamListItem = ({ team, delay, authUser, refreshTeams }) => { // Added ref
                 <Link to={`/team/${team.id}`} className="btn-secondary text-xs px-3 py-1.5 flex items-center justify-center hover:bg-dark-600 flex-1 sm:flex-initial" title="View Team Page">
                     <Eye size={14} className="mr-1" /> View
                 </Link>
-                {/* Conditionally render Manage or Leave button */}
+                {/* Conditionally render Manage or Leave button (WITH BADGE) */}
                 {isOwner ? (
-                    <Link to={`/manage-team/${team.id}`} className="btn-primary text-xs px-3 py-1.5 flex items-center justify-center hover:bg-primary-700 flex-1 sm:flex-initial" title="Manage Team Settings">
+                    <Link to={`/manage-team/${team.id}`} className="relative btn-primary text-xs px-3 py-1.5 flex items-center justify-center hover:bg-primary-700 flex-1 sm:flex-initial" title="Manage Team Settings">
                         <Settings size={14} className="mr-1" /> Manage
+                        {hasPendingInvites && (
+                            <div className="absolute -top-1 -right-1 w-4 h-4 bg-red-600 rounded-full flex items-center justify-center text-xs font-bold text-white shadow-lg">
+                                <span className="relative z-10">{team.pending_invites}</span>
+                            </div>
+                        )}
                     </Link>
                 ) : (
                     // Show Leave button if user is authenticated but not the owner
@@ -84,16 +138,16 @@ const TeamListItem = ({ team, delay, authUser, refreshTeams }) => { // Added ref
                         </button>
                     )
                 )}
-                 {/* If user isn't logged in, no Manage/Leave button shows */}
             </div>
         </AnimatedSection>
     );
 };
 
 // --- CreateTeamForm Component ---
-const CreateTeamForm = ({ onClose, onTeamCreated }) => {
+const CreateTeamForm = ({ onClose, onTeamCreated, openModal, closeModal }) => {
     const { user: authUser } = useAuth();
-    const availableGames = ['Free Fire', 'Farlight84', 'COD Warzone', 'Bloodstrike', 'Mobile Legends'].sort(); //
+    const { triggerTeamUpdate } = useTeamUpdate(); 
+    const availableGames = ['Free Fire', 'Farlight84', 'COD Warzone', 'Bloodstrike', 'Mobile Legends'].sort(); 
     const [teamName, setTeamName] = useState('');
     const [gameTitle, setGameTitle] = useState(availableGames[0]);
     const [logoPreview, setLogoPreview] = useState(null);
@@ -127,48 +181,43 @@ const CreateTeamForm = ({ onClose, onTeamCreated }) => {
         try {
             // Logo Upload
             if (logoFile) {
-                console.log('Uploading logo:', logoFile.name);
                 const fileExt = logoFile.name.split('.').pop();
                 const uniqueFileName = `${Date.now()}_${teamName.replace(/\s+/g, '_')}.${fileExt}`;
                 const filePath = `${authUser.id}/${uniqueFileName}`;
-                const bucketName = 'team-logos'; // *** YOUR BUCKET NAME ***
+                const bucketName = 'team-logos';
 
-                const { error: uploadError } = await supabase.storage.from(bucketName).upload(filePath, logoFile); //
-                if (uploadError) throw new Error(`Logo upload failed: ${uploadError.message}`); //
+                const { error: uploadError } = await supabase.storage.from(bucketName).upload(filePath, logoFile);
+                if (uploadError) throw new Error(`Logo upload failed: ${uploadError.message}`);
 
-                const { data: urlData } = supabase.storage.from(bucketName).getPublicUrl(filePath); //
-                if (!urlData?.publicUrl) throw new Error("Could not get public URL for uploaded logo."); //
-                logoUrl = urlData.publicUrl; //
-                console.log('Logo uploaded:', logoUrl); //
+                const { data: urlData } = supabase.storage.from(bucketName).getPublicUrl(filePath);
+                if (!urlData?.publicUrl) throw new Error("Could not get public URL for uploaded logo.");
+                logoUrl = urlData.publicUrl;
             }
 
             // Insert Team Data
-            const newTeamData = { name: teamName, game: gameTitle, logo_url: logoUrl, owner_id: authUser.id }; //
-            console.log('Inserting team data:', newTeamData); //
-            // Ensure the trigger `add_owner_as_captain` runs after this insert
-            const { data, error: insertError } = await supabase.from('teams').insert([newTeamData]).select().single(); //
+            const newTeamData = { name: teamName, game: gameTitle, logo_url: logoUrl, owner_id: authUser.id };
+            const { data, error: insertError } = await supabase.from('teams').insert([newTeamData]).select().single();
 
-            if (insertError) { //
-                 if (insertError.message.includes('team_name_owner_unique')) { throw new Error(`You already have a team named "${teamName}".`); } //
-                throw new Error(`Team creation failed: ${insertError.message}`); //
+            if (insertError) { 
+                 if (insertError.message.includes('team_name_owner_unique')) { throw new Error(`You already have a team named "${teamName}".`); } 
+                throw new Error(`Team creation failed: ${insertError.message}`); 
             }
 
-            console.log('Team created:', data); //
-            alert(`Team "${data.name}" created successfully!`); //
-            if (logoPreview && logoUrl === logoPreview) URL.revokeObjectURL(logoPreview); //
-            onTeamCreated(data); // Call the callback with the new team data
-            onClose(); //
+            openModal({title: "Success!", message: `Team "${data.name}" created successfully!`, showCancel: false});
+            if (logoPreview && logoUrl === logoPreview) URL.revokeObjectURL(logoPreview); 
+            onTeamCreated(data); 
+            triggerTeamUpdate(); 
+            onClose(); 
 
-        } catch (err) { //
-             console.error("Submission Error:", err); //
-            setError(err.message || "An unexpected error occurred."); //
-        } finally { //
-             setIsSubmitting(false); //
+        } catch (err) { 
+            setError(err.message || "An unexpected error occurred."); 
+        } finally { 
+             setIsSubmitting(false); 
         }
     };
 
     // Cleanup object URL on unmount
-    React.useEffect(() => { return () => { if (logoPreview) URL.revokeObjectURL(logoPreview); }; }, [logoPreview]); //
+    React.useEffect(() => { return () => { if (logoPreview) URL.revokeObjectURL(logoPreview); }; }, [logoPreview]);
 
 
     return (
@@ -191,17 +240,35 @@ const CreateTeamForm = ({ onClose, onTeamCreated }) => {
 };
 
 // --- Invite Item Component ---
-const InviteItem = ({ invite, onAccept, onDecline }) => {
+const InviteItem = ({ invite, onAccept, onDecline, openModal, closeModal }) => {
     const [isProcessing, setIsProcessing] = useState(false);
 
-    const handleAccept = async () => {
-        setIsProcessing(true);
-        await onAccept(invite.id, invite.team_id, invite.invited_user_id);
+    const handleAccept = () => {
+        openModal({
+            title: `Accept Invite`,
+            message: `Do you want to join ${invite.teams?.name}? You will be added to the team roster immediately.`,
+            confirmText: 'Accept Join',
+            showCancel: true,
+            onConfirm: async () => {
+                setIsProcessing(true);
+                await onAccept(invite.id, invite.teams?.id, invite.invited_user_id); // The onAccept handles closing the modal and resetting state globally
+                setIsProcessing(false);
+            }
+        });
     };
 
-    const handleDecline = async () => {
-        setIsProcessing(true);
-        await onDecline(invite.id);
+    const handleDecline = () => {
+        openModal({
+            title: `Decline Invite`,
+            message: `Are you sure you want to decline the invitation to join ${invite.teams?.name}?`,
+            confirmText: 'Decline Invite',
+            showCancel: true,
+            onConfirm: async () => {
+                setIsProcessing(true);
+                await onDecline(invite.id); // The onDecline handles closing the modal and resetting state globally
+                setIsProcessing(false);
+            }
+        });
     };
 
     return (
@@ -232,6 +299,7 @@ const InviteItem = ({ invite, onAccept, onDecline }) => {
 // --- TeamsManagementPage Component ---
 export default function TeamsManagementPage() {
     const { user: authUser, loading: authLoading } = useAuth();
+    const { teamUpdateKey, triggerTeamUpdate } = useTeamUpdate(); 
     const [isCreating, setIsCreating] = useState(false);
     const [userTeamsList, setUserTeamsList] = useState([]);
     const [loadingTeams, setLoadingTeams] = useState(true);
@@ -240,37 +308,68 @@ export default function TeamsManagementPage() {
     const [loadingInvites, setLoadingInvites] = useState(true);
     const [fetchInvitesError, setFetchInvitesError] = useState(null);
 
-    // --- Fetch User's Owned AND Member Teams ---
+    // --- MODAL STATE ---
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [modalContent, setModalContent] = useState({});
+
+    const openModal = (content) => { setModalContent(content); setIsModalOpen(true); };
+    const closeModal = () => { setIsModalOpen(false); setModalContent({}); };
+    // --- END MODAL STATE ---
+
+
+    // --- Fetch User's Owned AND Member Teams (MODIFIED FOR BADGE COUNT) ---
     const fetchUserTeams = async (userId) => {
-        if (!userId) return; // Prevent fetch if no user ID
+        if (!userId) return; 
         setLoadingTeams(true);
         setFetchTeamsError(null);
-        console.log("Fetching owned and member teams for user:", userId);
+
         try {
-            // Using multi-query approach:
-            const { data: ownedTeams, error: ownedError } = await supabase.from('teams').select('*').eq('owner_id', userId);
+            // 1. Fetch owned teams and members
+            const { data: ownedTeamsData, error: ownedError } = await supabase.from('teams').select('*').eq('owner_id', userId);
             if (ownedError) throw ownedError;
 
             const { data: memberEntries, error: memberError } = await supabase.from('team_members').select('team_id').eq('user_id', userId);
             if (memberError) throw memberError;
 
+            // 2. Process owned teams and count pending invites for each
+            let ownedTeams = ownedTeamsData || [];
+            if (ownedTeams.length > 0) {
+                // Fetch pending invite count for ALL owned teams in one query
+                const ownedTeamIds = ownedTeams.map(t => t.id);
+                const { data: inviteCounts } = await supabase
+                    .from('team_invites')
+                    .select('team_id', { count: 'exact' })
+                    .in('team_id', ownedTeamIds)
+                    .eq('status', 'pending');
+
+                const countsMap = (inviteCounts || []).reduce((acc, curr) => {
+                    acc[curr.team_id] = curr.count;
+                    return acc;
+                }, {});
+
+                ownedTeams = ownedTeams.map(team => ({
+                    ...team,
+                    // Attach the pending invite count to the team object
+                    pending_invites: countsMap[team.id] || 0
+                }));
+            }
+
+            // 3. Process member teams (no badge needed for member teams)
             const memberTeamIds = memberEntries?.map(entry => entry.team_id) || [];
             let memberTeams = [];
-            if (memberTeamIds.length > 0) {
-                 const ownedTeamIds = ownedTeams?.map(t => t.id) || [];
-                 const uniqueMemberTeamIds = memberTeamIds.filter(id => !ownedTeamIds.includes(id));
-                 if (uniqueMemberTeamIds.length > 0) {
-                     const { data: fetchedMemberTeams, error: memberTeamsError } = await supabase.from('teams').select('*').in('id', uniqueMemberTeamIds);
-                     if (memberTeamsError) throw memberTeamsError;
-                     memberTeams = fetchedMemberTeams || [];
-                 }
+            const ownedTeamIds = ownedTeams.map(t => t.id);
+            const uniqueMemberTeamIds = memberTeamIds.filter(id => !ownedTeamIds.includes(id));
+            if (uniqueMemberTeamIds.length > 0) {
+                 const { data: fetchedMemberTeams, error: memberTeamsError } = await supabase.from('teams').select('*').in('id', uniqueMemberTeamIds);
+                 if (memberTeamsError) throw memberTeamsError;
+                 memberTeams = fetchedMemberTeams || [];
             }
-            const combinedTeams = [...(ownedTeams || []), ...memberTeams];
-            // Simple de-duplication based on ID just in case
+
+            const combinedTeams = [...ownedTeams, ...memberTeams.map(t => ({...t, pending_invites: 0}))];
             const uniqueTeams = Array.from(new Map(combinedTeams.map(team => [team.id, team])).values());
-            uniqueTeams.sort((a, b) => new Date(b.created_at) - new Date(a.created_at)); // Sort after combining
-            console.log("Fetched combined unique teams:", uniqueTeams);
-            setUserTeamsList(uniqueTeams); // Update state with unique teams
+            uniqueTeams.sort((a, b) => new Date(b.created_at) - new Date(a.created_at)); 
+
+            setUserTeamsList(uniqueTeams); 
 
         } catch (err) {
             console.error("Error fetching teams:", err.message);
@@ -281,7 +380,7 @@ export default function TeamsManagementPage() {
         }
     };
 
-    // --- useEffect for fetching teams ---
+    // --- useEffect for fetching teams (Now depends on teamUpdateKey) ---
     useEffect(() => {
         let isMounted = true;
         if (!authLoading && authUser) {
@@ -290,27 +389,25 @@ export default function TeamsManagementPage() {
              setUserTeamsList([]); setLoadingTeams(false);
         }
         return () => { isMounted = false; }; // Cleanup on unmount
-    }, [authUser, authLoading]);
+    }, [authUser, authLoading, teamUpdateKey]); // <<< Added teamUpdateKey dependency
 
-    // --- Fetch Pending Invites ---
+    // --- Fetch Pending Invites (UNMODIFIED) ---
     useEffect(() => {
         let isMounted = true;
         if (!authLoading && authUser) {
             const fetchInvites = async () => {
                 if (!isMounted) return;
                 setLoadingInvites(true); setFetchInvitesError(null);
-                console.log("Fetching invites for user:", authUser.id);
                 try {
                     const { data, error } = await supabase
                         .from('team_invites')
-                        .select(`*, teams ( name, game, logo_url ), inviter:profiles!inviter_user_id ( username )`) //
-                        .eq('invited_user_id', authUser.id) //
-                        .eq('status', 'pending') //
+                        .select(`*, teams ( name, game, logo_url ), inviter:profiles!inviter_user_id ( username )`)
+                        .eq('invited_user_id', authUser.id)
+                        .eq('status', 'pending')
                         .order('created_at', { ascending: true });
                     if (error) throw error;
-                    if (isMounted) { console.log("Fetched invites:", data); setInvites(data || []); }
+                    if (isMounted) { setInvites(data || []); }
                 } catch (err) {
-                    console.error("Error fetching invites:", err.message);
                     if (isMounted) setFetchInvitesError(`Failed to load invites: ${err.message}`);
                 } finally { if (isMounted) setLoadingInvites(false); }
             };
@@ -322,53 +419,72 @@ export default function TeamsManagementPage() {
     }, [authUser, authLoading]);
 
     // --- Add New Team Locally ---
-    const handleTeamCreated = (newTeam) => { //
-        setUserTeamsList(prevTeams => [newTeam, ...prevTeams].sort((a, b) => new Date(b.created_at) - new Date(a.created_at))); //
+    const handleTeamCreated = (newTeam) => { 
+        setUserTeamsList(prevTeams => [newTeam, ...prevTeams].sort((a, b) => new Date(b.created_at) - new Date(a.created_at))); 
     };
 
-    // --- Invite Action Handlers (Using RPC for Accept) ---
-    const handleAcceptInvite = async (inviteId, teamId, userId) => { //
+    // --- Invite Action Handlers (MODIFIED: Integrates modal feedback) ---
+    const handleAcceptInvite = async (inviteId, teamId, userId) => {
         setFetchInvitesError(null);
-        console.log(`Accepting invite ${inviteId} via RPC`);
         try {
-            // Call the Supabase RPC function
-            const { error: rpcError } = await supabase.rpc('accept_team_invite', { //
-                invite_id_to_accept: inviteId //
+            // Call the Supabase RPC function (assumes you have deployed the 'accept_team_invite' RPC)
+            const { error: rpcError } = await supabase.rpc('accept_team_invite', { 
+                invite_id_to_accept: inviteId 
             });
-            if (rpcError) { //
-                if (rpcError.message.includes('Invite not found')) { throw new Error("This invite is no longer valid."); } //
-                throw rpcError; //
+            if (rpcError) { 
+                if (rpcError.message.includes('Invite not found')) { throw new Error("This invite is no longer valid."); } 
+                throw rpcError; 
             }
-            // Update local state
-            setInvites(prev => prev.filter(inv => inv.id !== inviteId)); //
-            alert("Invite accepted successfully!"); //
-            // Refresh the teams list AFTER accepting
-            if(authUser) await fetchUserTeams(authUser.id); // Re-fetch all teams
 
-        } catch (err) { //
-            console.error("Error accepting invite via RPC:", err); //
-            setFetchInvitesError(`Failed to accept invite: ${err.message}`); //
+            // UI Update on Success
+            setInvites(prev => prev.filter(inv => inv.id !== inviteId)); 
+            closeModal();
+            openModal({title: "Success!", message: "Invitation accepted. Welcome to the team!", showCancel: false});
+
+            if(authUser) await fetchUserTeams(authUser.id);
+            triggerTeamUpdate(); 
+
+        } catch (err) { 
+            closeModal();
+            openModal({title: "Acceptance Failed", message: `Error: ${err.message}`, showCancel: false, title: "Error"});
         }
     };
 
-    const handleDeclineInvite = async (inviteId) => { //
+    const handleDeclineInvite = async (inviteId) => { 
         setFetchInvitesError(null);
-        console.log(`Declining invite ${inviteId}`);
         try {
             // Delete the invite row
-            const { error } = await supabase.from('team_invites').delete().eq('id', inviteId); //
-            if (error) throw error; //
-            setInvites(prev => prev.filter(inv => inv.id !== inviteId)); //
-            alert("Invite declined."); //
-        } catch (err) { //
-            console.error("Error declining invite:", err); //
-            setFetchInvitesError(`Failed to decline invite: ${err.message}`); //
+            const { error } = await supabase.from('team_invites').delete().eq('id', inviteId); 
+            if (error) throw error; 
+
+            // UI Update on Success
+            setInvites(prev => prev.filter(inv => inv.id !== inviteId)); 
+            closeModal();
+            openModal({title: "Declined", message: "The invitation has been declined.", showCancel: false});
+
+        } catch (err) { 
+            closeModal();
+            openModal({title: "Decline Failed", message: `Error: ${err.message}`, showCancel: false, title: "Error"});
         }
     };
 
     return (
         <div className="bg-dark-900 text-white min-h-screen">
             <div className="space-y-10 p-4 sm:p-6 lg:p-8">
+
+                {/* --- RENDER MODAL --- */}
+                <CustomModal
+                    isOpen={isModalOpen}
+                    onClose={closeModal}
+                    title={modalContent.title}
+                    confirmText={modalContent.confirmText}
+                    onConfirm={modalContent.onConfirm}
+                    showCancel={modalContent.showCancel}
+                    isLoading={false} // Use false or manage loading state within the modal's context if necessary
+                >
+                    {modalContent.message}
+                </CustomModal>
+
 
                 <AnimatedSection delay={0}>
                     <h1 className="text-4xl font-extrabold text-center text-primary-400 flex items-center justify-center mb-2"> <Users className="w-8 h-8 mr-3" /> Team Management Hub </h1>
@@ -387,7 +503,14 @@ export default function TeamsManagementPage() {
                              <div className="space-y-4">
                                 {invites.length > 0 ? (
                                     invites.map((invite) => (
-                                        <InviteItem key={invite.id} invite={invite} onAccept={handleAcceptInvite} onDecline={handleDeclineInvite}/>
+                                        <InviteItem 
+                                            key={invite.id} 
+                                            invite={invite} 
+                                            onAccept={handleAcceptInvite} 
+                                            onDecline={handleDeclineInvite}
+                                            openModal={openModal}
+                                            closeModal={closeModal}
+                                        />
                                     ))
                                 ) : (
                                     <div className="bg-dark-800 p-6 rounded-xl text-center border border-dark-700"> <Mail className="w-8 h-8 mx-auto text-gray-500 mb-3" /> <p className="text-gray-500">You have no pending team invitations.</p> </div>
@@ -411,7 +534,14 @@ export default function TeamsManagementPage() {
                 )}
 
                 {/* --- Conditional Form Display --- */}
-                {isCreating && ( <CreateTeamForm onClose={() => setIsCreating(false)} onTeamCreated={handleTeamCreated} /> )}
+                {isCreating && ( 
+                    <CreateTeamForm 
+                        onClose={() => setIsCreating(false)} 
+                        onTeamCreated={handleTeamCreated} 
+                        openModal={openModal}
+                        closeModal={closeModal}
+                    /> 
+                )}
 
                 {/* --- Your Teams List (Hidden when creating) --- */}
                 {!isCreating && (
@@ -429,6 +559,8 @@ export default function TeamsManagementPage() {
                                             delay={index * 50}
                                             authUser={authUser} // Pass authUser
                                             refreshTeams={fetchUserTeams} // Pass refresh function
+                                            openModal={openModal}
+                                            closeModal={closeModal}
                                         />
                                     ))
                                 ) : (
@@ -447,15 +579,3 @@ export default function TeamsManagementPage() {
         </div>
     );
 }
-
-// Add these styles to your App.css or index.css if needed
-/*
-@layer components {
-  .btn-success { @apply bg-green-600 hover:bg-green-700 text-white font-bold rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed; }
-  .btn-danger { @apply bg-red-600 hover:bg-red-700 text-white font-bold rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed; }
-  .btn-sm { @apply text-sm py-1 px-3; }
-  .btn-xs { @apply text-xs py-1 px-2; }
-  .input-field { @apply w-full px-3 py-2 bg-dark-700 border border-dark-600 rounded-md text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent; } // Ensure base input styles
-  .input-field-sm { @apply text-sm py-1 px-2; }
-}
-*/

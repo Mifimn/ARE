@@ -4,11 +4,46 @@ import React, { useState, useEffect } from 'react';
 import { Link, useParams, Navigate } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
 import { useAuth } from '../contexts/AuthContext.jsx';
-// Added/changed icons: Heart, Clock, BarChart, Crosshair, Percent, User, LogOut, CheckCircle
+// Added/changed icons: Heart, Clock, BarChart, Crosshair, Percent, User, LogOut, CheckCircle, XCircle, AlertCircle, Info, Mail
 import {
-    Users, Trophy, Calendar, MapPin, Star, Mail, UserPlus, Settings, BarChart, Percent, Crosshair, Loader2, AlertCircle, Gamepad2, User, UserX, LogOut, Heart, Clock as ClockIcon, CheckCircle
+    Users, Trophy, Calendar, MapPin, Star, Mail, UserPlus, Settings, BarChart, Percent, Crosshair, Loader2, AlertCircle, Gamepad2, User, UserX, LogOut, Heart, Clock as ClockIcon, CheckCircle, XCircle, Info, X as CloseIcon
 } from 'lucide-react';
 import AnimatedSection from '../components/AnimatedSection';
+
+// --- Custom Modal Component (Added to fix ReferenceError) ---
+const CustomModal = ({ isOpen, onClose, title, children, confirmText = 'OK', onConfirm, showCancel = true, isLoading = false }) => {
+    if (!isOpen) return null;
+
+    const Icon = (title && title.toLowerCase().includes('error')) ? AlertCircle : (title && title.toLowerCase().includes('success')) ? CheckCircle : Info;
+    const iconColor = (title && title.toLowerCase().includes('error')) ? 'text-red-400' : (title && title.toLowerCase().includes('success')) ? 'text-green-400' : 'text-primary-400';
+
+    const handleConfirm = () => {
+        if (onConfirm) onConfirm();
+        else onClose(); 
+    };
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={() => !isLoading && onClose()}>
+            <div className="bg-dark-800 rounded-xl shadow-2xl w-full max-w-md border border-dark-600 relative animate-fade-in" onClick={(e) => e.stopPropagation()}>
+                <div className="flex items-center justify-between p-4 border-b border-dark-700">
+                    <div className="flex items-center"> <Icon className={`w-5 h-5 mr-3 ${iconColor}`} /> <h3 className="text-lg font-semibold text-white">{title}</h3> </div>
+                    <button onClick={() => !isLoading && onClose()} className="text-gray-400 hover:text-white rounded-full p-1 transition-colors" disabled={isLoading}> <CloseIcon size={20} /> </button>
+                </div>
+                <div className="p-6 space-y-4">
+                    <div className="text-gray-300 text-sm">{children}</div>
+                </div>
+                <div className="flex justify-end gap-3 p-4 bg-dark-700/50 border-t border-dark-700 rounded-b-xl">
+                    {showCancel && (<button onClick={() => !isLoading && onClose()} className="btn-secondary text-sm" disabled={isLoading}>Cancel</button>)}
+                    <button onClick={handleConfirm} className="btn-primary text-sm flex items-center justify-center" disabled={isLoading}>
+                        {isLoading && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}
+                        {confirmText}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+// --- End Custom Modal ---
 
 // --- SCORING ENGINE (BR - Free Fire Standard) ---
 const calculatePlacementPoints = (placement) => {
@@ -146,18 +181,34 @@ export default function TeamPage() {
     const [isOwner, setIsOwner] = useState(false);
     const [isMember, setIsMember] = useState(false);
 
+    // --- NEW MANAGEMENT STATES ---
+    const [hasPendingRequests, setHasPendingRequests] = useState(false); 
+    const [isProfileIncomplete, setIsProfileIncomplete] = useState(false); 
+    // --- END NEW MANAGEMENT STATES ---
+
     const [hasLiked, setHasLiked] = useState(false); 
     const [isLiking, setIsLiking] = useState(false);
     const [likeError, setLikeError] = useState(null);
 
-    const [hasPendingRequest, setHasPendingRequest] = useState(false);
+    // --- UPDATED JOIN REQUEST STATES ---
+    const [joinRequestStatus, setJoinRequestStatus] = useState('none'); // none, pending, declined, accepted
+    const [declinedCooldownEnd, setDeclinedCooldownEnd] = useState(null); // Timestamp for cooldown
     const [isRequestingJoin, setIsRequestingJoin] = useState(false);
     const [joinRequestError, setJoinRequestError] = useState(null);
+    const [isCancelling, setIsCancelling] = useState(false); 
+    // --- End UPDATED JOIN REQUEST STATES ---
 
     const [teamStats, setTeamStats] = useState(null);
     const [recentMatches, setRecentMatches] = useState([]);
     const [upcomingEvents, setUpcomingEvents] = useState([]);
-    const [teamAchievements, setTeamAchievements] = useState([]); // <-- NEW STATE
+    const [teamAchievements, setTeamAchievements] = useState([]); 
+
+    // --- MODAL STATE ---
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [modalContent, setModalContent] = useState({});
+
+    const openModal = (content) => { setModalContent(content); setIsModalOpen(true); };
+    const closeModal = () => { setIsModalOpen(false); setModalContent({}); };
     // --- End State declarations ---
 
 
@@ -190,9 +241,16 @@ export default function TeamPage() {
     };
 
     const handleRequestToJoin = async () => {
-        if (!authUser) { setJoinRequestError("You must be logged in to request to join."); return; }
-        if (!teamData || !teamData.id || isOwner || isMember || hasPendingRequest) {
-            setJoinRequestError("Cannot send join request."); return;
+        if (!authUser) { openModal({title: "Login Required", message: "You must be logged in to send a join request.", showCancel: false}); return; }
+        if (!teamData || !teamData.id || isOwner || isMember || joinRequestStatus !== 'none') {
+
+            if (joinRequestStatus === 'declined' && declinedCooldownEnd > Date.now()) {
+                const message = `You were recently declined. Please wait until your cooldown expires in: ${cooldownRemaining}.`;
+                openModal({title: "Cooldown Active", message: message, showCancel: false});
+            } else {
+                 setJoinRequestError("Cannot send join request (status invalid)."); 
+            }
+            return;
         }
 
         setIsRequestingJoin(true); setJoinRequestError(null);
@@ -209,7 +267,7 @@ export default function TeamPage() {
 
             if (insertError) {
                  if (insertError.message.includes('unique_pending_request')) {
-                     setHasPendingRequest(true);
+                     setJoinRequestStatus('pending');
                      throw new Error("You already have a pending request for this team.");
                  } else if (insertError.message.includes('violates row-level security policy')) {
                      const { data: memberCheck } = await supabase.from('team_members').select('user_id').eq('team_id', targetTeamId).eq('user_id', authUser.id).maybeSingle();
@@ -219,13 +277,50 @@ export default function TeamPage() {
                 throw insertError;
             }
 
-            setHasPendingRequest(true);
+            setJoinRequestStatus('pending'); // Update status on success
+            openModal({title: "Request Sent!", message: "Your join request has been sent to the team owner.", showCancel: false, confirmText: "Awesome!"});
 
         } catch (err) {
             setJoinRequestError(`Failed to send request: ${err.message}`);
         } finally {
             setIsRequestingJoin(false);
         }
+    };
+
+    // <<< NEW HANDLER: Allow user to cancel their pending request >>>
+    const handleCancelRequest = () => {
+         if (!authUser || !teamData || joinRequestStatus !== 'pending') return;
+
+         openModal({
+             title: "Confirm Cancellation",
+             message: "Are you sure you want to withdraw your pending join request?",
+             confirmText: "Yes, Cancel",
+             showCancel: true,
+             onConfirm: async () => {
+                 setIsCancelling(true); setJoinRequestError(null);
+                 const targetTeamId = teamData.id;
+
+                 try {
+                     const { error: deleteError } = await supabase
+                         .from('team_join_requests')
+                         .delete()
+                         .match({
+                             team_id: targetTeamId,
+                             user_id: authUser.id,
+                             status: 'pending' 
+                         });
+
+                     if (deleteError) throw deleteError;
+
+                     setJoinRequestStatus('none'); 
+                     openModal({title: "Cancelled", message: "Your join request was withdrawn.", showCancel: false});
+                 } catch (err) {
+                     openModal({title: "Cancellation Failed", message: `Error: ${err.message}`, showCancel: false});
+                 } finally {
+                     setIsCancelling(false);
+                 }
+             }
+         });
     };
     // --- End Handlers ---
 
@@ -242,9 +337,14 @@ export default function TeamPage() {
 
             if (!isMounted) return;
             setLoading(true); setError(null); setLikeError(null);
-            setJoinRequestError(null); setHasPendingRequest(false); setHasLiked(false);
+            setJoinRequestError(null); 
+            setJoinRequestStatus('none'); 
+            setDeclinedCooldownEnd(null); 
+            setHasLiked(false);
             setTeamStats(null); setRecentMatches([]); setUpcomingEvents([]);
-            setTeamAchievements([]); // <-- RESET NEW STATE
+            setTeamAchievements([]); 
+            setHasPendingRequests(false); 
+            setIsProfileIncomplete(false); 
 
             try {
                 // Fetch team data (including owner and likes column)
@@ -265,6 +365,22 @@ export default function TeamPage() {
                 // Check ownership
                 const ownerCheck = authUser && teamResult.owner_id === authUser.id;
                 setIsOwner(ownerCheck);
+
+                // --- NEW: Check Profile Completeness (for notification badge) ---
+                const incomplete = !teamResult.description || !teamResult.country || teamResult.banner_url === '/images/lan_9.jpg';
+                if (isMounted) setIsProfileIncomplete(incomplete);
+
+                // --- Fetch Pending Requests (for notification badge) ---
+                const { count: pendingCount, error: pendingError } = await supabase
+                    .from('team_join_requests')
+                    .select('id', { count: 'exact' })
+                    .eq('team_id', numericTeamId)
+                    .eq('status', 'pending');
+
+                if (pendingError) console.error("Error checking pending requests:", pendingError);
+                if (isMounted) setHasPendingRequests((pendingCount || 0) > 0);
+                // --- END NEW MANAGEMENT CHECKS ---
+
 
                 // Fetch members
                 const { data: membersResult, error: membersError } = await supabase
@@ -288,34 +404,50 @@ export default function TeamPage() {
                     setTeamStats(stats);
                     setRecentMatches(recentMatches);
                     setUpcomingEvents(upcomingEvents);
-                    setTeamAchievements(achievements); // <-- SET NEW STATE
+                    setTeamAchievements(achievements); 
                 }
                 // ---
 
                 // --- Fetch Like & Join Request Status (only if logged in and not owner/member) ---
                 if (authUser && !ownerCheck && !memberCheck) {
-                    const { data: likeData, error: likeCheckError } = await supabase
+                    // 1. Check Like Status
+                    const { data: likeData } = await supabase
                         .from('team_likes')
                         .select('team_id')
                         .eq('team_id', numericTeamId)
                         .eq('liker_id', authUser.id)
                         .maybeSingle();
-                    if (likeCheckError && isMounted) console.error("Error checking like status:", likeCheckError);
-                    else if (likeData && isMounted) { setHasLiked(true); }
+                    if (likeData && isMounted) { setHasLiked(true); }
 
-                    const { data: requestData, error: requestError } = await supabase
+                    // 2. Check Join Request Status (Pending or Declined)
+                    const { data: requestData } = await supabase
                         .from('team_join_requests')
-                        .select('id')
+                        .select('status, updated_at')
                         .eq('team_id', numericTeamId)
                         .eq('user_id', authUser.id)
-                        .eq('status', 'pending')
+                        .or('status.eq.pending,status.eq.declined') 
+                        .order('updated_at', { ascending: false }) 
+                        .limit(1)
                         .maybeSingle();
-                    if (requestError && isMounted) console.error("Error checking join request status:", requestError);
-                    else if (requestData && isMounted) { setHasPendingRequest(true); }
+
+                    if (requestData && isMounted) {
+                        setJoinRequestStatus(requestData.status);
+
+                        if (requestData.status === 'declined') {
+                            const lastDeclinedTime = new Date(requestData.updated_at).getTime();
+                            const twentyFourHours = 24 * 60 * 60 * 1000;
+                            const cooldownEnd = lastDeclinedTime + twentyFourHours;
+
+                            if (cooldownEnd > Date.now()) {
+                                setDeclinedCooldownEnd(cooldownEnd);
+                            } else {
+                                setJoinRequestStatus('none'); 
+                            }
+                        }
+                    }
                 }
                 // --- End Status Fetches ---
 
-                // Remove placeholder achievements since we have dynamic data now
                 if(isMounted){
                     setTeamData(prev => ({
                         ...(prev || {}),
@@ -335,6 +467,38 @@ export default function TeamPage() {
 
     }, [teamId, authUser]);
 
+    // --- Cooldown Timer Effect ---
+    const [cooldownRemaining, setCooldownRemaining] = useState(null);
+
+    useEffect(() => {
+        if (!declinedCooldownEnd) {
+            setCooldownRemaining(null);
+            return;
+        }
+
+        const calculateRemaining = () => {
+            const now = Date.now();
+            const remaining = declinedCooldownEnd - now;
+
+            if (remaining <= 0) {
+                setDeclinedCooldownEnd(null);
+                setJoinRequestStatus('none');
+                setCooldownRemaining(null);
+            } else {
+                const hours = Math.floor(remaining / (1000 * 60 * 60));
+                const minutes = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60));
+                const seconds = Math.floor((remaining % (1000 * 60)) / 1000);
+                setCooldownRemaining(`${hours}h ${minutes}m ${seconds}s`);
+            }
+        };
+
+        calculateRemaining();
+        const interval = setInterval(calculateRemaining, 1000);
+
+        return () => clearInterval(interval);
+    }, [declinedCooldownEnd]);
+
+
      // --- Render Loading State ---
      if (loading) {
          return ( <div className="flex justify-center items-center min-h-[calc(100vh-10rem)]"> <Loader2 className="w-16 h-16 text-primary-500 animate-spin" /> <p className="ml-4 text-xl text-gray-400">Loading Team...</p> </div> );
@@ -347,6 +511,83 @@ export default function TeamPage() {
 
      if (!teamData) { return <Navigate to="/players?view=teams" replace />; } // Redirect if no team data after loading
 
+     // --- ACTION BUTTON LOGIC (MODIFIED FOR NOTIFICATION BADGE) ---
+     const renderActionButton = () => {
+         if (!authUser) {
+             return <button className="btn-secondary text-sm flex items-center disabled:opacity-60 disabled:cursor-not-allowed" disabled>Login to Join</button>;
+         }
+
+         const notificationCount = (hasPendingRequests ? 1 : 0) + (isProfileIncomplete ? 1 : 0);
+         const needsAttention = notificationCount > 0;
+
+         if (isOwner) {
+             return (
+                 <Link to={`/manage-team/${teamData.id}`} 
+                       className="relative btn-primary text-sm flex items-center"
+                 >
+                     <Settings className="mr-1.5" size={16} /> Manage
+
+                     {needsAttention && (
+                         <div 
+                             className="absolute -top-1 -right-1 w-5 h-5 bg-red-600 rounded-full flex items-center justify-center text-xs font-bold text-white border-2 border-dark-900 shadow-lg"
+                             title={
+                                 (hasPendingRequests ? "1+ Pending Request" : "") + 
+                                 (isProfileIncomplete ? (hasPendingRequests ? " | " : "") + "Profile Incomplete" : "")
+                             }
+                         >
+                            {/* Inner dot with pulse for high visibility */}
+                            <span className='w-2 h-2 bg-red-500 rounded-full animate-ping absolute'/>
+                            <span className='relative text-xs'>
+                                {notificationCount > 1 ? notificationCount : <Mail size={12} />}
+                            </span>
+                         </div>
+                     )}
+                 </Link>
+             );
+         }
+
+         if (isMember) {
+             // NOTE: Leave action must be handled on My Teams or Manage Team page for security
+             return <button className="btn-danger text-sm flex items-center" disabled><LogOut className="mr-1.5 rotate-180" size={16} /> Member</button>; 
+         }
+
+         switch (joinRequestStatus) {
+             case 'pending':
+                 return (
+                     <button
+                         onClick={handleCancelRequest}
+                         disabled={isCancelling}
+                         className="btn-secondary text-sm flex items-center disabled:opacity-60 disabled:cursor-not-allowed"
+                     >
+                         {isCancelling ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin"/> : <XCircle className="mr-1.5" size={16} />}
+                         {isCancelling ? 'Cancelling...' : 'Cancel Request'}
+                     </button>
+                 );
+             case 'declined':
+                 return (
+                     <button className="btn-secondary text-sm flex items-center italic opacity-70 cursor-default" disabled>
+                         <ClockIcon className="mr-1.5" size={16} /> Cooldown ({cooldownRemaining || '0s'})
+                     </button>
+                 );
+             case 'accepted': 
+                 return <button className="btn-success text-sm flex items-center disabled:opacity-60 disabled:cursor-not-allowed" disabled> <CheckCircle className="mr-1.5" size={16} /> Joined</button>;
+             case 'none':
+             default:
+                 return (
+                     <button
+                         onClick={handleRequestToJoin}
+                         disabled={isRequestingJoin || !!cooldownRemaining} // Disable if requesting or on cooldown
+                         className="btn-secondary text-sm flex items-center disabled:opacity-60 disabled:cursor-not-allowed"
+                     >
+                         {isRequestingJoin ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin"/> : <UserPlus className="mr-1.5" size={16} />}
+                         {isRequestingJoin ? 'Sending...' : 'Request Join'}
+                     </button>
+                 );
+         }
+     };
+     // --- END ACTION BUTTON LOGIC ---
+
+
     return (
         <div className="bg-gradient-to-br from-dark-900 via-dark-800 to-primary-900 text-white min-h-screen relative overflow-hidden z-10">
             {/* Background elements */}
@@ -354,6 +595,20 @@ export default function TeamPage() {
             <div className="absolute inset-0 bg-radial-gradient-to-tl from-transparent via-primary-900/5 to-transparent animate-pulse-slow"></div>
 
             <div className="max-w-full mx-auto space-y-8 lg:space-y-10 pb-10 relative z-10">
+
+                {/* --- Modal Implementation --- */}
+                <CustomModal
+                    isOpen={isModalOpen}
+                    onClose={closeModal}
+                    title={modalContent.title}
+                    confirmText={modalContent.confirmText}
+                    onConfirm={modalContent.onConfirm}
+                    showCancel={modalContent.showCancel}
+                    isLoading={isCancelling || isRequestingJoin} 
+                >
+                    {modalContent.message}
+                </CustomModal>
+                {/* --- End Modal --- */}
 
                 {/* --- Hero Banner --- */}
                 <AnimatedSection delay={0} className="relative h-64 sm:h-80 w-full overflow-hidden shadow-xl bg-dark-800">
@@ -378,24 +633,7 @@ export default function TeamPage() {
                              {/* Action Buttons Container */}
                              <div className="flex flex-col items-center sm:items-end gap-3 flex-shrink-0 mt-3 sm:mt-0">
                                 <div className="flex gap-3">
-                                    {isOwner ? (
-                                        <Link to={`/manage-team/${teamData.id}`} className="btn-primary text-sm flex items-center"><Settings className="mr-1.5" size={16} /> Manage</Link>
-                                    ) : isMember ? (
-                                        <button className="btn-danger text-sm flex items-center"><LogOut className="mr-1.5 rotate-180" size={16} /> Leave</button> 
-                                    ) : authUser ? (
-                                        hasPendingRequest ? (
-                                            <button className="btn-secondary text-sm flex items-center italic opacity-70 cursor-default" disabled> <ClockIcon className="mr-1.5" size={16} /> Pending</button>
-                                        ) : (
-                                            <button
-                                                onClick={handleRequestToJoin}
-                                                disabled={isRequestingJoin}
-                                                className="btn-secondary text-sm flex items-center disabled:opacity-60 disabled:cursor-not-allowed"
-                                            >
-                                                {isRequestingJoin ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin"/> : <UserPlus className="mr-1.5" size={16} />}
-                                                {isRequestingJoin ? 'Sending...' : 'Request Join'}
-                                            </button>
-                                        )
-                                    ) : null /* Not logged in */}
+                                    {renderActionButton()} {/* RENDER DYNAMIC BUTTON */}
 
                                      {authUser && !isOwner && (
                                          <button
@@ -663,6 +901,19 @@ export default function TeamPage() {
 
 
             </div> {/* End Page Container */}
+
+            {/* --- Modal Implementation --- */}
+            <CustomModal
+                isOpen={isModalOpen}
+                onClose={closeModal}
+                title={modalContent.title}
+                confirmText={modalContent.confirmText}
+                onConfirm={modalContent.onConfirm}
+                showCancel={modalContent.showCancel}
+                isLoading={isCancelling || isRequestingJoin} 
+            >
+                {modalContent.message}
+            </CustomModal>
         </div>
     );
 }

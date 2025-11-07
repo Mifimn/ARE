@@ -41,6 +41,7 @@ import GamesSidebar from './components/GamesSidebar';
 import PrivateRoute from './components/PrivateRoute';
 import PublicOnlyRoute from './components/PublicOnlyRoute';
 import AdminRoute from './components/AdminRoute'; // --- 2. IMPORT ADMIN ROUTE ---
+import { TeamUpdateProvider } from './contexts/TeamUpdateContext.jsx'; // <<< NEW IMPORT >>>
 
 import './App.css';
 
@@ -86,83 +87,86 @@ export default function App() {
     <BrowserRouter>
       <div className="min-h-screen bg-dark-900 text-white flex flex-col">
         <Header />
-        <LayoutWrapper> {/* Use the wrapper */}
-          <Routes>
-            {/* --- Public-Only Routes (Redirects if logged in) --- */}
-            <Route 
-              path="/" 
-              element={
-                <PublicOnlyRoute>
-                  <LandingPage />
-                </PublicOnlyRoute>
-              } 
-            />
-            <Route 
-              path="/login" 
-              element={
-                <PublicOnlyRoute>
-                  <LoginPage />
-                </PublicOnlyRoute>
-              } 
-            />
-            <Route 
-              path="/signup" 
-              element={
-                <PublicOnlyRoute>
-                  <SignUpPage />
-                </PublicOnlyRoute>
-              } 
-            />
+        {/* --- WRAP CONTENT IN TEAM UPDATE CONTEXT --- */}
+        <TeamUpdateProvider>
+          <LayoutWrapper> {/* Use the wrapper */}
+            <Routes>
+              {/* --- Public-Only Routes (Redirects if logged in) --- */}
+              <Route 
+                path="/" 
+                element={
+                  <PublicOnlyRoute>
+                    <LandingPage />
+                  </PublicOnlyRoute>
+                } 
+              />
+              <Route 
+                path="/login" 
+                element={
+                  <PublicOnlyRoute>
+                    <LoginPage />
+                  </PublicOnlyRoute>
+                } 
+              />
+              <Route 
+                path="/signup" 
+                element={
+                  <PublicOnlyRoute>
+                    <SignUpPage />
+                  </PublicOnlyRoute>
+                } 
+              />
 
-            {/* --- Other Public Routes --- */}
-            <Route path="/about" element={<AboutPage />} />
-            <Route path="/contact" element={<ContactPage />} />
-            <Route path="/rules" element={<RulesPage />} />
-            <Route path="/terms" element={<TermsPage />} />
-            <Route path="/privacy" element={<PrivacyPage />} />
-            <Route path="/guidance" element={<GuidancePage />} />
-            <Route path="/news" element={<NewsPage />} />
-            <Route path="/freefire" element={<FreeFirePage />} />
-            <Route path="/cod" element={<CODPage />} />
-            <Route path="/farlight84" element={<Farlight84Page />} />
-            <Route path="/mobilelegends" element={<MobileLegendsPage />} />
-            <Route path="/bloodstrike" element={<BloodstrikePage />} />
-            <Route path="/tournaments" element={<TournamentsPage />} />
-            <Route path="/profile/:username" element={<ProfilePage />} />
-            <Route path="/team/:teamId" element={<TeamPage />} />
-            <Route path="/tournament/:tournamentId" element={<TournamentDetailsPage />} />
-            <Route path="/cup/:cupId" element={<CupPage />} />
-            {/* <Route path="/league/:leagueId" element={<LeaguePage />} /> */} {/* --- REMOVED OLD ROUTE --- */}
-            <Route path="/players" element={<PlayersDirectoryPage />} />
+              {/* --- Other Public Routes --- */}
+              <Route path="/about" element={<AboutPage />} />
+              <Route path="/contact" element={<ContactPage />} />
+              <Route path="/rules" element={<RulesPage />} />
+              <Route path="/terms" element={<TermsPage />} />
+              <Route path="/privacy" element={<PrivacyPage />} />
+              <Route path="/guidance" element={<GuidancePage />} />
+              <Route path="/news" element={<NewsPage />} />
+              <Route path="/freefire" element={<FreeFirePage />} />
+              <Route path="/cod" element={<CODPage />} />
+              <Route path="/farlight84" element={<Farlight84Page />} />
+              <Route path="/mobilelegends" element={<MobileLegendsPage />} />
+              <Route path="/bloodstrike" element={<BloodstrikePage />} />
+              <Route path="/tournaments" element={<TournamentsPage />} />
+              <Route path="/profile/:username" element={<ProfilePage />} />
+              <Route path="/team/:teamId" element={<TeamPage />} />
+              <Route path="/tournament/:tournamentId" element={<TournamentDetailsPage />} />
+              <Route path="/cup/:cupId" element={<CupPage />} />
+              {/* <Route path="/league/:leagueId" element={<LeaguePage />} /> */} {/* --- REMOVED OLD ROUTE --- */}
+              <Route path="/players" element={<PlayersDirectoryPage />} />
 
 
-            {/* --- Private Routes (For Any Logged-in User) --- */}
-            <Route path="/dashboard" element={<PrivateRoute><DashboardPage /></PrivateRoute>} />
-            <Route path="/profile" element={<PrivateRoute><ProfilePage /></PrivateRoute>} />
-            <Route path="/edit-profile" element={<PrivateRoute><EditProfilePage /></PrivateRoute>} />
-            <Route path="/my-teams" element={<PrivateRoute><TeamsManagementPage /></PrivateRoute>} />
-            <Route path="/manage-team/:teamId" element={<PrivateRoute><ManageTeamPage /></PrivateRoute>} />
+              {/* --- Private Routes (For Any Logged-in User) --- */}
+              <Route path="/dashboard" element={<PrivateRoute><DashboardPage /></PrivateRoute>} />
+              <Route path="/profile" element={<PrivateRoute><ProfilePage /></PrivateRoute>} />
+              <Route path="/edit-profile" element={<PrivateRoute><EditProfilePage /></PrivateRoute>} />
+              <Route path="/my-teams" element={<PrivateRoute><TeamsManagementPage /></PrivateRoute>} />
+              <Route path="/manage-team/:teamId" element={<PrivateRoute><ManageTeamPage /></PrivateRoute>} />
 
-            {/* --- 3. ADMIN-ONLY Routes --- */}
-            <Route 
-              path="/create-tournament" 
-              element={<AdminRoute><CreateTournamentPage /></AdminRoute>} 
-            />
-            <Route 
-              path="/update-tournament/:tournamentId" 
-              element={<AdminRoute><UpdateTournamentPage /></AdminRoute>} 
-            />
-            <Route 
-              path="/leagues" 
-              element={<AdminRoute><LeaguePage /></AdminRoute>} 
-            />
-            <Route 
-              path="/admin-guide" 
-              element={<AdminRoute><AdminGuidePage /></AdminRoute>} 
-            />
+              {/* --- 3. ADMIN-ONLY Routes --- */}
+              <Route 
+                path="/create-tournament" 
+                element={<AdminRoute><CreateTournamentPage /></AdminRoute>} 
+              />
+              <Route 
+                path="/update-tournament/:tournamentId" 
+                element={<AdminRoute><UpdateTournamentPage /></AdminRoute>} 
+              />
+              <Route 
+                path="/leagues" 
+                element={<AdminRoute><LeaguePage /></AdminRoute>} 
+              />
+              <Route 
+                path="/admin-guide" 
+                element={<AdminRoute><AdminGuidePage /></AdminRoute>} 
+              />
 
-          </Routes>
-        </LayoutWrapper>
+            </Routes>
+          </LayoutWrapper>
+        </TeamUpdateProvider>
         <Footer />
       </div>
     </BrowserRouter>

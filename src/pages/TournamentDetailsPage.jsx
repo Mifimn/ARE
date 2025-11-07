@@ -229,127 +229,62 @@ export default function TournamentDetailsPage() {
     }, [tournamentId, user]); // Re-run if user logs in or tournamentId changes
 
 
-    // --- Handle Join Button Click ---
+    // --- MODIFIED: Handle Join Button Click to use RPC for atomic transaction ---
     const handleJoinTournament = async () => {
         if (joinState !== 'READY' || !user || !selectedTeamId || !tournament) {
-            setAlertModal({ isOpen: true, title: "Error", message: "Cannot join. Please select a team." });
+            setAlertModal({ isOpen: true, title: "Error", message: "Cannot join. Please select an eligible team." });
             return;
         }
 
         setIsJoining(true);
-        setJoinMessage('Validating team...');
-        setAlertModal({ isOpen: false }); // Close any previous error
+        setJoinMessage('Processing registration on server...');
+        setAlertModal({ isOpen: false }); 
 
-        // FIX: Find team by string ID, as value from <select> is a string
-        const teamToJoin = eligibleTeams.find(t => t.id.toString() === selectedTeamId);
-        if (!teamToJoin) {
-            setAlertModal({ isOpen: true, title: "Error", message: "Selected team not found." });
-            setIsJoining(false);
-            return;
-        }
+        const numericTournamentId = tournament.id; // tournament.id is already UUID/string
+        const numericTeamId = parseInt(selectedTeamId, 10);
 
         try {
-            // Use the same logic as the filter to check IGNs/UIDs
-            const isMLTournament = tournament.game.startsWith('Mobile Legends');
-            const eligibleGameNames = isMLTournament 
-                ? ["Mobile Legends", "Mobile Legends (Pro League)"] 
-                : [tournament.game];
+            // --- Call the new RPC function (RPC 1: attempt_tournament_join) ---
+            const { data: rpcData, error: rpcError } = await supabase.rpc('attempt_tournament_join', {
+                p_tournament_id: numericTournamentId,
+                p_team_id: numericTeamId,
+                p_user_id: user.id 
+            });
 
-            // --- Get all team member user IDs (including owner) ---
-            const { data: teamMembers } = await supabase.from('team_members').select('user_id').eq('team_id', teamToJoin.id);
-            const teamMemberUserIds = (teamMembers || []).map(m => m.user_id);
-            const allTeamUserIds = [...new Set([...teamMemberUserIds, user.id])]; // Add owner
-
-            // --- Validation 1: Check Member Count ---
-            if (allTeamUserIds.length < 4) { // --- YOUR RULE: Min 4 members ---
-                throw new Error(`Your team "${teamToJoin.name}" needs 4+ members (currently has ${allTeamUserIds.length}).`);
+            if (rpcError) {
+                 // Throw the underlying Supabase error for logging
+                throw new Error(rpcError.message || "Database function error.");
             }
 
-            // --- Validation 1.5: Check IGN/UID for all members ---
-            setJoinMessage('Checking player IGNs/UIDs...');
-            const { data: memberProfiles, error: profileError } = await supabase
-                .from('profiles')
-                .select('id, username, game_details')
-                .in('id', allTeamUserIds);
+            // The RPC response is a JSON string we need to parse
+            const response = JSON.parse(rpcData); 
 
-            if (profileError) throw new Error(`Could not fetch team profiles: ${profileError.message}`);
-
-            const missingInfoPlayers = [];
-            for (const profile of memberProfiles) {
-                // Check all eligible game names for a valid IGN/UID
-                const hasValidGameInfo = eligibleGameNames.some(gameName => {
-                    const gameInfo = profile.game_details ? profile.game_details[gameName] : null;
-                    return gameInfo && gameInfo.ign && gameInfo.ign.trim() !== '' && gameInfo.uid && gameInfo.uid.trim() !== '';
-                });
-
-                if (!hasValidGameInfo) {
-                    missingInfoPlayers.push(profile.username);
-                }
-            }
-
-            if (missingInfoPlayers.length > 0) {
-                throw new Error(`Join failed: The following players must set their ${tournament.game} IGN and UID in their profile: ${missingInfoPlayers.join(', ')}`);
-            }
-            // --- END NEW VALIDATION ---
-
-
-            // --- Validation 2: Check for Player Conflicts ---
-            setJoinMessage('Checking for player conflicts...');
-
-            // 2b. Get all user IDs *already* in the tournament
-            const participantTeamIds = allTournamentParticipants.map(p => p.team_id);
-            const participantCaptainIds = allTournamentParticipants.map(p => p.captain_id);
-
-            let allRegisteredUserIds = new Set(participantCaptainIds);
-
-            if (participantTeamIds.length > 0) {
-                 const { data: participantMembers, error: pMemberError } = await supabase
-                    .from('team_members')
-                    .select('user_id')
-                    .in('team_id', participantTeamIds);
-                if (pMemberError) throw pMemberError;
-                (participantMembers || []).forEach(m => allRegisteredUserIds.add(m.user_id));
-            }
-
-            // 2c. Find the conflict
-            const conflictId = allTeamUserIds.find(id => allRegisteredUserIds.has(id));
-
-            if (conflictId) {
-                const conflictProfile = memberProfiles.find(p => p.id === conflictId);
-                throw new Error(`Join failed: Player "${conflictProfile?.username || conflictId}" (on your team) is already registered in this tournament.`);
-            }
-
-            // --- All Validations Passed, Proceed to Join ---
-            setJoinMessage('Joining tournament...');
-            const { data: newParticipant, error: insertError } = await supabase
-                .from('tournament_participants')
-                .insert({
-                    tournament_id: tournament.id,
-                    team_name: teamToJoin.name,        
-                    team_logo_url: teamToJoin.logo_url || null,
+            if (response.success) {
+                // On Success: Optimistic UI update
+                const teamToJoin = eligibleTeams.find(t => t.id.toString() === selectedTeamId);
+                const newParticipant = {
+                    id: response.participant.id, 
+                    team_id: numericTeamId,
+                    team_name: teamToJoin.name, // Use local team name for display
                     captain_id: user.id,
-                    team_id: teamToJoin.id,
-                    is_seeded: false // New teams are never seeded
-                })
-                .select()
-                .single();
+                    is_seeded: false 
+                };
 
-            if (insertError) throw insertError;
-
-            // Add new participant to local state
-            setAllTournamentParticipants(prev => [...prev, newParticipant]);
-
-            // Success!
-            setAlertModal({ isOpen: true, title: "Success!", message: `Your team, ${teamToJoin.name}, has successfully joined the tournament.` });
-            setJoinState('JOINED');
-            setJoinMessage('Team Already Joined');
-            setParticipantCount(prev => prev + 1);
-            setNewTeamCount(prev => prev + 1); // Increment new team count
-            setIsRegistered(true);
+                setAllTournamentParticipants(prev => [...prev, newParticipant]);
+                setAlertModal({ isOpen: true, title: "Success!", message: response.message });
+                // Note: The rest of the state updates rely on re-fetch, but for quick UX:
+                setJoinState('JOINED');
+                setJoinMessage('Team Already Joined');
+                setParticipantCount(prev => prev + 1);
+                setNewTeamCount(prev => prev + 1);
+                setIsRegistered(true);
+            } else {
+                // On Failure: Show the specific validation message from the RPC
+                throw new Error(response.message);
+            }
 
         } catch (err) {
             console.error("Error during join validation/insert:", err.message);
-            // Show the specific validation error message
             setAlertModal({ isOpen: true, title: "Join Failed", message: err.message });
             setJoinState('READY'); // Reset button
             setJoinMessage('Select a team to join');
@@ -357,6 +292,7 @@ export default function TournamentDetailsPage() {
             setIsJoining(false);
         }
     };
+    // --- END MODIFIED handleJoinTournament ---
 
     // --- Loading State ---
     if (loading) {
