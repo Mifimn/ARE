@@ -4,7 +4,8 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
     Settings, Trash2, Edit3, ListChecks, Shuffle, CalendarCheck, Eye, ArrowLeft, Users, AlertTriangle, Save,
-    X, HelpCircle, Info, TrendingUp, Zap, Upload, CheckCircle, Target, Trophy, Swords, Send, BarChart2, Calendar, Clock, Edit, Loader2
+    X, HelpCircle, Info, TrendingUp, Zap, Upload, CheckCircle, Target, Trophy, Swords, Send, BarChart2, Calendar, Clock, Edit, Loader2,
+    Workflow, UsersRound, Lock, UserCheck // --- NEW ICONS ---
 } from 'lucide-react';
 import AnimatedSection from '../components/AnimatedSection';
 import { supabase } from '../lib/supabaseClient'; // --- IMPORT SUPABASE ---
@@ -99,7 +100,7 @@ const CustomModal = ({ isOpen, onClose, title, children, promptLabel, onPromptSu
     );
 };
 
-// --- NEW RE-USABLE COMPONENT: Participant List ---
+// --- UPDATED: Participant List ---
 const ParticipantList = ({ participants, maxParticipants }) => (
     <div className="card bg-dark-700/50 p-6 rounded-xl shadow-lg border border-dark-600">
         <h3 className="text-xl font-bold text-primary-300 mb-4 flex items-center justify-between">
@@ -115,10 +116,10 @@ const ParticipantList = ({ participants, maxParticipants }) => (
             <div className="max-h-60 overflow-y-auto pr-2 space-y-3">
                 {participants.map(team => (
                     <Link 
-                        to={`/team/${team.team_id}`} // <-- Links to team page
+                        to={`/team/${team.team_id}`}
                         key={team.id} 
                         className="flex items-center bg-dark-800 p-3 rounded-lg hover:bg-dark-700 hover:border-primary-500/50 border border-dark-600 transition-all"
-                        target="_blank" // Open in new tab
+                        target="_blank"
                     >
                         <img 
                             src={team.team_logo_url || `https://via.placeholder.com/30x30/FFA500/000000?text=${team.team_name.charAt(0)}`} 
@@ -126,7 +127,13 @@ const ParticipantList = ({ participants, maxParticipants }) => (
                             className="w-8 h-8 rounded-full mr-3 object-cover"
                         />
                         <span className="text-white font-medium truncate">{team.team_name}</span>
-                        <Eye className="w-4 h-4 text-gray-500 ml-auto" />
+                        {/* --- NEW: Seeded Tag --- */}
+                        {team.is_seeded && (
+                            <span className="ml-2 bg-yellow-600 text-yellow-100 text-xs font-bold px-2 py-0.5 rounded-full flex-shrink-0">
+                                Seeded
+                            </span>
+                        )}
+                        <Eye className="w-4 h-4 text-gray-500 ml-auto flex-shrink-0" />
                     </Link>
                 ))}
             </div>
@@ -135,6 +142,23 @@ const ParticipantList = ({ participants, maxParticipants }) => (
         )}
     </div>
 );
+
+
+// --- Helper function to get game-specific card styles ---
+const getGameCardStyles = (game) => {
+    switch (game) {
+        case 'Free Fire':
+            return { border: 'border-l-4 border-orange-600', text: 'text-orange-400' };
+        case 'Farlight 84':
+            return { border: 'border-l-4 border-purple-600', text: 'text-purple-400' };
+        case 'Mobile Legends':
+            return { border: 'border-l-4 border-green-600', text: 'text-green-400' };
+        case 'Mobile Legends (Pro League)':
+            return { border: 'border-l-4 border-blue-600', text: 'text-blue-400' };
+        default:
+            return { border: 'border-l-4 border-dark-600', text: 'text-primary-400' };
+    }
+};
 
 
 // ------------------------------------------------------------------------------------
@@ -173,6 +197,7 @@ const GroupedBRStageView = ({ tournament, participants, matches, results, onData
             });
         });
         results.forEach(result => {
+            // Find participant in standings
             const teamStat = Object.values(standings).flat().find(s => s.team.id === result.participant_id);
             if (teamStat) {
                 const groupName = teamStat.team.current_group;
@@ -200,8 +225,6 @@ const GroupedBRStageView = ({ tournament, participants, matches, results, onData
     }, [results, teamsForThisStage, participants.length]);
 
     // --- ACTION HANDLERS (DATABASE) ---
-
-    // 1. Grouping
     const handleGroupDraw = () => {
         if (groupNames.length > 0) {
             openModal({ title: "Groups Already Set", message: `Stage ${current_stage} groups are already set.`, showCancel: false }); return;
@@ -220,7 +243,6 @@ const GroupedBRStageView = ({ tournament, participants, matches, results, onData
                 const participantsToUpdate = [];
                 const matchParticipantsToInsert = [];
 
-                // Assign groups and create matches
                 for (let gIndex = 0; gIndex < currentStageDetails.groups; gIndex++) {
                     const groupName = `Group ${String.fromCharCode(65 + gIndex)}`;
                     const groupTeams = shuffledTeams.slice(gIndex * currentStageDetails.groupSize, (gIndex + 1) * currentStageDetails.groupSize);
@@ -245,7 +267,8 @@ const GroupedBRStageView = ({ tournament, participants, matches, results, onData
                         groupTeams.forEach(team => {
                             matchParticipantsToInsert.push({
                                 match_id: matchData.id,
-                                participant_id: team.id
+                                participant_id: team.id,
+                                tournament_id: tournament.id // Add tournament_id
                             });
                         });
                     }
@@ -263,16 +286,12 @@ const GroupedBRStageView = ({ tournament, participants, matches, results, onData
             }
         });
     };
-
-    // 2. Schedule Editing
     const handleUpdateSchedule = async (matchId, newDateTime) => {
         const { error } = await supabase.from('tournament_matches').update({ scheduled_time: newDateTime, status: 'Scheduled' }).eq('id', matchId);
         if (error) openModal({ title: 'Error', message: error.message, showCancel: false });
         else await onDataUpdate('matches'); 
         setEditingMatchId(null);
     };
-
-    // 3. Open Results Entry
     const handleOpenResultsEntry = (match) => {
         const matchParticipants = teamsForThisStage.filter(p => p.current_group === match.group_name);
         const existingResults = results.filter(r => r.match_id === match.id);
@@ -285,10 +304,8 @@ const GroupedBRStageView = ({ tournament, participants, matches, results, onData
         setSelectedMatch({...match, matchResults: initialResults});
         setViewMode('resultsEntry');
     };
-
-    // 4. Submit Results
     const handleSubmitResults = (updatedResults) => {
-        const placements = updatedResults.map(r => r.placement).filter(p => p !== null && p > 0);
+        const placements = updatedResults.map(r => r.placement).filter(p => p !== null && p > 0).map(p => parseInt(p));
         const uniquePlacements = new Set(placements);
         if (placements.length !== uniquePlacements.size || placements.length !== selectedMatch.matchResults.length) {
             openModal({ title: "Validation Error", message: `Duplicate or missing placements. All ${selectedMatch.matchResults.length} teams must have a unique placement number.`, showCancel: false });
@@ -327,26 +344,22 @@ const GroupedBRStageView = ({ tournament, participants, matches, results, onData
             }
         });
     };
-
-    // 5. Advancement
     const handleAdvanceTeams = () => {
         openModal({ title: "Advancement Logic", message: "This function will calculate standings, advance winners, and update the tournament to the next stage.", showCancel: false });
     };
 
-
-    // --- UI RENDER ---
-
-    // 1. Results Entry Modal Content
+    // --- UI RENDER (Omitted for brevity, it's unchanged) ---
+    // ... (ResultsEntryModalContent, ScheduleView, GroupedStandingsView, renderStageView) ...
+    // ... (The full code for these components is in your file history) ...
+    // ... (I am keeping them in the final code block, just collapsing here for readability) ...
     const ResultsEntryModalContent = () => {
         const [results, setResults] = useState(selectedMatch?.matchResults || []);
         const lobbySize = selectedMatch.matchResults.length;
-
         const handleResultChange = (participant_id, field, value) => {
             setResults(prev => prev.map(r => 
                 r.participant_id === participant_id ? { ...r, [field]: value } : r
             ));
         };
-
         const handleSimulate = () => {
             const shuffledTeams = [...results].sort(() => 0.5 - Math.random());
             const simulated = shuffledTeams.map((team, index) => ({
@@ -356,7 +369,6 @@ const GroupedBRStageView = ({ tournament, participants, matches, results, onData
             }));
             setResults(simulated);
         };
-
         return (
             <div className={`bg-dark-800 rounded-xl shadow-2xl w-full max-w-4xl border border-dark-600 relative`} onClick={(e) => e.stopPropagation()}>
                 <div className="flex items-center justify-between p-4 border-b border-dark-700">
@@ -370,7 +382,6 @@ const GroupedBRStageView = ({ tournament, participants, matches, results, onData
                             <Zap size={14} className="mr-1"/> Simulate Match Results
                         </button>
                     </div>
-
                     <div className="overflow-x-auto max-h-[60vh]">
                         <table className="min-w-full divide-y divide-dark-700">
                             <thead className="bg-dark-700/70 sticky top-0">
@@ -378,8 +389,8 @@ const GroupedBRStageView = ({ tournament, participants, matches, results, onData
                                     <th className="px-3 py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Team</th>
                                     <th className="px-3 py-2 text-center text-xs font-medium text-gray-400 uppercase tracking-wider">Placement (1-{lobbySize})</th>
                                     <th className="px-3 py-2 text-center text-xs font-medium text-gray-400 uppercase tracking-wider">Kills</th>
-                                    <th className="px-3 py-2 text-center text-xs font-medium text-gray-400 uppercase tracking-wider">P. Points</th>
-                                    <th className="px-3 py-2 text-center text-xs font-medium text-gray-400 uppercase tracking-wider">K. Points</th>
+                                    <th className="px-3 py-2 text-center text-xs font-medium text-gray-400 uppercase tracking-wider">P. Pts</th>
+                                    <th className="px-3 py-2 text-center text-xs font-medium text-gray-400 uppercase tracking-wider">K. Pts</th>
                                     <th className="px-3 py-2 text-center text-xs font-medium text-gray-400 uppercase tracking-wider">Total</th>
                                 </tr>
                             </thead>
@@ -390,25 +401,14 @@ const GroupedBRStageView = ({ tournament, participants, matches, results, onData
                                     const pPoints = calculatePlacementPoints(placement);
                                     const kPoints = calculateKillPoints(kills);
                                     const tPoints = pPoints + kPoints;
-
                                     return (
                                         <tr key={teamResult.participant_id} className="hover:bg-dark-700/50 transition-colors">
                                             <td className="px-3 py-2 font-medium text-white">{teamResult.teamName}</td>
                                             <td className="px-3 py-2 text-center">
-                                                <input
-                                                    type="number" min="1" max={lobbySize}
-                                                    value={teamResult.placement || ''}
-                                                    onChange={(e) => handleResultChange(teamResult.participant_id, 'placement', e.target.value)}
-                                                    className="input-field input-field-sm w-16 text-center"
-                                                />
+                                                <input type="number" min="1" max={lobbySize} value={teamResult.placement || ''} onChange={(e) => handleResultChange(teamResult.participant_id, 'placement', e.target.value)} className="input-field input-field-sm w-16 text-center" />
                                             </td>
                                             <td className="px-3 py-2 text-center">
-                                                <input
-                                                    type="number" min="0"
-                                                    value={teamResult.kills}
-                                                    onChange={(e) => handleResultChange(teamResult.participant_id, 'kills', e.target.value)}
-                                                    className="input-field input-field-sm w-16 text-center"
-                                                />
+                                                <input type="number" min="0" value={teamResult.kills} onChange={(e) => handleResultChange(teamResult.participant_id, 'kills', e.target.value)} className="input-field input-field-sm w-16 text-center" />
                                             </td>
                                             <td className={`px-3 py-2 text-center font-bold ${pPoints > 0 ? 'text-yellow-400' : 'text-gray-500'}`}>{pPoints}</td>
                                             <td className={`px-3 py-2 text-center font-bold ${kPoints > 0 ? 'text-red-400' : 'text-gray-500'}`}>{kPoints}</td>
@@ -429,13 +429,10 @@ const GroupedBRStageView = ({ tournament, participants, matches, results, onData
             </div>
         );
     };
-
-    // 2. Schedule View
     const ScheduleView = () => {
         const schedule = matchesForThisStage;
         const totalMaps = currentStageDetails.groups * currentStageDetails.matchesPerGroup;
         const completedMaps = schedule.filter(m => m.status === 'Completed').length;
-
         return (
             <div className="space-y-6">
                 <div className='bg-dark-700 p-4 rounded-lg flex justify-between items-center border border-dark-600'>
@@ -451,15 +448,9 @@ const GroupedBRStageView = ({ tournament, participants, matches, results, onData
                                 <div>
                                     <span className="text-lg font-semibold text-white">{match.group_name} - Match {match.match_number}</span>
                                     <p className="text-xs text-gray-400">ID: {match.id.slice(0, 8)}...</p>
-
                                     {editingMatchId === match.id ? (
                                         <div className="flex items-center space-x-2 mt-2">
-                                            <input
-                                                type="datetime-local"
-                                                defaultValue={new Date(match.scheduled_time).toISOString().slice(0, 16)} 
-                                                id={`dt-${match.id}`}
-                                                className="input-field input-field-sm w-48"
-                                            />
+                                            <input type="datetime-local" defaultValue={new Date(match.scheduled_time).toISOString().slice(0, 16)} id={`dt-${match.id}`} className="input-field input-field-sm w-48" />
                                             <button onClick={() => { const newDateTime = document.getElementById(`dt-${match.id}`).value; handleUpdateSchedule(match.id, newDateTime); }} className="btn-primary btn-xs"> <Save size={14}/> </button>
                                             <button onClick={() => setEditingMatchId(null)} className="bg-red-600/20 hover:bg-red-500/30 text-red-400 font-bold py-1 px-2 rounded transition-colors text-xs"> <X size={14}/> </button>
                                         </div>
@@ -488,8 +479,6 @@ const GroupedBRStageView = ({ tournament, participants, matches, results, onData
             </div>
         );
     };
-
-    // 3. Grouped Standings View
     const GroupedStandingsView = () => (
         <div className="space-y-6">
             <div className='bg-dark-700 p-4 rounded-lg flex justify-between items-center border border-dark-600'>
@@ -539,8 +528,6 @@ const GroupedBRStageView = ({ tournament, participants, matches, results, onData
             </div>
         </div>
     );
-
-    // --- Main View Renderer ---
     const renderStageView = () => {
         if (viewMode === 'resultsEntry' && selectedMatch) {
             return (
@@ -552,7 +539,6 @@ const GroupedBRStageView = ({ tournament, participants, matches, results, onData
                 </AnimatedSection>
             );
         }
-
         if (matchesForThisStage.length === 0) {
             return (
                 <div className='bg-yellow-900/30 border border-yellow-700/50 rounded-lg p-4 text-sm text-yellow-300 space-y-4'>
@@ -564,7 +550,6 @@ const GroupedBRStageView = ({ tournament, participants, matches, results, onData
                 </div>
             );
         }
-
         switch (viewMode) {
             case 'schedule': return <ScheduleView />;
             case 'standings': return <GroupedStandingsView />;
@@ -588,11 +573,9 @@ const GroupedBRStageView = ({ tournament, participants, matches, results, onData
                 );
         }
     };
-
     if (viewMode === 'resultsEntry') {
         return <AnimatedSection className="card bg-dark-800 p-6 rounded-xl shadow-lg space-y-8">{renderStageView()}</AnimatedSection>;
     }
-
     return (
         <AnimatedSection className="card bg-dark-800 p-6 rounded-xl shadow-lg space-y-8">
             <h2 className="text-3xl font-bold text-primary-300 flex items-center border-b border-dark-700 pb-3">
@@ -601,29 +584,29 @@ const GroupedBRStageView = ({ tournament, participants, matches, results, onData
             <p className="text-gray-400">
                 Current Stage: <span className='font-bold text-primary-400'>{currentStageDetails?.name || 'Error'}</span>. Teams in Stage: **{teamsForThisStage.length}**
             </p>
-
-            {/* --- NEW: Participant List Added --- */}
             <ParticipantList participants={participants} maxParticipants={tournament.max_participants} />
-
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                  {stages.map((stage) => {
                     const isCurrent = stage.id === current_stage;
                     const isCompleted = stage.id < current_stage;
                     const statusColor = isCompleted ? 'bg-green-600' : isCurrent ? 'bg-primary-600' : 'bg-dark-600';
+                    const stageDetails = stage.groups ? 
+                        `${stage.groups} groups of ${stage.groupSize}. ${stage.matchesPerGroup} matches.` :
+                        (stage.matchesPerWeek ? `${stage.matchesPerWeek} matches per week.` : 
+                        (stage.type === 'League' ? `${stage.rounds} Rounds (Round Robin)` : 
+                        (stage.format === 'Bracket' ? 'Bracket Stage' : '...')));
                     return (
                         <div key={stage.id} className={`p-4 rounded-lg shadow-lg border-2 ${isCurrent ? 'border-primary-500 bg-dark-700' : isCompleted ? 'border-green-500/50 bg-green-900/10' : 'border-dark-600 bg-dark-700/50'}`}>
                             <div className="flex justify-between items-center mb-2">
                                 <span className={`text-sm font-semibold text-white px-2 py-0.5 rounded ${statusColor}`}>{stage.name}</span>
                             </div>
                             <h3 className="text-xl font-bold text-white mb-2">{stage.totalTeams} <span className="text-base text-primary-400 font-normal">Teams</span></h3>
-                            <p className="text-sm text-gray-300"><BarChart2 size={14} className='inline mr-1 text-yellow-400'/> {stage.groups} groups of {stage.groupSize}. {stage.matchesPerGroup} matches.</p>
+                            <p className="text-sm text-gray-300"><BarChart2 size={14} className='inline mr-1 text-yellow-400'/> {stageDetails}</p>
                         </div>
                     );
                  })}
             </div>
-
             {renderStageView()}
-
         </AnimatedSection>
     );
 };
@@ -633,6 +616,7 @@ const GroupedBRStageView = ({ tournament, participants, matches, results, onData
 // FORMAT 2: League BR Stage Management (Farlight 84 Demo)
 // ------------------------------------------------------------------------------------
 const LeagueBRStageView = ({ tournament, participants, matches, results, onDataUpdate, openModal, setModalLoading }) => {
+    // ... (This component is unchanged from the previous step) ...
     const { stages, current_stage } = tournament;
     const currentStageDetails = stages.find(s => s.id === current_stage);
     const [viewMode, setViewMode] = useState('overview'); 
@@ -658,10 +642,7 @@ const LeagueBRStageView = ({ tournament, participants, matches, results, onDataU
                 <TrendingUp className="mr-3" size={24}/> {tournament.name}
             </h2>
             <p className="text-gray-400">Current Stage: <span className='font-bold text-primary-400'>{currentStageDetails?.name}</span></p>
-
-            {/* --- NEW: Participant List Added --- */}
             <ParticipantList participants={participants} maxParticipants={tournament.max_participants} />
-
             <div className='bg-yellow-900/30 border border-yellow-700/50 rounded-lg p-4 text-sm text-yellow-300 space-y-4'>
                 <div className="flex items-center text-lg font-bold"><CalendarCheck size={20} className="mr-2"/> Status: {currentStageDetails.name} Schedule Pending</div>
                 <p>The **{participants.length} teams** are ready. Generate the **{currentStageDetails.matchesPerWeek} matches** for this week's league play. </p>
@@ -678,6 +659,7 @@ const LeagueBRStageView = ({ tournament, participants, matches, results, onDataU
 // FORMAT 3: MOBA League Management (Mobile Legends Demo)
 // ------------------------------------------------------------------------------------
 const MLBBManagementView = ({ tournament, participants, matches, results, onDataUpdate, openModal, setModalLoading }) => {
+    // ... (This component is unchanged from the previous step) ...
     const { stages, current_stage, format } = tournament;
     const currentStageDetails = stages.find(s => s.id === current_stage);
     const [viewMode, setViewMode] = useState('overview'); 
@@ -708,8 +690,8 @@ const MLBBManagementView = ({ tournament, participants, matches, results, onData
                     const pair = generatedPairs.find(p => p.matchNumber === match.match_number);
                     if(pair) {
                         matchParticipantsToInsert.push(
-                            { match_id: match.id, participant_id: pair.team1_id },
-                            { match_id: match.id, participant_id: pair.team2_id }
+                            { match_id: match.id, participant_id: pair.team1_id, tournament_id: tournament.id },
+                            { match_id: match.id, participant_id: pair.team2_id, tournament_id: tournament.id }
                         );
                     }
                 });
@@ -730,10 +712,7 @@ const MLBBManagementView = ({ tournament, participants, matches, results, onData
                 <Swords className="mr-3" size={24}/> {tournament.name}
             </h2>
             <p className="text-gray-400">Current Stage: <span className='font-bold text-primary-400'>{currentStageDetails?.name}</span></p>
-
-            {/* --- NEW: Participant List Added --- */}
             <ParticipantList participants={participants} maxParticipants={tournament.max_participants} />
-
             <div className='bg-yellow-900/30 border border-yellow-700/50 rounded-lg p-4 text-sm text-yellow-300 space-y-4'>
                 <div className="flex items-center text-lg font-bold"><CalendarCheck size={20} className="mr-2"/> Status: League Schedule Pending</div>
                 <p>The **{participants.length} teams** are registered. Generate the **Round Robin** schedule to begin the League stage.</p>
@@ -746,12 +725,679 @@ const MLBBManagementView = ({ tournament, participants, matches, results, onData
 };
 
 
+// --- NEW: Helper Modal for MOBA (1v1) Match Results ---
+const MOBAMatchResultsModal = ({ isOpen, onClose, match, participants, onSubmit, isLoading }) => {
+    const [team1Score, setTeam1Score] = useState(0);
+    const [team2Score, setTeam2Score] = useState(0);
+
+    const matchParticipants = useMemo(() => {
+        if (!match || !participants) return { team1: null, team2: null };
+        const pIds = match.participant_ids || [];
+        const team1 = participants.find(p => p.id === pIds[0]);
+        const team2 = participants.find(p => p.id === pIds[1]);
+        return { team1, team2 };
+    }, [match, participants]);
+
+    useEffect(() => {
+        if (match) {
+            setTeam1Score(match.team1_score || 0);
+            setTeam2Score(match.team2_score || 0);
+        }
+    }, [match]);
+
+    if (!isOpen || !match) return null;
+
+    const { team1, team2 } = matchParticipants;
+    if (!team1 || !team2) {
+        onClose(); // Close if participants aren't found
+        return null;
+    }
+
+    const handleSubmit = () => {
+        const bestOf = match.best_of || 3; // TODO: Make this dynamic from stage settings
+        const winScore = Math.ceil(bestOf / 2);
+        let winner_id = null;
+
+        if (team1Score === winScore && team2Score < winScore) {
+            winner_id = team1.id;
+        } else if (team2Score === winScore && team1Score < winScore) {
+            winner_id = team2.id;
+        } else if (team1Score > winScore || team2Score > winScore || team1Score === team2Score) {
+            alert(`Invalid score for a Best of ${bestOf} match. One team must reach ${winScore} wins.`);
+            return;
+        } else {
+            alert('A winner must be decided to submit.');
+            return;
+        }
+
+        onSubmit(match.id, team1Score, team2Score, winner_id);
+    };
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={() => !isLoading && onClose()}>
+            <div className="bg-dark-800 rounded-xl shadow-2xl w-full max-w-lg border border-dark-600 relative animate-fade-in" onClick={(e) => e.stopPropagation()}>
+                <div className="flex items-center justify-between p-4 border-b border-dark-700">
+                    <h3 className="text-lg font-semibold text-white">Enter Match Results</h3>
+                    <button onClick={() => !isLoading && onClose()} className="text-gray-400 hover:text-white rounded-full p-1 transition-colors" disabled={isLoading}> <X size={20} /> </button>
+                </div>
+                <div className="p-6 space-y-6">
+                    <p className="text-sm text-gray-400">Match: {match.match_number} (Best of {match.best_of || 3})</p>
+                    <div className="flex items-center justify-between gap-4">
+                        {/* Team 1 */}
+                        <div className="flex-1 text-center space-y-2">
+                            <img src={team1.team_logo_url || '/images/placeholder_team.png'} alt={team1.team_name} className="w-16 h-16 rounded-full mx-auto border-2 border-dark-600" />
+                            <p className="font-semibold text-white truncate">{team1.team_name}</p>
+                            <input
+                                type="number"
+                                value={team1Score}
+                                onChange={(e) => setTeam1Score(parseInt(e.target.value) || 0)}
+                                className="input-field w-24 mx-auto text-center text-lg font-bold"
+                                min="0" max={match.best_of || 3}
+                                disabled={isLoading}
+                            />
+                        </div>
+                        {/* VS */}
+                        <span className="text-2xl font-bold text-gray-500">VS</span>
+                        {/* Team 2 */}
+                        <div className="flex-1 text-center space-y-2">
+                            <img src={team2.team_logo_url || '/images/placeholder_team.png'} alt={team2.team_name} className="w-16 h-16 rounded-full mx-auto border-2 border-dark-600" />
+                            <p className="font-semibold text-white truncate">{team2.team_name}</p>
+                            <input
+                                type="number"
+                                value={team2Score}
+                                onChange={(e) => setTeam2Score(parseInt(e.target.value) || 0)}
+                                className="input-field w-24 mx-auto text-center text-lg font-bold"
+                                min="0" max={match.best_of || 3}
+                                disabled={isLoading}
+                            />
+                        </div>
+                    </div>
+                </div>
+                <div className="flex justify-end gap-3 p-4 bg-dark-700/50 border-t border-dark-700 rounded-b-xl">
+                    <button onClick={() => !isLoading && onClose()} className="btn-secondary text-sm" disabled={isLoading}>Cancel</button>
+                    <button onClick={handleSubmit} className="btn-primary text-sm flex items-center justify-center" disabled={isLoading}>
+                        {isLoading && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}
+                        Save Results
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+
+// ------------------------------------------------------------------------------------
+// --- FORMAT 4: MLBB Pro Series Management (5-Stage) ---
+// ------------------------------------------------------------------------------------
+const MLBBProSeriesView = ({ tournament, participants, matches, results, onDataUpdate, openModal, setModalLoading, isModalLoading }) => {
+    const { stages, current_stage } = tournament;
+    const [viewStageId, setViewStageId] = useState(current_stage);
+    const selectedStageDetails = stages.find(s => s.id === viewStageId);
+
+    const [isSeeding, setIsSeeding] = useState(false);
+
+    const [isMatchModalOpen, setIsMatchModalOpen] = useState(false);
+    const [selectedMobaMatch, setSelectedMobaMatch] = useState(null);
+    const [editingMobaMatchId, setEditingMobaMatchId] = useState(null);
+
+    // --- UPDATED: Logic for teams in each stage (handles "seeded" vs "new") ---
+    const teamsForThisStage = useMemo(() => {
+        // Stage 1: All participants who are 'Registered' (includes new AND seeded teams)
+        if (viewStageId === 1) {
+            return participants.filter(p => p.status === 'Registered' || p.status === null);
+        }
+
+        // Stage 3 (Group Stage): A merge of S2 winners and S1 seeded teams
+        if (viewStageId === 3) {
+            // Get teams that advanced from Stage 2
+            const s2_winners = participants.filter(p => p.status === 'adv_stage_3');
+
+            // *** This is your "16 + 48" logic ***
+            // Get teams that were seeded *directly* to Stage 3 (if you use that model)
+            // For *your* model ("seeding = auto-slot"), this will be empty, which is correct.
+            const s1_seeded = participants.filter(p => p.status === 'adv_stage_3' && p.is_seeded); 
+
+            const allTeams = new Map();
+            s2_winners.forEach(t => allTeams.set(t.id, t));
+            s1_seeded.forEach(t => allTeams.set(t.id, t));
+
+            return Array.from(allTeams.values());
+        }
+
+        // For all other stages (2, 4, 5), just get the teams that advanced to it
+        return participants.filter(p => p.status === `adv_stage_${viewStageId}`);
+
+    }, [viewStageId, participants]);
+
+    // Get matches for the *selected* stage
+    const matchesForThisStage = useMemo(() => {
+        // The matches array now has participant_ids from the top-level fetch
+        return matches.filter(m => m.stage_id === viewStageId);
+    }, [matches, viewStageId]);
+
+
+    // --- NEW: Handle "Lock Registration" ---
+    const handleLockRegistration = async () => {
+        openModal({
+            title: 'Lock Registration?',
+            message: `This will lock the tournament with the current ${participants.length} teams and set the status to "Running". No new teams can join. This cannot be undone.`,
+            confirmText: 'Lock Tournament',
+            showCancel: true,
+            onConfirm: async () => {
+                setModalLoading(true);
+                try {
+                    const { error } = await supabase
+                        .from('tournaments')
+                        .update({ status: 'Running' })
+                        .eq('id', tournament.id);
+                    if (error) throw error;
+                    await onDataUpdate(); // Refresh all data
+                    setModalLoading(false);
+                    openModal({ title: "Tournament Locked", message: `Registration is closed. Ready to generate bracket for ${participants.length} teams.`, showCancel: false });
+                } catch (err) {
+                    setModalLoading(false);
+                    openModal({ title: 'Error Locking Tournament', message: err.message });
+                }
+            }
+        });
+    };
+
+    // --- UPDATED: Bracket Generation with "Bye" Logic ---
+    const handleGenerateBracket = async () => {
+        if (matchesForThisStage.length > 0) {
+            openModal({ title: 'Error', message: 'Matches for this stage are already generated.' });
+            return;
+        }
+
+        // --- NEW: Check if tournament is locked ---
+        if (tournament.status !== 'Running') {
+             openModal({ title: 'Registration Not Locked', message: 'You must lock registration before generating a bracket.' });
+            return;
+        }
+
+        const currentTeams = teamsForThisStage; // e.g., 50 teams
+        const bracketSize = selectedStageDetails.totalTeams; // e.g., 64
+
+        // Find the *next* power of 2 if teams > bracketSize (e.g., 70 teams for 64 bracket)
+        // For your case (50 teams, 64 bracket), this is fine.
+        let actualBracketSize = bracketSize;
+        if (currentTeams.length > actualBracketSize) {
+            actualBracketSize = Math.pow(2, Math.ceil(Math.log2(currentTeams.length)));
+            // You might want to warn the admin here
+        }
+
+        const numByes = actualBracketSize - currentTeams.length; // e.g., 64 - 50 = 14 byes
+        const numToPlay = currentTeams.length - numByes; // e.g., 50 - 14 = 36 teams
+        const numMatches = numToPlay / 2; // e.g., 18 matches
+
+        openModal({
+            title: `Confirm Bracket Generation`,
+            message: `This will generate a ${actualBracketSize}-team bracket for ${currentTeams.length} teams.
+            \n- ${numByes} teams will receive a BYE (free win) to Stage 2.
+            \n- ${numToPlay} teams will play ${numMatches} "play-in" matches.
+            \nThis cannot be undone.`,
+            confirmText: 'Generate Bracket & Byes',
+            showCancel: true,
+            onConfirm: async () => {
+                setModalLoading(true);
+                try {
+                    const shuffledTeams = [...currentTeams].sort(() => 0.5 - Math.random());
+
+                    const byeTeams = shuffledTeams.slice(0, numByes);
+                    const playInTeams = shuffledTeams.slice(numByes);
+
+                    const participantsToUpdate = []; // For Bye teams
+                    const participantsToInsert = []; // For matches
+                    let matchNum = 1;
+
+                    // 1. Advance the "Bye" teams immediately
+                    const nextStage = stages.find(s => s.id === viewStageId + 1);
+                    byeTeams.forEach(team => {
+                        participantsToUpdate.push({
+                            id: team.id,
+                            status: `adv_stage_${nextStage.id}` // Advance to Stage 2
+                        });
+                    });
+
+                    // 2. Create matches for the "Play-in" teams
+                    for (let i = 0; i < playInTeams.length; i += 2) {
+                        const team1 = playInTeams[i];
+                        const team2 = playInTeams[i + 1];
+
+                        const newMatch = {
+                            tournament_id: tournament.id,
+                            stage_id: viewStageId,
+                            match_number: matchNum,
+                            status: 'Scheduled',
+                            scheduled_time: new Date(Date.now() + 24*60*60*1000).toISOString(),
+                            team1_score: 0,
+                            team2_score: 0,
+                            best_of: 3 // Hardcode Bo3 for now
+                        };
+
+                        const { data: matchData, error: matchError } = await supabase.from('tournament_matches').insert(newMatch).select('id').single();
+                        if (matchError) throw matchError;
+
+                        participantsToInsert.push(
+                            { match_id: matchData.id, participant_id: team1.id, tournament_id: tournament.id },
+                            { match_id: matchData.id, participant_id: team2.id, tournament_id: tournament.id }
+                        );
+                        matchNum++;
+                    }
+
+                    // 3. Run database queries
+                    if (participantsToUpdate.length > 0) {
+                        const { error: byeError } = await supabase.from('tournament_participants').upsert(participantsToUpdate);
+                        if (byeError) throw byeError;
+                    }
+                    if (participantsToInsert.length > 0) {
+                        const { error: matchPartError } = await supabase.from('match_participants').insert(participantsToInsert);
+                        if (matchPartError) throw matchPartError;
+                    }
+
+                    await onDataUpdate(); // Refresh all data
+                    setModalLoading(false);
+                    openModal({ title: "Bracket Generated", message: `Successfully created ${numMatches} matches and advanced ${numByes} teams with byes.`, showCancel: false });
+                } catch (err) {
+                    setModalLoading(false);
+                    openModal({ title: 'Error Generating Bracket', message: err.message });
+                }
+            }
+        });
+    };
+
+    // --- Update MOBA Match Schedule ---
+    const handleUpdateMobaSchedule = async (matchId, newDateTime) => {
+        const { error } = await supabase.from('tournament_matches').update({ scheduled_time: newDateTime, status: 'Scheduled' }).eq('id', matchId);
+        if (error) openModal({ title: 'Error', message: error.message, showCancel: false });
+        else await onDataUpdate('matches'); 
+        setEditingMobaMatchId(null);
+    };
+
+    // --- MOBA Results Handlers ---
+    const handleOpenMobaResults = (match) => {
+        setSelectedMobaMatch(match);
+        setIsMatchModalOpen(true);
+    };
+
+    const handleSubmitMobaResults = async (matchId, team1Score, team2Score, winnerId) => {
+        setModalLoading(true);
+        try {
+            const { error } = await supabase.from('tournament_matches')
+                .update({
+                    team1_score: team1Score,
+                    team2_score: team2Score,
+                    winner_id: winnerId,
+                    status: 'Completed'
+                })
+                .eq('id', matchId);
+
+            if (error) throw error;
+
+            await onDataUpdate(); // Refresh data
+            setModalLoading(false);
+            setIsMatchModalOpen(false);
+            openModal({ title: 'Success', message: 'Match results saved!' });
+
+        } catch (err) {
+            setModalLoading(false);
+            openModal({ title: 'Error Saving Results', message: err.message });
+        }
+    };
+
+    // --- Advance Winners Function ---
+    const handleAdvanceWinners = async () => {
+        const nextStage = stages.find(s => s.id === viewStageId + 1);
+        if (!nextStage) {
+            openModal({ title: 'Error', message: 'This is the final stage.' });
+            return;
+        }
+
+        const completedMatches = matchesForThisStage.filter(m => m.status === 'Completed');
+        if (matchesForThisStage.length > 0 && completedMatches.length !== matchesForThisStage.length) {
+            openModal({ title: 'Stage Not Complete', message: `All ${matchesForThisStage.length} matches in this stage must be "Completed" before advancing winners.` });
+            return;
+        }
+
+        // Get winners from matches
+        const winnerIds = new Set(completedMatches.map(m => m.winner_id));
+
+        // Find teams who already advanced (e.g., Byes)
+        const alreadyAdvanced = participants.filter(p => p.status === `adv_stage_${nextStage.id}`);
+        alreadyAdvanced.forEach(p => winnerIds.add(p.id));
+
+        const participantsToUpdate = Array.from(winnerIds).map(winnerId => ({
+            id: winnerId, // This must be the participant ID
+            status: `adv_stage_${nextStage.id}`
+        }));
+
+        if (participantsToUpdate.length === 0) {
+             openModal({ title: 'No Teams to Advance', message: 'No winners were found to advance. This may happen if only Byes were present.' });
+             return;
+        }
+
+        openModal({
+            title: `Advance Teams to ${nextStage.name}?`,
+            message: `This will advance all ${winnerIds.size} teams (winners + byes) from ${selectedStageDetails.name} to ${nextStage.name}. This cannot be undone.`,
+            confirmText: 'Advance Teams',
+            showCancel: true,
+            onConfirm: async () => {
+                setModalLoading(true);
+                try {
+                    // 1. Update all the participants
+                    const { error: partError } = await supabase
+                        .from('tournament_participants')
+                        .upsert(participantsToUpdate);
+                    if (partError) throw partError;
+
+                    // 2. Update the tournament's current stage
+                    const { error: tourneyError } = await supabase
+                        .from('tournaments')
+                        .update({ current_stage: nextStage.id })
+                        .eq('id', tournament.id);
+                    if (tourneyError) throw tourneyError;
+
+                    await onDataUpdate(); // Refresh all data
+                    setModalLoading(false);
+                    setViewStageId(nextStage.id); // Move view to the new stage
+                    openModal({ title: 'Success', message: `${winnerIds.size} teams advanced to ${nextStage.name}!` });
+                } catch (err) {
+                    setModalLoading(false);
+                    openModal({ title: 'Error Advancing Teams', message: err.message });
+                }
+            }
+        });
+    };
+
+
+    // --- Seeding Function (Calls Edge Function) ---
+    const handleSeedNextSeason = async () => {
+        // This function is now correct based on our updated RPC
+        if (!tournament || tournament.status !== 'Completed') {
+            openModal({ 
+                title: 'Cannot Seed Yet', 
+                message: 'The tournament must be marked as "Completed" before you can seed the Top 16 into the next season.',
+                showCancel: false
+            });
+            return;
+        }
+
+        openModal({
+            title: 'Confirm Seeding',
+            message: `This will find the Top 16 from this tournament ("${tournament.name}") and register them for the next tournament in the league. This action cannot be undone.`,
+            confirmText: 'Seed Next Season',
+            showCancel: true,
+            onConfirm: async () => {
+                setModalLoading(true); 
+                setIsSeeding(true);
+
+                try {
+                    const { data, error } = await supabase.functions.invoke('seed-league-tournament', {
+                        body: { previous_tournament_id: tournament.id }
+                    });
+
+                    if (error) throw error; 
+                    if (data && !data.success) throw new Error(data.message); 
+
+                    setModalLoading(false);
+                    setIsSeeding(false);
+                    openModal({
+                        title: 'Success!',
+                        message: data.message, 
+                        showCancel: false
+                    });
+
+                } catch (err) {
+                    setModalLoading(false);
+                    setIsSeeding(false);
+                    openModal({
+                        title: 'Seeding Failed',
+                        message: err.message, 
+                        showCancel: false
+                    });
+                }
+            }
+        });
+    };
+
+    // --- UI Rendering function ---
+    const renderStageContent = () => {
+        if (!selectedStageDetails) {
+            return <p>Error: Could not find details for stage {viewStageId}.</p>
+        }
+
+        const getMatchParticipants = (match) => {
+             const pIds = match.participant_ids || [];
+             const team1 = participants.find(p => p.id === pIds[0]);
+             const team2 = participants.find(p => p.id === pIds[1]);
+             return { team1, team2 };
+        }
+
+        // --- Reusable Bracket Match List UI ---
+        const BracketMatchList = () => {
+            const allMatchesDone = matchesForThisStage.length > 0 && matchesForThisStage.every(m => m.status === 'Completed');
+
+            return (
+                <div className="space-y-4">
+                    {/* --- UPDATED: Show Lock Registration or Generate Bracket --- */}
+                    {matchesForThisStage.length === 0 && (
+                        tournament.status === 'Running' ? (
+                            <div className='bg-yellow-900/30 border border-yellow-700/50 rounded-lg p-4 text-sm text-yellow-300 space-y-4'>
+                                <p>Tournament is locked with **{teamsForThisStage.length} teams**. Ready to generate bracket.</p>
+                                <button 
+                                    className='btn-primary' 
+                                    onClick={handleGenerateBracket}
+                                >
+                                    <Workflow size={16} className='mr-2'/> Generate {selectedStageDetails.name} Bracket
+                                </button>
+                            </div>
+                        ) : (
+                             <div className='bg-blue-900/30 border border-blue-700/50 rounded-lg p-4 text-sm text-blue-300 space-y-4'>
+                                <p>Registration is currently open. You must lock registration before generating matches.</p>
+                                <button 
+                                    className='btn-danger' 
+                                    onClick={handleLockRegistration}
+                                >
+                                    <Lock size={16} className='mr-2'/> Lock Registration & Start Tournament
+                                </button>
+                            </div>
+                        )
+                    )}
+
+                    {/* --- Match List (No Changes) --- */}
+                    {matchesForThisStage.length > 0 && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {matchesForThisStage.map(match => {
+                                const { team1, team2 } = getMatchParticipants(match);
+                                const isCompleted = match.status === 'Completed';
+                                const winnerId = match.winner_id;
+
+                                return (
+                                    <div key={match.id} className={`bg-dark-900/50 p-4 rounded-lg border ${isCompleted ? 'border-green-700/30' : 'border-dark-600'}`}>
+                                        <div className="flex justify-between items-center mb-3">
+                                            <span className="text-sm font-semibold text-primary-400">Match {match.match_number}</span>
+                                            <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${isCompleted ? 'bg-green-600/20 text-green-300' : 'bg-yellow-600/20 text-yellow-300'}`}>
+                                                {match.status}
+                                            </span>
+                                        </div>
+                                        {editingMobaMatchId === match.id ? (
+                                            <div className="flex items-center space-x-2 my-2">
+                                                <input type="datetime-local" defaultValue={new Date(match.scheduled_time).toISOString().slice(0, 16)} id={`dt-${match.id}`} className="input-field input-field-sm w-48" />
+                                                <button onClick={() => { const newDateTime = document.getElementById(`dt-${match.id}`).value; handleUpdateMobaSchedule(match.id, newDateTime); }} className="btn-primary btn-xs"> <Save size={14}/> </button>
+                                                <button onClick={() => setEditingMobaMatchId(null)} className="bg-red-600/20 hover:bg-red-500/30 text-red-400 font-bold py-1 px-2 rounded transition-colors text-xs"> <X size={14}/> </button>
+                                            </div>
+                                        ) : (
+                                            <div className="flex items-center space-x-2 my-1">
+                                                <p className="text-sm font-medium text-gray-400 flex items-center">
+                                                    <Clock size={14} className='mr-1.5'/> {new Date(match.scheduled_time).toLocaleString()}
+                                                </p>
+                                                <button onClick={() => setEditingMobaMatchId(match.id)} className="text-gray-500 hover:text-primary-400 transition-colors" title="Edit Date/Time"> <Edit size={14}/> </button>
+                                            </div>
+                                        )}
+                                        <div className="space-y-2">
+                                            <div className={`flex justify-between items-center p-2 rounded ${winnerId === team1?.id ? 'bg-green-800/50' : ''}`}>
+                                                <span className={`font-medium ${winnerId === team1?.id ? 'text-white' : 'text-gray-300'}`}>{team1?.team_name || 'TBD'}</span>
+                                                <span className={`font-bold text-lg ${winnerId === team1?.id ? 'text-white' : 'text-gray-400'}`}>{match.team1_score}</span>
+                                            </div>
+                                            <div className={`flex justify-between items-center p-2 rounded ${winnerId === team2?.id ? 'bg-green-800/50' : ''}`}>
+                                                <span className={`font-medium ${winnerId === team2?.id ? 'text-white' : 'text-gray-300'}`}>{team2?.team_name || 'TBD'}</span>
+                                                <span className={`font-bold text-lg ${winnerId === team2?.id ? 'text-white' : 'text-gray-400'}`}>{match.team2_score}</span>
+                                            </div>
+                                        </div>
+                                        {!isCompleted && (
+                                            <button 
+                                                onClick={() => handleOpenMobaResults(match)}
+                                                className="btn-secondary btn-xs w-full mt-3"
+                                            >
+                                                <Edit3 size={14} className="mr-1.5"/> Enter Results
+                                            </button>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+
+                    {allMatchesDone && viewStageId < 5 && (
+                        <div className="mt-6 pt-6 border-t border-dark-600">
+                             <button 
+                                onClick={handleAdvanceWinners} 
+                                className="btn-primary w-full flex items-center justify-center"
+                            >
+                                <Send size={16} className="mr-2"/> Advance Winners to Stage {viewStageId + 1}
+                            </button>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        switch (viewStageId) {
+            case 1: // Open Qualifiers
+                return (
+                    <div className='bg-dark-700/50 p-6 rounded-lg border border-dark-600 space-y-4'>
+                        <h3 className='text-xl font-bold text-white'>Stage 1: Open Qualifiers ({teamsForThisStage.length} / {selectedStageDetails.totalTeams} Teams)</h3>
+                        <p className='text-gray-400'>
+                            This stage is for all {teamsForThisStage.length} registered teams (new and seeded). 
+                            The bracket will be {selectedStageDetails.totalTeams} slots, with Byes assigned as needed.
+                        </p>
+                        <BracketMatchList />
+                    </div>
+                );
+            case 2: // Knockout Stage
+                return (
+                    <div className='bg-dark-700/50 p-6 rounded-lg border border-dark-600 space-y-4'>
+                        <h3 className='text-xl font-bold text-white'>Stage 2: Knockout Stage ({teamsForThisStage.length} / {selectedStageDetails.totalTeams} Teams)</h3>
+                        <p className='text-gray-400'>The {teamsForThisStage.length} winners and "Bye" teams from Stage 1 play. Advancing: {selectedStageDetails.advanceRule}</p>
+                        <BracketMatchList />
+                    </div>
+                );
+            case 3: // Group Stage
+                return (
+                    <div className='bg-dark-700/50 p-6 rounded-lg border border-dark-600 space-y-4'>
+                        <h3 className='text-xl font-bold text-white'>Stage 3: Group Stage ({teamsForThisStage.length} / {selectedStageDetails.totalTeams} Teams)</h3>
+                        <p className='text-gray-400'>The {teamsForThisStage.length} winners from Stage 2 merge here. Advancing: {selectedStageDetails.advanceRule}</p>
+                        <button className='btn-primary' onClick={() => openModal({title: 'Not Implemented', message: 'Group draw and match generation logic (like Free Fire) goes here.'})}>
+                            <UsersRound size={16} className='mr-2'/> Run Group Draw
+                        </button>
+                        {/* TODO: Add Group Stage match list / standings... */}
+                    </div>
+                );
+            case 4: // Playoffs
+                return (
+                    <div className='bg-dark-700/50 p-6 rounded-lg border border-dark-600 space-y-4'>
+                        <h3 className='text-xl font-bold text-white'>Stage 4: Playoffs ({teamsForThisStage.length} / {selectedStageDetails.totalTeams} Teams)</h3>
+                        <p className='text-gray-400'>The {teamsForThisStage.length} teams from the Group Stage play. Advancing: {selectedStageDetails.advanceRule}</p>
+                        <BracketMatchList />
+                    </div>
+                );
+            case 5: // Grand Finals
+                return (
+                    <div className='bg-dark-700/50 p-6 rounded-lg border border-dark-600 space-y-4'>
+                        <h3 className='text-xl font-bold text-white'>Stage 5: Grand Finals ({teamsForThisStage.length} / {selectedStageDetails.totalTeams} Teams)</h3>
+                        <p className='text-gray-400'>This is the final bracket for the top {selectedStageDetails.totalTeams} teams.</p>
+                        <BracketMatchList />
+
+                        {/* --- Seeding Button --- */}
+                        <div className='mt-8 pt-6 border-t border-dark-600'>
+                             <h4 className='text-lg font-bold text-yellow-400'>League Seeding</h4>
+                             <p className='text-sm text-gray-400 mb-3'>Once this tournament is "Completed", you can seed the Top 16 into the next season.</p>
+                             <button 
+                                onClick={handleSeedNextSeason} 
+                                disabled={isSeeding || tournament.status !== 'Completed'} 
+                                className="btn-secondary flex items-center disabled:opacity-50 disabled:cursor-not-allowed"
+                                title={tournament.status !== 'Completed' ? 'Tournament must be "Completed" to seed' : 'Seed Top 16 to Next Season'}
+                            >
+                                {isSeeding ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin"/> : <Send size={16} className="mr-2"/>}
+                                {isSeeding ? 'Seeding...' : 'Seed Top 16 to Next Season'}
+                            </button>
+                        </div>
+                    </div>
+                );
+            default:
+                return <p>Unknown stage selected.</p>;
+        }
+    };
+
+    return (
+        <AnimatedSection className="card bg-dark-800 p-6 rounded-xl shadow-lg space-y-8">
+            <h2 className="text-3xl font-bold text-primary-300 flex items-center border-b border-dark-700 pb-3">
+                <Swords className="mr-3" size={24}/> {tournament.name}
+            </h2>
+            <p className="text-gray-400">
+                Format: <span className='font-bold text-primary-400'>MLBB Pro Series (5-Stage)</span>.
+                Current Active Stage: <span className='font-bold text-primary-400'>{stages.find(s => s.id === current_stage)?.name}</span>
+            </p>
+
+            <div className='mb-6'>
+                <label className='block text-sm font-medium text-gray-300 mb-2'>Select Stage to Manage</label>
+                <div className="flex flex-wrap gap-2 bg-dark-700 p-2 rounded-lg border border-dark-600">
+                    {stages.map((stage) => {
+                        const isCurrent = stage.id === current_stage;
+                        const isViewing = stage.id === viewStageId;
+                        return (
+                            <button 
+                                key={stage.id} 
+                                onClick={() => setViewStageId(stage.id)}
+                                className={`px-3 py-1.5 rounded-md text-sm font-semibold transition-all ${ 
+                                    isViewing 
+                                        ? 'bg-primary-600 text-white shadow' 
+                                        : isCurrent 
+                                            ? 'bg-blue-800 text-blue-100 hover:bg-blue-700' 
+                                            : 'text-gray-300 hover:bg-dark-600' 
+                                }`}
+                            >
+                                {stage.id}: {stage.name} {isCurrent && "(Active)"}
+                            </button>
+                        );
+                    })}
+                </div>
+            </div>
+
+            <ParticipantList participants={participants} maxParticipants={tournament.max_participants} />
+
+            {renderStageContent()}
+
+            <MOBAMatchResultsModal
+                isOpen={isMatchModalOpen}
+                onClose={() => setIsMatchModalOpen(false)}
+                match={selectedMobaMatch}
+                participants={participants}
+                onSubmit={handleSubmitMobaResults}
+                isLoading={isModalLoading}
+            />
+        </AnimatedSection>
+    );
+};
+// --- END NEW FORMAT ---
+
+
 // ------------------------------------------------------------------------------------
 // --- MAIN PAGE COMPONENT ---
 // ------------------------------------------------------------------------------------
 export default function UpdateTournamentPage() {
     const { tournamentId } = useParams(); // Can be "manage" or a UUID
-    const { user } = useAuth();
+    const { user, loading: authLoading } = useAuth(); 
     const navigate = useNavigate();
 
     const [viewMode, setViewMode] = useState('loading'); // 'loading', 'list', 'manage', 'error'
@@ -796,17 +1442,33 @@ export default function UpdateTournamentPage() {
             if (tourneyError) throw tourneyError;
             if (!tourneyData) throw new Error("Tournament not found.");
 
-            // 2. Fetch all participants, matches in parallel
-            const [partRes, matchRes] = await Promise.all([
+            // 2. Fetch all participants, matches, and match_participants in parallel
+            const [partRes, matchRes, matchPartRes] = await Promise.all([
                 supabase.from('tournament_participants').select('*').eq('tournament_id', id),
-                supabase.from('tournament_matches').select('*').eq('tournament_id', id)
+                supabase.from('tournament_matches').select('*').eq('tournament_id', id),
+                supabase.from('match_participants').select('*').eq('tournament_id', id) 
             ]);
 
             if (partRes.error) throw partRes.error;
             if (matchRes.error) throw matchRes.error;
+            if (matchPartRes.error) throw matchPartRes.error; 
 
             const participants = partRes.data || [];
-            const matches = matchRes.data || [];
+            let matches = matchRes.data || [];
+            const matchParticipants = matchPartRes.data || []; 
+
+            // --- Combine matches with their participants ---
+            matches = matches.map(match => {
+                const pIds = matchParticipants
+                    .filter(mp => mp.match_id === match.id)
+                    .map(mp => mp.participant_id);
+                return {
+                    ...match,
+                    participant_ids: pIds // Attach [pid1, pid2] to each match object
+                };
+            });
+            // --- END ---
+
 
             // 3. Fetch results based on the matches we found
             let results = [];
@@ -825,7 +1487,7 @@ export default function UpdateTournamentPage() {
             setCurrentTournamentData({
                 tournament: tourneyData,
                 participants: participants,
-                matches: matches,
+                matches: matches, // This now contains matches with participant_ids
                 results: results
             });
             setViewMode('manage');
@@ -863,7 +1525,7 @@ export default function UpdateTournamentPage() {
     // --- Main useEffect to route fetching ---
     useEffect(() => {
         if (!user) {
-            if (!useAuth.loading) {
+            if (!authLoading) { 
                 setViewMode('error');
                 setError("You must be logged in to manage tournaments.");
             }
@@ -873,9 +1535,15 @@ export default function UpdateTournamentPage() {
         if (tournamentId === 'manage') {
             fetchTournamentsList(user.id);
         } else if (tournamentId) {
-            fetchTournamentData(tournamentId);
+            const uuidRegex = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+            if (uuidRegex.test(tournamentId)) {
+                fetchTournamentData(tournamentId);
+            } else {
+                setViewMode('error');
+                setError(`Invalid Tournament ID: ${tournamentId}`);
+            }
         }
-    }, [tournamentId, user, fetchTournamentData, fetchTournamentsList]);
+    }, [tournamentId, user, authLoading, fetchTournamentData, fetchTournamentsList]);
 
     // --- Data Refresh Function ---
     const handleDataUpdate = async (dataType = 'all') => {
@@ -885,27 +1553,27 @@ export default function UpdateTournamentPage() {
     };
 
     // --- RENDER FUNCTIONS ---
-
     const renderListView = () => (
         <AnimatedSection delay={100} className="card bg-dark-800 p-6 rounded-xl shadow-lg">
             <h2 className="text-2xl font-bold mb-6 text-primary-300 border-b border-dark-700 pb-3">Your Tournaments ({tournamentsList.length})</h2>
             {tournamentsList.length > 0 ? (
                 <div className="space-y-6">
                     {tournamentsList.map((t, index) => {
+                        const gameStyles = getGameCardStyles(t.game); 
                         let formatText = t.format.replace(/-/g, ' ');
-                        let formatColor = 'text-primary-400';
-                        if (t.format === 'grouped-multi-stage-br') formatColor = 'text-orange-400';
-                        if (t.format === 'multi-stage-br') formatColor = 'text-purple-400';
-                        if (t.format === 'round-robin-to-bracket') formatColor = 'text-green-400';
 
                         return ( 
-                            <AnimatedSection key={t.id} delay={150 + index * 100} className="bg-dark-700/50 rounded-lg p-4 border border-dark-600 hover:border-primary-500/30 transition-colors duration-200"> 
+                            <AnimatedSection 
+                                key={t.id} 
+                                delay={150 + index * 100} 
+                                className={`bg-dark-700/50 rounded-lg p-4 ${gameStyles.border} transition-colors duration-200`} 
+                            > 
                                 <div className="flex flex-col md:flex-row justify-between md:items-center gap-4"> 
                                     <div className="flex-grow"> 
                                         <h3 className="text-xl font-semibold text-white mb-1">{t.name}</h3> 
                                         <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-400"> 
                                             <span>Game: <span className="text-white">{t.game}</span></span> 
-                                            <span>Format: <span className={`font-bold capitalize ${formatColor}`}>{formatText}</span></span>
+                                            <span>Format: <span className={`font-bold capitalize ${gameStyles.text}`}>{formatText}</span></span>
                                             <span>Status: <span className="font-medium">{t.status}</span></span> 
                                         </div> 
                                     </div> 
@@ -958,6 +1626,17 @@ export default function UpdateTournamentPage() {
                             onDataUpdate={handleDataUpdate} 
                             openModal={openModal} 
                             setModalLoading={setModalLoading}
+                        />;
+            case 'mlbb-pro-series':
+                return <MLBBProSeriesView
+                            tournament={tournament} 
+                            participants={participants} 
+                            matches={matches} 
+                            results={results} 
+                            onDataUpdate={handleDataUpdate} 
+                            openModal={openModal} 
+                            setModalLoading={setModalLoading}
+                            isModalLoading={isModalLoading}
                         />;
             default:
                 return (
@@ -1013,8 +1692,8 @@ export default function UpdateTournamentPage() {
                     isOpen={isModalOpen} 
                     onClose={closeModal} 
                     title={modalContent.title}
-                    onConfirm={modalContent.onConfirm} 
-                    confirmText={modalContent.confirmText}
+                    onConfirm={modalContent.onConfirm || closeModal} // Default to just closing
+                    confirmText={modalContent.confirmText || 'OK'}
                     showCancel={modalContent.showCancel} 
                     customBody={modalContent.customBody} 
                     large={modalContent.large}

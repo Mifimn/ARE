@@ -31,7 +31,8 @@ import CupPage from './pages/CupPage';
 import PlayersDirectoryPage from './pages/PlayersDirectoryPage';
 import TeamPage from './pages/TeamPage.jsx';
 import AboutPage from './pages/AboutPage.jsx';
-import GuidancePage from './pages/GuidancePage.jsx'; // <-- 1. IMPORT IT HERE
+import GuidancePage from './pages/GuidancePage.jsx'; 
+import AdminGuidePage from './pages/AdminGuidePage.jsx'; // --- 1. IMPORT ADMIN GUIDE ---
 
 // --- Component Imports ---
 import Header from './components/Header';
@@ -39,6 +40,7 @@ import Footer from './components/Footer';
 import GamesSidebar from './components/GamesSidebar';
 import PrivateRoute from './components/PrivateRoute';
 import PublicOnlyRoute from './components/PublicOnlyRoute';
+import AdminRoute from './components/AdminRoute'; // --- 2. IMPORT ADMIN ROUTE ---
 
 import './App.css';
 
@@ -74,7 +76,8 @@ export default function App() {
    if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-dark-900 text-white">
-        <h2 className="text-2xl">Loading Authentication...</h2>
+        {/* You can use a simple loader here, or a more complex one */}
+        <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-primary-500"></div>
       </div>
     );
   }
@@ -110,14 +113,14 @@ export default function App() {
                 </PublicOnlyRoute>
               } 
             />
-            
+
             {/* --- Other Public Routes --- */}
             <Route path="/about" element={<AboutPage />} />
             <Route path="/contact" element={<ContactPage />} />
             <Route path="/rules" element={<RulesPage />} />
             <Route path="/terms" element={<TermsPage />} />
             <Route path="/privacy" element={<PrivacyPage />} />
-            <Route path="/guidance" element={<GuidancePage />} /> {/* <-- 2. ADD THE ROUTE HERE */}
+            <Route path="/guidance" element={<GuidancePage />} />
             <Route path="/news" element={<NewsPage />} />
             <Route path="/freefire" element={<FreeFirePage />} />
             <Route path="/cod" element={<CODPage />} />
@@ -129,19 +132,34 @@ export default function App() {
             <Route path="/team/:teamId" element={<TeamPage />} />
             <Route path="/tournament/:tournamentId" element={<TournamentDetailsPage />} />
             <Route path="/cup/:cupId" element={<CupPage />} />
-            <Route path="/league/:leagueId" element={<LeaguePage />} />
+            {/* <Route path="/league/:leagueId" element={<LeaguePage />} /> */} {/* --- REMOVED OLD ROUTE --- */}
             <Route path="/players" element={<PlayersDirectoryPage />} />
 
 
-            {/* --- Private Routes --- */}
+            {/* --- Private Routes (For Any Logged-in User) --- */}
             <Route path="/dashboard" element={<PrivateRoute><DashboardPage /></PrivateRoute>} />
             <Route path="/profile" element={<PrivateRoute><ProfilePage /></PrivateRoute>} />
             <Route path="/edit-profile" element={<PrivateRoute><EditProfilePage /></PrivateRoute>} />
             <Route path="/my-teams" element={<PrivateRoute><TeamsManagementPage /></PrivateRoute>} />
             <Route path="/manage-team/:teamId" element={<PrivateRoute><ManageTeamPage /></PrivateRoute>} />
-            <Route path="/create-tournament" element={<PrivateRoute><CreateTournamentPage /></PrivateRoute>} />
-            <Route path="/update-tournament/:tournamentId" element={<PrivateRoute><UpdateTournamentPage /></PrivateRoute>} />
-            {/* Add any other strictly private routes here */}
+
+            {/* --- 3. ADMIN-ONLY Routes --- */}
+            <Route 
+              path="/create-tournament" 
+              element={<AdminRoute><CreateTournamentPage /></AdminRoute>} 
+            />
+            <Route 
+              path="/update-tournament/:tournamentId" 
+              element={<AdminRoute><UpdateTournamentPage /></AdminRoute>} 
+            />
+            <Route 
+              path="/leagues" 
+              element={<AdminRoute><LeaguePage /></AdminRoute>} 
+            />
+            <Route 
+              path="/admin-guide" 
+              element={<AdminRoute><AdminGuidePage /></AdminRoute>} 
+            />
 
           </Routes>
         </LayoutWrapper>

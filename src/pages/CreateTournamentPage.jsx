@@ -7,32 +7,37 @@ import AnimatedSection from '../components/AnimatedSection';
 import { useAuth } from '../contexts/AuthContext'; 
 import { supabase } from '../lib/supabaseClient'; 
 
-// --- Game Lists (Simplified to the 3 demo formats) ---
+// --- UPDATED: Game Lists ---
 const availableGames = [
     'Free Fire',
     'Mobile Legends',
+    'Mobile Legends (Pro League)', // --- NEW ---
     'Farlight 84',
 ].sort();
 
-// --- Game Details ---
+// --- UPDATED: Game Details ---
 const defaultGameRules = {
     'Free Fire': `1. Game Mode: Battle Royale.\n2. Map: TBD (Set by Admin).\n3. Squad Size: Squads (4).\n4. Points: Standard BR points (Placement + Kills).\n5. Fair Play: No hacks, exploits, or teaming.`,
     'Mobile Legends': `1. Game Mode: Draft Pick.\n2. Map: Land of Dawn.\n3. Format: Round Robin (Bo3) into Single Elimination Playoffs.\n4. Team Size: 5v5.\n5. Fair Play: Exploits/Bugs strictly prohibited.`,
+    // --- NEW ---
+    'Mobile Legends (Pro League)': `AML PRO LEAGUE - 5-STAGE FORMAT\n1. Stage 1: Open Qualifiers\n2. Stage 2: Knockout Stage\n3. Stage 3: Group Stage (Seeded teams join here)\n4. Stage 4: Playoffs\n5. Stage 5: Grand Finals\n\nAll matches are 5v5 Draft Pick on Land of Dawn.`,
     'Farlight 84': `1. Game Mode: Battle Royale (Hunt).\n2. Map: TBD (Set by Admin).\n3. Squad Size: Squads (4).\n4. Points: Standard BR points (Placement + Kills).\n5. Fair Play enforced.`
 };
 
 const gameSpecificSettingOptions = {
     'Free Fire': { modes: ['Battle Royale', 'Clash Squad'], maps: ['Bermuda', 'Purgatory', 'Kalahari', 'Alpine', 'NeXTerra'], teamSizes: ['Squads (4)'] },
     'Mobile Legends': { modes: ['Draft Pick'], map: ['Land of Dawn'], teamSize: ['5v5'] },
+    'Mobile Legends (Pro League)': { modes: ['Draft Pick'], map: ['Land of Dawn'], teamSize: ['5v5'] }, // --- NEW ---
     'Farlight 84': { modes: ['Battle Royale', 'Hunt'], maps: ['Sunset City', 'Lampton'], teamSizes: ['Squads (4)'] }
 };
 
-// --- Helper functions to get implicit format ---
+// --- UPDATED: Helper functions to get implicit format ---
 const getTournamentFormat = (gameName) => {
     switch(gameName) {
         case 'Free Fire': return 'grouped-multi-stage-br';
         case 'Farlight 84': return 'multi-stage-br';
         case 'Mobile Legends': return 'round-robin-to-bracket';
+        case 'Mobile Legends (Pro League)': return 'mlbb-pro-series'; // --- NEW ---
         default: return 'unknown';
     }
 };
@@ -42,11 +47,13 @@ const getFormatDescription = (gameName) => {
         case 'Free Fire': return 'A multi-stage Battle Royale qualifier format with group draws and advancement.';
         case 'Farlight 84': return 'A multi-week Battle Royale league where points accumulate over all weeks.';
         case 'Mobile Legends': return 'A Round Robin league stage that seeds into a final Single Elimination playoff bracket.';
+        case 'Mobile Legends (Pro League)': return 'A 5-stage progressive series: Open Qualifiers -> Knockout -> Groups -> Playoffs -> Finals.'; // --- NEW ---
         default: return 'Select a game to see the format.';
     }
 };
 
 const getInitialGameSettings = (gameName) => {
+    // --- UPDATED to handle new format ---
     const settings = gameSpecificSettingOptions[gameName];
     if (!settings) return {};
     const initial = {};
@@ -60,28 +67,24 @@ const getInitialGameSettings = (gameName) => {
 // --- End Game Details ---
 
 
-// --- Custom Modal Component ---
+// --- Custom Modal Component (Unchanged) ---
 const CustomModal = ({ isOpen, onClose, title, children, promptLabel, onPromptSubmit, showCancel = true, confirmText = 'OK', onConfirm, customBody, large = false }) => {
     const [inputValue, setInputValue] = useState('');
     useEffect(() => { if (isOpen) setInputValue(''); }, [isOpen, promptLabel]);
     if (!isOpen) return null;
     const isPrompt = !!promptLabel;
-    
-    // This function now handles the confirm action *and* closing the modal
+
     const handleConfirm = () => {
         if (isPrompt && onPromptSubmit) {
             onPromptSubmit(inputValue);
         } else if (onConfirm) {
             onConfirm();
         }
-        
-        // Only close if onConfirm is NOT defined (e.g. simple error alert)
-        // If onConfirm IS defined, it is responsible for closing the modal
         if (!onConfirm) {
             onClose();
         }
     };
-    
+
     const Icon = isPrompt ? HelpCircle : (title && title.toLowerCase().includes('error')) ? AlertCircle : Info;
     const iconColor = (title && title.toLowerCase().includes('error')) ? 'text-red-400' : 'text-primary-400';
 
@@ -112,7 +115,8 @@ export default function CreateTournamentPage() {
     const navigate = useNavigate();
     const { user } = useAuth(); 
     const defaultGame = availableGames[0];
-    
+
+    // --- UPDATED: Added MLBB Pro Series Configs ---
     const [formData, setFormData] = useState({
         name: '',
         game: defaultGame,
@@ -134,7 +138,7 @@ export default function CreateTournamentPage() {
         contactEmail: '',
         isPublic: true,
         allowTeams: true,
-        
+
         // Simplified Stage Configs
         ff_qualifier_matches_per_group: '3',
         ff_playoff_matches_per_group: '6',
@@ -142,13 +146,20 @@ export default function CreateTournamentPage() {
         fl84_matches_per_week: '5',
         mlbb_league_rounds: '5',
         mlbb_playoff_teams: '8',
+
+        // --- NEW: MLBB Pro Series Configs (for the 48-team path) ---
+        mlbb_pro_qualifier_teams: '48', // Stage 1 (48 teams)
+        mlbb_pro_knockout_teams: '32',  // Stage 2 (32 teams)
+        mlbb_pro_group_teams: '16',     // Stage 3 (16 teams from S2)
+        mlbb_pro_groups_in_stage_3: '4',// This is for Stage 3 winners
+        mlbb_pro_playoff_teams: '8',    // Stage 4
+        mlbb_pro_final_teams: '4',      // Stage 5
     });
 
     const [currentStep, setCurrentStep] = useState(1);
     const [isLoading, setIsLoading] = useState(false); 
     const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
-    
-    // --- NEW: Replaced error state with a general alert modal state ---
+
     const [alertModal, setAlertModal] = useState({
         isOpen: false,
         title: '',
@@ -157,7 +168,7 @@ export default function CreateTournamentPage() {
         confirmText: 'OK',
         showCancel: false
     });
-    
+
     const totalSteps = 3;
 
     const handleChange = (e) => {
@@ -182,13 +193,15 @@ export default function CreateTournamentPage() {
                 };
             }
 
+            // --- UPDATED: Handle game change logic ---
             if (name === 'game') {
                 newData.rules = defaultGameRules[value] || '';
                 newData.gameSpecificSettings = getInitialGameSettings(value);
-                
+
                 if (value === 'Free Fire') newData.maxParticipants = '60';
                 if (value === 'Farlight 84') newData.maxParticipants = '20';
                 if (value === 'Mobile Legends') newData.maxParticipants = '32';
+                if (value === 'Mobile Legends (Pro League)') newData.maxParticipants = '64'; // --- NEW ---
             }
 
             return newData;
@@ -204,7 +217,7 @@ export default function CreateTournamentPage() {
             setIsConfirmModalOpen(false); // Close the confirmation modal
             return;
         }
-        
+
         const format = getTournamentFormat(formData.game);
         let stages = [];
 
@@ -222,14 +235,34 @@ export default function CreateTournamentPage() {
                 { id: 3, name: 'Week 3', status: 'Pending', totalTeams: 20, matchesPerWeek: matchesPerWeek, advanceRule: 'Points accumulate' },
                 { id: 4, name: 'Week 4 - Finals', status: 'Pending', totalTeams: 20, matchesPerWeek: matchesPerWeek, advanceRule: 'Final standings determine rewards' },
             ];
-        } else if (format === 'round-robin-to-bracket') { // Mobile Legends
+        } else if (format === 'round-robin-to-bracket') { // Mobile Legends (Old)
             const advancing = parseInt(formData.mlbb_playoff_teams);
             const maxParticipants = parseInt(formData.maxParticipants);
             stages = [
                 { id: 1, name: 'Group Stage (Round Robin)', totalTeams: maxParticipants, rounds: parseInt(formData.mlbb_league_rounds), type: 'League', advancementRule: `Top ${advancing} advance to Playoffs` },
                 { id: 2, name: 'Playoff Bracket', totalTeams: advancing, type: 'Single Elimination', advancementRule: `Top ${advancing} seeded into BO3 bracket.` }
             ];
+        // --- NEW: MLBB Pro Series Logic ---
+        } else if (format === 'mlbb-pro-series') { 
+            const s1_teams = parseInt(formData.mlbb_pro_qualifier_teams); // e.g., 48
+            const s2_teams = parseInt(formData.mlbb_pro_knockout_teams);  // e.g., 32
+            const s3_teams = parseInt(formData.mlbb_pro_group_teams);     // e.g., 16 (from qualifiers) + 16 (seeded) = 32
+            const s3_groups = parseInt(formData.mlbb_pro_groups_in_stage_3);
+            const s4_teams = parseInt(formData.mlbb_pro_playoff_teams);    // e.g., 8
+            const s5_teams = parseInt(formData.mlbb_pro_final_teams);      // e.g., 4
+
+            // This calculates the TOTAL teams for Stage 3 (16 from qualifiers + 16 seeded)
+            const s3_total_teams = s3_teams + 16; 
+
+            stages = [
+                { id: 1, name: 'Open Qualifiers', status: 'Setup', totalTeams: s1_teams, format: 'Bracket', advanceRule: `Top ${s2_teams} advance` },
+                { id: 2, name: 'Knockout Stage', status: 'Pending', totalTeams: s2_teams, format: 'Bracket', advanceRule: `Top ${s3_teams} advance` },
+                { id: 3, name: 'Group Stage', status: 'Pending', totalTeams: s3_total_teams, groups: s3_groups, groupSize: s3_total_teams / s3_groups, format: 'Groups', advanceRule: `Top ${s4_teams} advance` },
+                { id: 4, name: 'Playoffs', status: 'Pending', totalTeams: s4_teams, format: 'Bracket', advanceRule: `Top ${s5_teams} advance` },
+                { id: 5, name: 'Grand Finals', status: 'Pending', totalTeams: s5_teams, format: 'Bracket', advanceRule: 'Crown Champion' }
+            ];
         }
+        // --- END NEW ---
 
         const newTournamentData = {
             organizer_id: user.id,
@@ -248,7 +281,7 @@ export default function CreateTournamentPage() {
             prize_currency: formData.prizeType === 'In-Game Currency' ? formData.prizeCurrencyName : null,
             entry_fee: parseInt(formData.entryFee || 0),
             format: format,
-            stages: stages,
+            stages: stages, // <-- This saves our new 5-stage array
             stream_url: formData.streamingPlatform,
             rules: formData.rules,
             extra_rules: formData.extraRules,
@@ -269,7 +302,6 @@ export default function CreateTournamentPage() {
 
         if (insertError) {
             console.error('Supabase Insert Error:', insertError.message);
-            // --- UPDATED: Use alert modal for error ---
             setAlertModal({ 
                 isOpen: true, 
                 title: 'Error Creating Tournament', 
@@ -277,7 +309,6 @@ export default function CreateTournamentPage() {
             });
         } else if (data) {
             console.log('Tournament created:', data);
-            // --- UPDATED: Use alert modal for success ---
             setAlertModal({
                 isOpen: true,
                 title: 'Success!',
@@ -291,23 +322,18 @@ export default function CreateTournamentPage() {
             });
         }
     };
-    
-    // Opens the confirmation modal
+
     const handleConfirmAndSubmit = () => {
         setIsConfirmModalOpen(true);
     };
 
-    // --- *** THIS IS THE FIX for the blank page *** ---
-    // The syntax `()_ =>` was corrected to `() =>`
     const handleFinalSubmit = () => {
-        // processSave will handle loading, errors, and closing the modal
         processSave();
     };
 
     const nextStep = () => { 
         if (currentStep === 1) {
             if (!formData.name || !formData.contactEmail || !formData.description) {
-                // --- UPDATED: Use alert modal instead of browser alert ---
                 setAlertModal({ 
                     isOpen: true, 
                     title: 'Missing Information', 
@@ -320,13 +346,13 @@ export default function CreateTournamentPage() {
     };
     const prevStep = () => { if (currentStep > 1) setCurrentStep(currentStep - 1); };
 
-    // --- Styling helpers ---
+    // --- Styling helpers (Unchanged) ---
     const stepIconClass = (step) => `w-10 h-10 rounded-full flex items-center justify-center text-lg font-bold border-2 transition-all duration-300 ${ step <= currentStep ? 'bg-primary-600 text-white border-primary-600' : 'bg-dark-700 text-gray-400 border-dark-600' }`;
     const stepLineClass = (step) => `flex-1 h-1 mx-2 transition-colors duration-300 ${ step < currentStep ? 'bg-primary-600' : 'bg-dark-700' }`;
     const stepLabelClass = (step) => `transition-colors duration-300 ${ step <= currentStep ? 'text-primary-400 font-semibold' : 'text-gray-400' }`;
 
 
-    // --- Helper Component to Render Game Specific Fields ---
+    // --- Helper Component to Render Game Specific Fields (Unchanged) ---
     const GameSpecificFields = ({ gameName, settings, onChange }) => {
         const options = gameSpecificSettingOptions[gameName];
         if (!options) return null;
@@ -377,8 +403,8 @@ export default function CreateTournamentPage() {
             </div>
         );
     };
-    
-    // --- Helper Component to Render Stage Config Fields ---
+
+    // --- UPDATED: Helper Component to Render Stage Config Fields ---
     const StageConfigFields = ({ gameName, formData, onChange }) => {
         if (gameName === 'Free Fire') {
             return (
@@ -443,6 +469,71 @@ export default function CreateTournamentPage() {
                 </div>
             );
         }
+        // --- NEW: MLBB Pro Series Config UI ---
+        if (gameName === 'Mobile Legends (Pro League)') {
+             return (
+                <div className="bg-dark-900/50 p-4 rounded-lg border border-primary-600/50 space-y-4">
+                    <div className="flex items-center mb-3">
+                        <ListChecks size={18} className="mr-2 text-primary-400" />
+                        <h4 className="text-md font-semibold text-primary-300">MLBB Pro League (5-Stage) Setup</h4>
+                    </div>
+                    <p className="text-xs text-gray-400 -mt-2">
+                        Configure the advancement path for the **newly registering teams** (e.g., 48).
+                        The 16 seeded teams will be added to Stage 3 automatically.
+                    </p>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-300 mb-2">S1: Qualifier Teams</label>
+                            <select name="mlbb_pro_qualifier_teams" value={formData.mlbb_pro_qualifier_teams} onChange={onChange} className="input-field appearance-none" required>
+                                <option value="32">32</option>
+                                <option value="48">48 (Recommended)</option>
+                                <option value="64">64</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-300 mb-2">S2: Knockout Teams</label>
+                            <select name="mlbb_pro_knockout_teams" value={formData.mlbb_pro_knockout_teams} onChange={onChange} className="input-field appearance-none" required>
+                                <option value="16">16</option>
+                                <option value="32">32 (Recommended)</option>
+                                <option value="64">64</option>
+                            </select>
+                        </div>
+                         <div>
+                            <label className="block text-sm font-medium text-gray-300 mb-2">S3: Group Teams (from S2)</label>
+                            <select name="mlbb_pro_group_teams" value={formData.mlbb_pro_group_teams} onChange={onChange} className="input-field appearance-none" required>
+                                <option value="8">8</option>
+                                <option value="16">16 (Recommended)</option>
+                                <option value="24">24</option>
+                            </select>
+                        </div>
+                         <div>
+                            <label className="block text-sm font-medium text-gray-300 mb-2">S3: Number of Groups</label>
+                            <select name="mlbb_pro_groups_in_stage_3" value={formData.mlbb_pro_groups_in_stage_3} onChange={onChange} className="input-field appearance-none" required>
+                                <option value="2">2</option>
+                                <option value="4">4 (for 32 total)</option>
+                                <option value="8">8 (for 32 total)</option>
+                            </select>
+                        </div>
+                         <div>
+                            <label className="block text-sm font-medium text-gray-300 mb-2">S4: Playoff Teams</label>
+                            <select name="mlbb_pro_playoff_teams" value={formData.mlbb_pro_playoff_teams} onChange={onChange} className="input-field appearance-none" required>
+                                <option value="4">4</option>
+                                <option value="8">8 (Recommended)</option>
+                                <option value="16">16</option>
+                            </select>
+                        </div>
+                         <div>
+                            <label className="block text-sm font-medium text-gray-300 mb-2">S5: Final Teams</label>
+                            <select name="mlbb_pro_final_teams" value={formData.mlbb_pro_final_teams} onChange={onChange} className="input-field appearance-none" required>
+                                <option value="2">2 (Final)</option>
+                                <option value="4">4 (Finals)</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+        // --- END NEW ---
         return null;
     };
 
@@ -457,7 +548,7 @@ export default function CreateTournamentPage() {
                         <div className="flex gap-3"><Link to="/tournaments" className="btn-secondary flex items-center text-sm"><X className="mr-1.5" size={16} /> Cancel</Link></div>
                     </div>
 
-                    {/* Progress Bar */}
+                    {/* Progress Bar (Unchanged) */}
                     <AnimatedSection tag="div" className="mb-10" delay={100}>
                         <div className="flex items-center"><div className={stepIconClass(1)}>1</div><div className={stepLineClass(1)}></div><div className={stepIconClass(2)}>2</div><div className={stepLineClass(2)}></div><div className={stepIconClass(3)}>3</div></div>
                         <div className="flex justify-between mt-2 text-xs sm:text-sm px-1"><span className={stepLabelClass(1)}>Basic Info</span><span className={stepLabelClass(2)}>Settings</span><span className={stepLabelClass(3)}>Review</span></div>
@@ -465,7 +556,7 @@ export default function CreateTournamentPage() {
 
                     {/* Form Content */}
                     <div className="space-y-8">
-                        {/* Step 1: Basic Information */}
+                        {/* Step 1: Basic Information (Unchanged) */}
                         {currentStep === 1 && (
                             <AnimatedSection className="space-y-6">
                                 <h2 className="text-2xl font-semibold mb-4 text-gray-100 flex items-center"><Info size={20} className="mr-3 text-primary-400"/>Basic Information</h2>
@@ -489,7 +580,7 @@ export default function CreateTournamentPage() {
                             </AnimatedSection>
                         )}
 
-                        {/* Step 2: Tournament Settings */}
+                        {/* Step 2: Tournament Settings (UPDATED) */}
                         {currentStep === 2 && (
                             <AnimatedSection className="space-y-6">
                                 <h2 className="text-2xl font-semibold mb-4 text-gray-100 flex items-center"><Settings size={20} className="mr-3 text-primary-400"/>Tournament Settings</h2>
@@ -520,24 +611,25 @@ export default function CreateTournamentPage() {
                                             </div>
                                         )}
                                     </div>
-                                    
+
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                         <div>
                                             <label className="block text-sm font-medium text-gray-300 mb-2">Max Participants *</label>
+                                            {/* --- UPDATED: Added 64 for MLBB Pro League --- */}
                                             <select name="maxParticipants" value={formData.maxParticipants} onChange={handleChange} className="input-field appearance-none" required>
                                                 <option value="16">16</option>
                                                 <option value="20">20 (Farlight 84 League)</option>
                                                 <option value="32">32 (MLBB Default)</option>
                                                 <option value="48">48</option>
                                                 <option value="60">60 (Free Fire Qualifiers)</option>
-                                                <option value="64">64</option>
+                                                <option value="64">64 (MLBB Pro League)</option>
                                                 <option value="128">128</option>
                                             </select>
                                         </div>
                                         <div><label className="block text-sm font-medium text-gray-300 mb-2">Entry Fee ($)</label><input type="number" name="entryFee" value={formData.entryFee} onChange={handleChange} className="input-field" min="0" placeholder="0"/></div>
                                     </div>
 
-                                    
+                                    {/* --- UPDATED: This component now handles the new MLBB Pro format --- */}
                                     <StageConfigFields
                                         gameName={formData.game}
                                         formData={formData}
@@ -548,7 +640,7 @@ export default function CreateTournamentPage() {
                                     <div className="space-y-4 pt-4 border-t border-dark-600">
                                         <label className="flex items-center"><input id="isPublic" name="isPublic" type="checkbox" checked={formData.isPublic} onChange={handleChange} className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-500 rounded mr-2 bg-dark-600"/><span className="text-sm text-gray-300">Make tournament public</span></label>
                                     </div>
-                                    
+
                                     <GameSpecificFields
                                         gameName={formData.game}
                                         settings={formData.gameSpecificSettings}
@@ -560,14 +652,14 @@ export default function CreateTournamentPage() {
                             </AnimatedSection>
                         )}
 
-                        {/* Step 3: Review */}
+                        {/* Step 3: Review (UPDATED) */}
                         {currentStep === 3 && (
                             <AnimatedSection className="space-y-6">
                                 <h2 className="text-2xl font-semibold mb-4 text-gray-100 flex items-center"><Eye size={20} className="mr-3 text-primary-400"/>Review Details</h2>
                                 <div className="bg-dark-700/50 rounded-lg p-6 border border-dark-600 space-y-6">
-                                    {/* Basic Info */}
+                                    {/* Basic Info (Unchanged) */}
                                     <div className="pb-4 border-b border-dark-600"><h3 className="font-semibold text-primary-400 mb-3 text-lg">Basic Information</h3><div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-sm"><p><span className="text-gray-400 font-medium">Name:</span> {formData.name}</p><p><span className="text-gray-400 font-medium">Game:</span> {formData.game}</p><p><span className="text-gray-400 font-medium">Platform:</span> {formData.platform}</p><p><span className="text-gray-400 font-medium">Region:</span> {formData.region}</p><p className="col-span-1 sm:col-span-2"><span className="text-gray-400 font-medium">Contact:</span> {formData.contactEmail}</p></div></div>
-                                    {/* Settings */}
+                                    {/* Settings (Unchanged) */}
                                     <div className="pb-4 border-b border-dark-600">
                                         <h3 className="font-semibold text-primary-400 mb-3 text-lg">Settings</h3>
                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
@@ -583,7 +675,8 @@ export default function CreateTournamentPage() {
                                             <p><span className="text-gray-400 font-medium">Public:</span> {formData.isPublic ? 'Yes' : 'No'}</p>
                                         </div>
                                     </div>
-                                    
+
+                                    {/* --- UPDATED: Stage Configuration Review --- */}
                                     <div className="pb-4 border-b border-dark-600">
                                         <h3 className="font-semibold text-primary-400 mb-3 text-lg">Stage Configuration</h3>
                                         {formData.game === 'Free Fire' && (
@@ -604,8 +697,20 @@ export default function CreateTournamentPage() {
                                                 <p><span className="text-gray-400 font-medium">Playoff Teams:</span> {formData.mlbb_playoff_teams}</p>
                                             </div>
                                         )}
+                                        {/* --- NEW: MLBB Pro Series Review --- */}
+                                        {formData.game === 'Mobile Legends (Pro League)' && (
+                                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-2 text-sm">
+                                                <p><span className="text-gray-400 font-medium">S1 Teams:</span> {formData.mlbb_pro_qualifier_teams}</p>
+                                                <p><span className="text-gray-400 font-medium">S2 Teams:</span> {formData.mlbb_pro_knockout_teams}</p>
+                                                <p><span className="text-gray-400 font-medium">S3 Teams (from S2):</span> {formData.mlbb_pro_group_teams}</p>
+                                                <p><span className="text-gray-400 font-medium">S3 Groups:</span> {formData.mlbb_pro_groups_in_stage_3}</p>
+                                                <p><span className="text-gray-400 font-medium">S4 Teams:</span> {formData.mlbb_pro_playoff_teams}</p>
+                                                <p><span className="text-gray-400 font-medium">S5 Teams:</span> {formData.mlbb_pro_final_teams}</p>
+                                            </div>
+                                        )}
                                     </div>
 
+                                    {/* Game Settings (Unchanged) */}
                                     <div className="pb-4 border-b border-dark-600">
                                         <h3 className="font-semibold text-primary-400 mb-3 text-lg">{formData.game} Settings</h3>
                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
@@ -614,6 +719,7 @@ export default function CreateTournamentPage() {
                                             ))}
                                         </div>
                                     </div>
+                                    {/* Schedule & Desc (Unchanged) */}
                                     <div className="pb-4 border-b border-dark-600"><h3 className="font-semibold text-primary-400 mb-3 text-lg">Schedule</h3><div className="grid grid-cols-1 sm:grid-cols-3 gap-x-6 gap-y-2 text-sm"><p><span className="text-gray-400 font-medium">Start:</span> {formData.startDate || 'N/A'}</p><p><span className="text-gray-400 font-medium">End:</span> {formData.endDate || 'N/A'}</p><p><span className="text-gray-400 font-medium">Reg. Deadline:</span> {formData.registrationDeadline || 'N/A'}</p></div></div>
                                     <div>
                                         <h3 className="font-semibold text-primary-400 mb-2 text-lg">Description</h3><p className="text-sm text-gray-300 mb-4">{formData.description || 'N/A'}</p>
@@ -625,7 +731,7 @@ export default function CreateTournamentPage() {
                             </AnimatedSection>
                         )}
 
-                        {/* Navigation Buttons */}
+                        {/* Navigation Buttons (Unchanged) */}
                         <AnimatedSection delay={100} className="flex justify-between items-center pt-8 border-t border-dark-700">
                             <button type="button" onClick={prevStep} disabled={isLoading} className={`btn-secondary text-sm ${currentStep === 1 ? 'invisible' : ''} disabled:opacity-50`}>Previous</button>
                             {currentStep < totalSteps ? (
@@ -649,10 +755,10 @@ export default function CreateTournamentPage() {
                     </div> {/* End Form Content */}
                 </AnimatedSection>
 
-                {/* --- Confirmation Modal --- */}
+                {/* Modals (Unchanged) */}
                 <CustomModal
                     isOpen={isConfirmModalOpen}
-                    onClose={() => !isLoading && setIsConfirmModalOpen(false)} // Prevent closing while loading
+                    onClose={() => !isLoading && setIsConfirmModalOpen(false)} 
                     title="Confirm Tournament Creation"
                     onConfirm={handleFinalSubmit}
                     confirmText={isLoading ? "Creating..." : "Create Tournament"}
@@ -661,7 +767,6 @@ export default function CreateTournamentPage() {
                     will be locked after creation. Are you sure you want to proceed?
                 </CustomModal>
 
-                {/* --- NEW: General Alert Modal (for errors, success, etc.) --- */}
                 <CustomModal
                     isOpen={alertModal.isOpen}
                     onClose={() => setAlertModal({ isOpen: false })}

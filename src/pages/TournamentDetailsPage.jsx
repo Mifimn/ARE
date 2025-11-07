@@ -55,7 +55,11 @@ export default function TournamentDetailsPage() {
     // --- Data States ---
     const [tournament, setTournament] = useState(null);
     const [allTournamentParticipants, setAllTournamentParticipants] = useState([]); // <-- List of all teams in tourney
-    const [participantCount, setParticipantCount] = useState(0);
+    const [participantCount, setParticipantCount] = useState(0); // Total count
+    const [newTeamCount, setNewTeamCount] = useState(0); // Count for new teams
+    const [seededTeamCount, setSeededTeamCount] = useState(0); // Count for seeded teams
+    const [qualifierSlotLimit, setQualifierSlotLimit] = useState(0); // e.g., 48
+
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
@@ -86,11 +90,11 @@ export default function TournamentDetailsPage() {
             let participants = [];
 
             try {
-                // 1. Fetch tournament details
+                // 1. Fetch tournament details (including format and stages)
                 const { data: tourneyData, error: tournamentError } = await supabase
                     .from('tournaments')
-                    .select('*')
-                    .eq('id', tournamentId) // Use string tournamentId
+                    .select('*') // '*' includes format and stages
+                    .eq('id', tournamentId) 
                     .single();
 
                 if (tournamentError) throw tournamentError;
@@ -101,14 +105,26 @@ export default function TournamentDetailsPage() {
                 // 2. Fetch ALL participants for this tournament
                 const { data: participantData, error: countError } = await supabase
                     .from('tournament_participants')
-                    .select('id, team_id, captain_id')
-                    .eq('tournament_id', tournamentId); // <-- Use string tournamentId
+                    .select('id, team_id, captain_id, is_seeded') // <-- ADDED is_seeded
+                    .eq('tournament_id', tournamentId);
 
                 if (countError) throw countError;
                 participants = participantData || [];
                 if (isMounted) {
                     setAllTournamentParticipants(participants);
                     setParticipantCount(participants.length);
+
+                    // Calculate counts based on format
+                    const seededParticipants = participants.filter(p => p.is_seeded);
+                    const newParticipants = participants.filter(p => !p.is_seeded);
+                    setSeededTeamCount(seededParticipants.length);
+                    setNewTeamCount(newParticipants.length);
+
+                    if (tournamentData.format === 'mlbb-pro-series') {
+                        setQualifierSlotLimit(tournamentData.stages[0]?.totalTeams || 0); // e.g., 48
+                    } else {
+                        setQualifierSlotLimit(tournamentData.max_participants); // Standard tournament
+                    }
                 }
 
             } catch (err) {
@@ -145,19 +161,36 @@ export default function TournamentDetailsPage() {
                         // 3c. User is not registered, so find eligible *owned* teams
                         if (isMounted) setIsRegistered(false);
 
-                        const teamsForGame = ownedTeams.filter(t => t.game === tournamentData.game);
-                        const isFull = participants.length >= tournamentData.max_participants;
+                        // Use new "Full" logic
+                        const isProLeague = tournamentData.format === 'mlbb-pro-series';
+                        const newTeamSlots = isProLeague ? (tournamentData.stages[0]?.totalTeams || 0) : tournamentData.max_participants;
+                        const newTeamsCount = participants.filter(p => !p.is_seeded).length;
+
+                        const isFull = newTeamsCount >= newTeamSlots;
                         const isClosed = new Date() > new Date(tournamentData.registration_deadline);
+
+                        // --- *** THIS IS THE FIX *** ---
+                        // Check if the tournament is an ML tournament
+                        const isMLTournament = tournamentData.game.startsWith('Mobile Legends');
+                        // Define the games that are eligible to join
+                        const eligibleGameNames = isMLTournament 
+                            ? ["Mobile Legends", "Mobile Legends (Pro League)"] 
+                            : [tournamentData.game];
+
+                        // Filter user's owned teams by the eligible game names
+                        const teamsForGame = ownedTeams.filter(t => eligibleGameNames.includes(t.game));
+                        // --- *** END OF FIX *** ---
 
                         if (isFull) {
                             setJoinState('DISABLED');
-                            setJoinMessage('Tournament Full');
+                            setJoinMessage('Registration Full');
                         } else if (isClosed) {
                             setJoinState('DISABLED');
                             setJoinMessage('Registration Closed');
                         } else if (teamsForGame.length === 0) {
                             setJoinState('DISABLED');
-                            setJoinMessage(`You don't own a ${tournamentData.game} team.`);
+                            // Updated error message to be more general
+                            setJoinMessage(`You don't own an eligible ${tournamentData.game} team.`);
                         } else {
                             // User has eligible teams, set up the dropdown
                             setJoinState('READY');
@@ -197,7 +230,8 @@ export default function TournamentDetailsPage() {
         setJoinMessage('Validating team...');
         setAlertModal({ isOpen: false }); // Close any previous error
 
-        const teamToJoin = eligibleTeams.find(t => t.id === Number(selectedTeamId));
+        // FIX: Find team by string ID, as value from <select> is a string
+        const teamToJoin = eligibleTeams.find(t => t.id.toString() === selectedTeamId);
         if (!teamToJoin) {
             setAlertModal({ isOpen: true, title: "Error", message: "Selected team not found." });
             setIsJoining(false);
@@ -205,7 +239,13 @@ export default function TournamentDetailsPage() {
         }
 
         try {
-            const gameName = tournament.game; // e.g., "Free Fire"
+            // --- *** THIS IS THE SECOND FIX *** ---
+            // Use the same logic as the filter to check IGNs/UIDs
+            const isMLTournament = tournament.game.startsWith('Mobile Legends');
+            const eligibleGameNames = isMLTournament 
+                ? ["Mobile Legends", "Mobile Legends (Pro League)"] 
+                : [tournament.game];
+            // --- *** END FIX *** ---
 
             // --- Get all team member user IDs (including owner) ---
             const { data: teamMembers } = await supabase.from('team_members').select('user_id').eq('team_id', teamToJoin.id);
@@ -217,7 +257,7 @@ export default function TournamentDetailsPage() {
                 throw new Error(`Your team "${teamToJoin.name}" needs 4+ members (currently has ${allTeamUserIds.length}).`);
             }
 
-            // --- *** NEW: Validation 1.5: Check IGN/UID for all members *** ---
+            // --- Validation 1.5: Check IGN/UID for all members ---
             setJoinMessage('Checking player IGNs/UIDs...');
             const { data: memberProfiles, error: profileError } = await supabase
                 .from('profiles')
@@ -228,17 +268,21 @@ export default function TournamentDetailsPage() {
 
             const missingInfoPlayers = [];
             for (const profile of memberProfiles) {
-                const gameInfo = profile.game_details ? profile.game_details[gameName] : null;
-                // Check if gameInfo exists, and if ign/uid are present and not empty
-                if (!gameInfo || !gameInfo.ign || gameInfo.ign.trim() === '' || !gameInfo.uid || gameInfo.uid.trim() === '') {
+                // Check all eligible game names for a valid IGN/UID
+                const hasValidGameInfo = eligibleGameNames.some(gameName => {
+                    const gameInfo = profile.game_details ? profile.game_details[gameName] : null;
+                    return gameInfo && gameInfo.ign && gameInfo.ign.trim() !== '' && gameInfo.uid && gameInfo.uid.trim() !== '';
+                });
+
+                if (!hasValidGameInfo) {
                     missingInfoPlayers.push(profile.username);
                 }
             }
 
             if (missingInfoPlayers.length > 0) {
-                throw new Error(`Join failed: The following players must set their ${gameName} IGN and UID in their profile: ${missingInfoPlayers.join(', ')}`);
+                throw new Error(`Join failed: The following players must set their ${tournament.game} IGN and UID in their profile: ${missingInfoPlayers.join(', ')}`);
             }
-            // --- *** END NEW VALIDATION *** ---
+            // --- END NEW VALIDATION ---
 
 
             // --- Validation 2: Check for Player Conflicts ---
@@ -276,7 +320,8 @@ export default function TournamentDetailsPage() {
                     team_name: teamToJoin.name,        
                     team_logo_url: teamToJoin.logo_url || null,
                     captain_id: user.id,
-                    team_id: teamToJoin.id             
+                    team_id: teamToJoin.id,
+                    is_seeded: false // New teams are never seeded
                 })
                 .select()
                 .single();
@@ -291,6 +336,7 @@ export default function TournamentDetailsPage() {
             setJoinState('JOINED');
             setJoinMessage('Team Already Joined');
             setParticipantCount(prev => prev + 1);
+            setNewTeamCount(prev => prev + 1); // Increment new team count
             setIsRegistered(true);
 
         } catch (err) {
@@ -365,19 +411,24 @@ export default function TournamentDetailsPage() {
         } 
     };
 
-    // Determine status text
+    // --- UPDATED: Status Text Logic ---
     let statusText = tournament.status;
+    const isProLeague = tournament.format === 'mlbb-pro-series';
+    const newTeamSlotsFull = newTeamCount >= qualifierSlotLimit;
+
     if (isRegistered) statusText = 'JOINED';
-    else if (participantCount >= tournament.max_participants) statusText = 'Full';
+    else if (newTeamSlotsFull) statusText = 'Full';
     else if (new Date() > new Date(tournament.registration_deadline)) statusText = 'Registration Closed';
     else if (tournament.status === 'Draft' || tournament.status === 'Setup') statusText = 'Registration Open';
+    // --- END UPDATE ---
 
     // --- Helper function to get game-specific banner ---
     const getGameBanner = (gameName) => {
         if (gameName === 'Free Fire') {
             return '/images/FF_ban.jpg';
         }
-        if (gameName === 'Mobile Legends') {
+        // --- UPDATED: Both ML games use the same banner ---
+        if (gameName.startsWith('Mobile Legends')) {
             return '/images/ml_ban.jpeg';
         }
         if (gameName === 'Farlight 84') {
@@ -417,7 +468,18 @@ export default function TournamentDetailsPage() {
                             <p className="text-xl sm:text-2xl text-primary-400 font-semibold mb-4">{tournament.game}</p>
                             <div className="flex flex-wrap gap-x-6 gap-y-2 text-gray-300 text-sm sm:text-base">
                                 <span className="flex items-center"><Calendar className="mr-1.5 text-primary-500" size={16} /> {new Date(tournament.start_date).toLocaleDateString()} - {new Date(tournament.end_date).toLocaleDateString()}</span>
-                                <span className="flex items-center"><Users className="mr-1.5 text-primary-500" size={16} /> {participantCount}/{tournament.max_participants} Teams</span>
+
+                                {/* --- UPDATED: Participant Count Display --- */}
+                                {isProLeague ? (
+                                    <>
+                                        <span className="flex items-center"><UserPlus className="mr-1.5 text-primary-500" size={16} /> {newTeamCount}/{qualifierSlotLimit} New Teams</span>
+                                        <span className="flex items-center"><UserCheck className="mr-1.5 text-yellow-400" size={16} /> {seededTeamCount} Seeded Teams</span>
+                                    </>
+                                ) : (
+                                    <span className="flex items-center"><Users className="mr-1.5 text-primary-500" size={16} /> {participantCount}/{tournament.max_participants} Teams</span>
+                                )}
+                                {/* --- END UPDATE --- */}
+
                                 <span className="flex items-center"><DollarSign className="mr-1.5 text-yellow-400" size={16} /> {prize} Prize Pool</span>
                                 <span className="flex items-center"><MapPin className="mr-1.5 text-primary-500" size={16} /> {tournament.region}</span>
                             </div>
@@ -440,11 +502,11 @@ export default function TournamentDetailsPage() {
                                 <p><span className="text-gray-400 font-medium block">Platform:</span> <span className="font-semibold text-lg capitalize">{tournament.platform}</span></p>
                                 <p><span className="text-gray-400 font-medium block">Region:</span> <span className="font-semibold text-lg capitalize">{tournament.region}</span></p>
                                 <p><span className="text-gray-400 font-medium block">Entry Fee:</span> <span className="font-semibold text-lg text-yellow-400">{tournament.entry_fee === 0 ? 'Free' : `$${tournament.entry_fee}`}</span></p>
-                                <p><span className="text-gray-400 font-medium block">Max Teams:</span> <span className="font-semibold text-lg">{tournament.max_participants}</span></p>
+                                <p><span className="text-gray-400 font-medium block">Total Teams:</span> <span className="font-semibold text-lg">{tournament.max_participants}</span></p>
                                 <p><span className="text-gray-400 font-medium block">Teams Allowed:</span> <span className="font-semibold text-lg">Yes</span></p>
                             </div>
 
-                            {/* --- UPDATED: Action/Join Button Block --- */}
+                            {/* --- Action/Join Button Block --- */}
                             <div className="border-t border-dark-700 pt-6">
                                 {joinState === 'READY' ? (
                                     <div className="flex flex-col sm:flex-row gap-4">

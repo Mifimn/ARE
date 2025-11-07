@@ -7,10 +7,12 @@ import AnimatedSection from '../components/AnimatedSection';
 import { supabase } from '../lib/supabaseClient'; // --- IMPORT SUPABASE ---
 import { useAuth } from '../contexts/AuthContext.jsx'; // --- IMPORT AUTH ---
 
-// --- Game-specific config ---
-const GAME_NAME = "Mobile Legends";
-const GAME_BANNER_URL = "/images/ml_lan.jpg"; // Use the uploaded ML image
-const GAME_CUP_THUMBNAIL = "/images/ml_ban.jpeg"; // <-- YOUR REQUESTED IMAGE
+// --- UPDATED: Game-specific config ---
+const GAME_NAME_STANDARD = "Mobile Legends";
+const GAME_NAME_PRO = "Mobile Legends (Pro League)";
+const GAME_NAMES = [GAME_NAME_STANDARD, GAME_NAME_PRO]; // --- Array of all ML games
+const GAME_BANNER_URL = "/images/ml_lan.jpg"; 
+const GAME_CUP_THUMBNAIL = "/images/ml_ban.jpeg";
 // ---
 
 // --- Enhanced Cup List Item (Uses Supabase data) ---
@@ -28,13 +30,11 @@ const CupListItem = ({ cup, isPast = false }) => {
             to={`/tournament/${cup.id}`} // This is the correct link
             className="block relative group overflow-hidden rounded-xl shadow-lg border border-dark-700 hover:border-primary-500/50 transition-all duration-300"
         >
-            {/* --- *** UPDATED THIS IMAGE SRC *** --- */}
             <img
                 src={GAME_CUP_THUMBNAIL} // Use the constant Mobile Legends banner
                 alt="Mobile Legends Cup Background"
                 className={`absolute inset-0 w-full h-full object-cover transition-all duration-500 group-hover:scale-110 ${isPast ? 'opacity-20 group-hover:opacity-30' : 'opacity-30 group-hover:opacity-40'}`}
             />
-            {/* --- *** END UPDATE *** --- */}
 
             <div className="relative z-10 p-5 bg-gradient-to-r from-dark-800/90 via-dark-800/80 to-transparent flex items-center justify-between">
                 <div className="flex-grow pr-4">
@@ -99,7 +99,7 @@ const LeaderboardContent = ({ leaderboard, loading, error }) => (
             <BarChart size={28} className="mr-3" /> Team Leaderboard
         </h2>
         <p className="text-gray-300 text-lg">
-            Top {GAME_NAME} teams competing on Africa Rise Esports, ranked by win rate.
+            Top Mobile Legends teams competing on Africa Rise Esports, ranked by win rate.
         </p>
 
         <div className="bg-dark-800 p-4 sm:p-6 rounded-xl shadow-inner border border-dark-700">
@@ -149,7 +149,7 @@ const LeaderboardContent = ({ leaderboard, loading, error }) => (
                     })
                 )}
                 {!loading && !error && leaderboard.length === 0 && (
-                     <p className="text-center text-sm text-gray-500 py-10">No ranked teams found for {GAME_NAME}.</p>
+                     <p className="text-center text-sm text-gray-500 py-10">No ranked teams found for Mobile Legends.</p>
                 )}
             </div>
         </div>
@@ -159,7 +159,7 @@ const LeaderboardContent = ({ leaderboard, loading, error }) => (
 const TeamsContent = ({ teams, loading, error }) => (
     <AnimatedSection delay={0} className="space-y-8">
         <h2 className="text-3xl font-bold text-primary-400 border-b-2 border-primary-500/30 pb-3 flex items-center"><Users size={28} className="mr-3" /> Team Directory</h2>
-        <p className="text-gray-300 text-lg">Find registered {GAME_NAME} teams or create your own squad.</p>
+        <p className="text-gray-300 text-lg">Find registered Mobile Legends teams or create your own squad.</p>
         <AnimatedSection delay={100} className="bg-gradient-to-r from-green-600/30 to-dark-800/50 p-6 rounded-xl border border-green-500/50 shadow-lg flex items-center justify-between">
             <div><h3 className="text-2xl font-bold text-white mb-2">Ready to Build Your Legacy?</h3><p className="text-green-200">Assemble your squad and register for upcoming competitions.</p></div>
             <Link to="/my-teams" className="btn-primary bg-green-600 hover:bg-green-700 flex items-center flex-shrink-0"><PlusCircle size={18} className="mr-2"/> Create Team</Link>
@@ -195,7 +195,7 @@ const TeamsContent = ({ teams, loading, error }) => (
                 </div>
             )}
             {!loading && !error && teams.length === 0 && (
-                <p className="text-gray-500 text-center py-10">No {GAME_NAME} teams have been created yet.</p>
+                <p className="text-gray-500 text-center py-10">No Mobile Legends teams have been created yet.</p>
             )}
         </AnimatedSection>
     </AnimatedSection>
@@ -249,12 +249,12 @@ const RundownContent = ({
                                     ))}
                                 </div>
                              ) : (
-                                <p className="text-gray-500 text-center py-4">You haven't joined any {GAME_NAME} tournaments yet.</p>
+                                <p className="text-gray-500 text-center py-4">You haven't joined any Mobile Legends tournaments yet.</p>
                              )
                          )}
                     </AnimatedSection>
                 )}
-                
+
                 <AnimatedSection delay={500} className="card bg-dark-800 p-6 rounded-xl shadow-lg border border-dark-700">
                     {/* --- THIS SECTION IS NOW PUBLIC RECENT RESULTS --- */}
                     <h3 className="text-2xl font-bold text-primary-400 mb-6">RECENT RESULTS</h3>
@@ -291,7 +291,7 @@ const RundownContent = ({
 export default function MobileLegendsPage() {
     const { user } = useAuth();
     const [activeTab, setActiveTab] = useState('rundown');
-    
+
     // --- Public Data States ---
     const [upcomingCups, setUpcomingCups] = useState([]);
     const [pastCups, setPastCups] = useState([]);
@@ -306,7 +306,7 @@ export default function MobileLegendsPage() {
     const [publicMatchesError, setPublicMatchesError] = useState(null); 
     const [loadingAllTeams, setLoadingAllTeams] = useState(true);
     const [allTeamsError, setAllTeamsError] = useState(null);
-    
+
     // --- User-Specific Data States ---
     const [myTournaments, setMyTournaments] = useState([]);
     const [loadingMyData, setLoadingMyData] = useState(true);
@@ -320,28 +320,26 @@ export default function MobileLegendsPage() {
             setLoadingLeaderboard(true);
             setLoadingPublicMatches(true);
             setLoadingAllTeams(true);
-            
+
             // --- 1. Fetch Cups ---
             try {
+                // --- UPDATED: Use .in() with GAME_NAMES array ---
                 const { data: cupData, error: cupError } = await supabase
                     .from('tournaments')
                     .select('id, name, format, max_participants, start_date, prize_pool_amount, prize_type, prize_currency, status, image')
-                    .eq('game', GAME_NAME)
+                    .in('game', GAME_NAMES) // <-- FIX
                     .eq('is_public', true)
                     .order('start_date', { ascending: false }); // Get most recent first
 
                 if (cupError) throw new Error(`Cup Error: ${cupError.message}`);
 
-                // --- *** FIX FOR UPCOMING CUPS *** ---
                 const past = cupData.filter(t => t.status === 'Completed');
                 const upcoming = cupData
                     .filter(t => t.status !== 'Completed')
                     .sort((a, b) => new Date(a.start_date) - new Date(b.start_date)); // Sort ascending
-                
+
                 setUpcomingCups(upcoming);
                 setPastCups(past);
-                // --- *** END FIX *** ---
-                
                 setCupsError(null);
             } catch (cupError) {
                 console.error("Error fetching tournaments:", cupError);
@@ -352,11 +350,12 @@ export default function MobileLegendsPage() {
 
             // --- 2. Fetch All Teams (for Teams Tab) ---
             try {
+                // --- UPDATED: Use .in() with GAME_NAMES array ---
                 const { data: teamsData, error: teamsError } = await supabase
                     .from('teams')
                     .select('id, name, game, logo_url')
-                    .eq('game', GAME_NAME);
-                
+                    .in('game', GAME_NAMES); // <-- FIX
+
                 if (teamsError) throw teamsError;
                 setAllTeams(teamsData || []);
                 setAllTeamsError(null);
@@ -370,13 +369,14 @@ export default function MobileLegendsPage() {
             // --- 3. Fetch Leaderboard & Public Matches ---
             try {
                 // 3a. Get all participants
+                // --- UPDATED: Use .in() with GAME_NAMES array ---
                 const { data: participants, error: pError } = await supabase
                     .from('tournament_participants')
                     .select('id, team_id, team_name, team_logo_url, tournaments!inner(game)')
-                    .eq('tournaments.game', GAME_NAME);
-                
+                    .in('tournaments.game', GAME_NAMES); // <-- FIX
+
                 if (pError) throw pError;
-                
+
                 // 3b. Get unique teams *that have participated*
                 const uniqueParticipantTeams = Array.from(new Map(participants.map(p => [p.team_id, p])).values());
 
@@ -392,7 +392,7 @@ export default function MobileLegendsPage() {
                     if (rError) throw rError;
                     allResults = results || [];
                 }
-                
+
                 // 3d. Set Public Recent Matches (for Rundown tab)
                 const formattedRecentMatches = allResults.slice(0, 5).map(r => ({
                     ...r,
@@ -435,7 +435,7 @@ export default function MobileLegendsPage() {
                     }))
                     .filter(item => item.totalMatches > 0) // Only rank teams with matches
                     .sort((a, b) => b.winRate - a.winRate || b.totalWins - a.totalWins); // Sort by win rate, then wins
-                
+
                 setLeaderboard(calculatedLeaderboard);
                 setLeaderboardError(null);
 
@@ -455,7 +455,7 @@ export default function MobileLegendsPage() {
                 setLoadingMyData(false);
                 return;
             }
-            
+
             setLoadingMyData(true);
             setMyDataError(null);
             try {
@@ -473,12 +473,13 @@ export default function MobileLegendsPage() {
                 }
 
                 // 2. Get participant records for user's teams
+                // --- UPDATED: Use .in() with GAME_NAMES array ---
                 const { data: participantRecords, error: pError } = await supabase
                     .from('tournament_participants')
                     .select('id, tournaments!inner(id, name, game, start_date, status)')
-                    .eq('tournaments.game', GAME_NAME)
+                    .in('tournaments.game', GAME_NAMES) // <-- FIX
                     .in('team_id', uniqueTeamIds);
-                
+
                 if (pError) throw pError;
                 if (!participantRecords || participantRecords.length === 0) {
                     setLoadingMyData(false);
@@ -554,7 +555,7 @@ export default function MobileLegendsPage() {
                     <div className="absolute inset-0 bg-gradient-to-t from-dark-900 via-dark-900/70 to-transparent"></div>
                     <div className="relative z-10 h-full flex flex-col justify-end max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-8 sm:pb-12">
                          <div className="flex items-center mb-4"><Gamepad2 className="w-10 h-10 sm:w-12 sm:h-12 mr-4 text-primary-400 bg-dark-800/50 p-2 rounded-lg border border-primary-500/30" /><h1 className="text-4xl md:text-6xl font-extrabold text-white drop-shadow-md">MOBILE LEGENDS HUB</h1></div>
-                         <p className="text-lg sm:text-xl text-gray-300 max-w-3xl">Your central command for all {GAME_NAME} tournaments, leaderboards, and team activities on Africa Rise Esports.</p>
+                         <p className="text-lg sm:text-xl text-gray-300 max-w-3xl">Your central command for all Mobile Legends tournaments, leaderboards, and team activities on Africa Rise Esports.</p>
                     </div>
                 </AnimatedSection>
                 <AnimatedSection delay={50} className="sticky top-16 bg-dark-900 z-30 shadow-md border-b border-dark-700">

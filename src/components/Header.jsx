@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react'; // Added React import
 import { Link, useLocation } from 'react-router-dom';
-import { Menu, X, LogOut, User, Settings, Trophy, Users as UsersIcon } from 'lucide-react'; // --- ADDED UsersIcon ---
+import { Menu, X, LogOut, User, Settings, Trophy, Users as UsersIcon, Layers } from 'lucide-react'; // --- ADDED Layers ---
 import { useAuth } from '../contexts/AuthContext.jsx'; // Import useAuth
 import { supabase } from '../lib/supabaseClient'; // Import supabase client
 
@@ -69,12 +69,14 @@ export default function Header() {
   const publicNavigation = [
     { name: 'Home', href: '/' },
     { name: 'Games', href: '/tournaments' },
+    { name: 'Leagues', href: '/leagues' }, // --- NEW LINK ---
     { name: 'About Us', href: '/about' },
     { name: 'News', href: '/news' },
   ];
   const authenticatedNavigation = [
     { name: 'Dashboard', href: '/dashboard' },
     { name: 'Games', href: '/tournaments' },
+    { name: 'Leagues', href: '/leagues' }, // --- NEW LINK ---
     { name: 'My Teams', href: '/my-teams' }, // --- "MY TEAMS" LIVES HERE ---
     { name: 'News', href: '/news' },
     { name: 'Create Tournament', href: '/create-tournament' },
@@ -112,6 +114,7 @@ export default function Header() {
                 className={`px-3 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap ${
                   (location.pathname === item.href || 
                    (item.name === 'Games' && location.pathname.startsWith('/tournaments')) || 
+                   (item.name === 'Leagues' && location.pathname.startsWith('/leagues')) || // --- NEW ---
                    (item.name === 'My Teams' && (location.pathname.startsWith('/my-teams') || location.pathname.startsWith('/manage-team'))) || 
                    (item.name === 'Manage Tournaments' && location.pathname.startsWith('/update-tournament'))) 
                     ? 'text-primary-500 bg-dark-700'
@@ -135,7 +138,7 @@ export default function Header() {
                   disabled={profileLoading} // Disable button while profile loads
                 >
                   {profileLoading ? (
-                     <div className="w-8 h-8 rounded-full bg-dark-700 animate-pulse"></div> // Placeholder while loading profile
+                       <div className="w-8 h-8 rounded-full bg-dark-700 animate-pulse"></div> // Placeholder while loading profile
                   ) : (
                     <img
                       src={displayAvatar} // Use fetched or default avatar
@@ -164,9 +167,9 @@ export default function Header() {
                     >
                       <Settings className="mr-2" size={16} /> Settings
                     </Link>
-                    
+
                     {/* --- REMOVED "My Teams" and "Manage Tournaments" from here --- */}
-                    
+
                     {/* Updated Logout Button */}
                     <button
                       onClick={async () => {
@@ -218,43 +221,44 @@ export default function Header() {
         {isMenuOpen && (
            <div className="md:hidden absolute top-16 inset-x-0 bg-dark-800 border-t border-dark-700 shadow-lg z-40">
              <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
-                {navigation.map((item) => (
-                    <Link
-                        key={item.name} to={item.href}
-                        className={`block px-3 py-2 rounded-md text-base font-medium ${ 
-                          (location.pathname === item.href || 
-                           (item.name === 'Games' && location.pathname.startsWith('/tournaments')) ||
-                           (item.name === 'My Teams' && (location.pathname.startsWith('/my-teams') || location.pathname.startsWith('/manage-team'))) || 
-                           (item.name === 'Manage Tournaments' && location.pathname.startsWith('/update-tournament'))) 
-                           ? 'text-primary-500 bg-dark-700' 
-                           : 'text-gray-300 hover:text-white hover:bg-dark-700' 
-                        }`}
-                        onClick={() => setIsMenuOpen(false)}
-                    > {item.name} </Link>
-                ))}
-                <div className="border-t border-dark-600 pt-4 pb-3">
-                    {authLoading ? (
-                        <div className="px-3 py-2 text-gray-400">Loading user...</div>
-                    ) : isAuthenticated ? (
-                        <>
-                            <div className="flex items-center px-3 py-2 mb-2">
-                                <img src={displayAvatar} alt="Profile" className="w-8 h-8 rounded-full mr-3 object-cover"/>
-                                <span className="text-white font-medium">{displayUsername}</span>
-                            </div>
-                            <Link to="/profile" className="block px-3 py-2 rounded-md text-base font-medium text-gray-300 hover:text-white hover:bg-dark-700" onClick={() => setIsMenuOpen(false)}>Profile</Link>
-                            <Link to="/edit-profile" className="block px-3 py-2 rounded-md text-base font-medium text-gray-300 hover:text-white hover:bg-dark-700" onClick={() => setIsMenuOpen(false)}>Settings</Link>
-                            
-                            {/* --- REMOVED "My Teams" and "Manage Tournaments" from here --- */}
-                            
-                            <button onClick={async () => { setIsMenuOpen(false); await supabase.auth.signOut(); }} className="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-gray-300 hover:text-white hover:bg-dark-700">Logout</button>
-                        </>
-                    ) : (
-                        <>
-                            <Link to="/login" className="block px-3 py-2 rounded-md text-base font-medium text-gray-300 hover:text-white hover:bg-dark-700" onClick={() => setIsMenuOpen(false)}>Login</Link>
-                            <Link to="/signup" className="block text-center mt-2 px-3 py-2 rounded-md text-base font-medium btn-primary" onClick={() => setIsMenuOpen(false)}>Sign Up</Link>
-                        </>
-                    )}
-                </div>
+               {navigation.map((item) => (
+                   <Link
+                       key={item.name} to={item.href}
+                       className={`block px-3 py-2 rounded-md text-base font-medium ${ 
+                         (location.pathname === item.href || 
+                          (item.name === 'Games' && location.pathname.startsWith('/tournaments')) ||
+                          (item.name === 'Leagues' && location.pathname.startsWith('/leagues')) || // --- NEW ---
+                          (item.name === 'My Teams' && (location.pathname.startsWith('/my-teams') || location.pathname.startsWith('/manage-team'))) || 
+                          (item.name === 'Manage Tournaments' && location.pathname.startsWith('/update-tournament'))) 
+                          ? 'text-primary-500 bg-dark-700' 
+                          : 'text-gray-300 hover:text-white hover:bg-dark-700' 
+                       }`}
+                       onClick={() => setIsMenuOpen(false)}
+                   > {item.name} </Link>
+               ))}
+               <div className="border-t border-dark-600 pt-4 pb-3">
+                   {authLoading ? (
+                       <div className="px-3 py-2 text-gray-400">Loading user...</div>
+                   ) : isAuthenticated ? (
+                       <>
+                           <div className="flex items-center px-3 py-2 mb-2">
+                               <img src={displayAvatar} alt="Profile" className="w-8 h-8 rounded-full mr-3 object-cover"/>
+                               <span className="text-white font-medium">{displayUsername}</span>
+                           </div>
+                           <Link to="/profile" className="block px-3 py-2 rounded-md text-base font-medium text-gray-300 hover:text-white hover:bg-dark-700" onClick={() => setIsMenuOpen(false)}>Profile</Link>
+                           <Link to="/edit-profile" className="block px-3 py-2 rounded-md text-base font-medium text-gray-300 hover:text-white hover:bg-dark-700" onClick={() => setIsMenuOpen(false)}>Settings</Link>
+
+                           {/* --- REMOVED "My Teams" and "Manage Tournaments" from here --- */}
+
+                           <button onClick={async () => { setIsMenuOpen(false); await supabase.auth.signOut(); }} className="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-gray-300 hover:text-white hover:bg-dark-700">Logout</button>
+                       </>
+                   ) : (
+                       <>
+                           <Link to="/login" className="block px-3 py-2 rounded-md text-base font-medium text-gray-300 hover:text-white hover:bg-dark-700" onClick={() => setIsMenuOpen(false)}>Login</Link>
+                           <Link to="/signup" className="block text-center mt-2 px-3 py-2 rounded-md text-base font-medium btn-primary" onClick={() => setIsMenuOpen(false)}>Sign Up</Link>
+                       </>
+                   )}
+               </div>
              </div>
            </div>
         )}
