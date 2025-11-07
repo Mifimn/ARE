@@ -32,7 +32,18 @@ import PlayersDirectoryPage from './pages/PlayersDirectoryPage';
 import TeamPage from './pages/TeamPage.jsx';
 import AboutPage from './pages/AboutPage.jsx';
 import GuidancePage from './pages/GuidancePage.jsx'; 
-import AdminGuidePage from './pages/AdminGuidePage.jsx'; // --- 1. IMPORT ADMIN GUIDE ---
+import AdminGuidePage from './pages/AdminGuidePage.jsx'; 
+import StorePage from './pages/StorePage.jsx';
+
+// --- NEW SCRIMS PAGE IMPORTS ---
+import CreateScrimPage from './pages/CreateScrimPage.jsx';
+import ManageScrimPage from './pages/ManageScrimPage.jsx';
+import ManageScrimsListPage from './pages/ManageScrimsListPage.jsx';
+import ScrimDetailsPage from './pages/ScrimDetailsPage.jsx';
+import FreeFireScrimsPage from './pages/FreeFireScrimsPage.jsx';
+import MobileLegendsScrimsPage from './pages/MobileLegendsScrimsPage.jsx';
+import Farlight84ScrimsPage from './pages/Farlight84ScrimsPage.jsx';
+// --- END NEW SCRIMS PAGE IMPORTS ---
 
 // --- Component Imports ---
 import Header from './components/Header';
@@ -40,8 +51,8 @@ import Footer from './components/Footer';
 import GamesSidebar from './components/GamesSidebar';
 import PrivateRoute from './components/PrivateRoute';
 import PublicOnlyRoute from './components/PublicOnlyRoute';
-import AdminRoute from './components/AdminRoute'; // --- 2. IMPORT ADMIN ROUTE ---
-import { TeamUpdateProvider } from './contexts/TeamUpdateContext.jsx'; // <<< NEW IMPORT >>>
+import AdminRoute from './components/AdminRoute'; 
+import { TeamUpdateProvider } from './contexts/TeamUpdateContext.jsx'; 
 
 import './App.css';
 
@@ -72,7 +83,7 @@ function LayoutWrapper({ children }) {
 
 
 export default function App() {
-  const { loading } = useAuth(); // Only need loading here now
+  const { loading } = useAuth(); 
 
    if (loading) {
     return (
@@ -135,8 +146,16 @@ export default function App() {
               <Route path="/team/:teamId" element={<TeamPage />} />
               <Route path="/tournament/:tournamentId" element={<TournamentDetailsPage />} />
               <Route path="/cup/:cupId" element={<CupPage />} />
-              {/* <Route path="/league/:leagueId" element={<LeaguePage />} /> */} {/* --- REMOVED OLD ROUTE --- */}
               <Route path="/players" element={<PlayersDirectoryPage />} />
+              <Route path="/store" element={<StorePage />} />
+
+
+              {/* --- NEW PUBLIC SCRIMS ROUTES --- */}
+              <Route path="/scrim/:scrimId" element={<ScrimDetailsPage />} /> 
+              <Route path="/freefire/scrims" element={<FreeFireScrimsPage />} />
+              <Route path="/mobilelegends/scrims" element={<MobileLegendsScrimsPage />} />
+              <Route path="/farlight84/scrims" element={<Farlight84ScrimsPage />} />
+              {/* --- END NEW PUBLIC SCRIMS ROUTES --- */}
 
 
               {/* --- Private Routes (For Any Logged-in User) --- */}
@@ -146,7 +165,19 @@ export default function App() {
               <Route path="/my-teams" element={<PrivateRoute><TeamsManagementPage /></PrivateRoute>} />
               <Route path="/manage-team/:teamId" element={<PrivateRoute><ManageTeamPage /></PrivateRoute>} />
 
-              {/* --- 3. ADMIN-ONLY Routes --- */}
+              {/* --- ADMIN-ONLY Routes --- */}
+              <Route 
+                path="/admin/manage-scrims" 
+                element={<AdminRoute><ManageScrimsListPage /></AdminRoute>} 
+              />
+              <Route 
+                path="/admin/create-scrim" 
+                element={<AdminRoute><CreateScrimPage /></AdminRoute>} 
+              />
+              <Route 
+                path="/admin/manage-scrim/:scrimId" 
+                element={<AdminRoute><ManageScrimPage /></AdminRoute>} 
+              />
               <Route 
                 path="/create-tournament" 
                 element={<AdminRoute><CreateTournamentPage /></AdminRoute>} 

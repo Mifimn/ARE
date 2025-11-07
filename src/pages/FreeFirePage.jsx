@@ -29,7 +29,7 @@ const CupListItem = ({ cup, isPast = false }) => {
                 className={`absolute inset-0 w-full h-full object-cover transition-all duration-500 group-hover:scale-110 ${isPast ? 'opacity-20 group-hover:opacity-30' : 'opacity-30 group-hover:opacity-40'}`}
             />
             {/* --- *** END UPDATE *** --- */}
-            
+
             <div className="relative z-10 p-5 bg-gradient-to-r from-dark-800/90 via-dark-800/80 to-transparent flex items-center justify-between">
                 <div className="flex-grow pr-4">
                     <h4 className={`text-lg font-bold mb-1 transition-colors ${isPast ? 'text-gray-400 group-hover:text-gray-300' : 'text-white group-hover:text-primary-300'}`}>
@@ -248,7 +248,7 @@ const RundownContent = ({
                          )}
                     </AnimatedSection>
                 )}
-                
+
                 <AnimatedSection delay={500} className="card bg-dark-800 p-6 rounded-xl shadow-lg border border-dark-700">
                     {/* --- THIS SECTION IS NOW PUBLIC RECENT RESULTS --- */}
                     <h3 className="text-2xl font-bold text-primary-400 mb-6">RECENT RESULTS</h3>
@@ -285,7 +285,7 @@ const RundownContent = ({
 export default function FreeFirePage() {
     const { user } = useAuth();
     const [activeTab, setActiveTab] = useState('rundown');
-    
+
     // --- Public Data States ---
     const [upcomingCups, setUpcomingCups] = useState([]);
     const [pastCups, setPastCups] = useState([]);
@@ -300,7 +300,7 @@ export default function FreeFirePage() {
     const [publicMatchesError, setPublicMatchesError] = useState(null); 
     const [loadingAllTeams, setLoadingAllTeams] = useState(true);
     const [allTeamsError, setAllTeamsError] = useState(null);
-    
+
     // --- User-Specific Data States ---
     const [myTournaments, setMyTournaments] = useState([]);
     const [loadingMyData, setLoadingMyData] = useState(true);
@@ -314,7 +314,7 @@ export default function FreeFirePage() {
             setLoadingLeaderboard(true);
             setLoadingPublicMatches(true);
             setLoadingAllTeams(true);
-            
+
             // --- 1. Fetch Cups ---
             try {
                 const { data: cupData, error: cupError } = await supabase
@@ -331,11 +331,11 @@ export default function FreeFirePage() {
                 const upcoming = cupData
                     .filter(t => t.status !== 'Completed')
                     .sort((a, b) => new Date(a.start_date) - new Date(b.start_date)); // Sort ascending
-                
+
                 setUpcomingCups(upcoming);
                 setPastCups(past);
                 // --- END FIX ---
-                
+
                 setCupsError(null);
             } catch (cupError) {
                 console.error("Error fetching tournaments:", cupError);
@@ -350,7 +350,7 @@ export default function FreeFirePage() {
                     .from('teams')
                     .select('id, name, game, logo_url')
                     .eq('game', 'Free Fire');
-                
+
                 if (teamsError) throw teamsError;
                 setAllTeams(teamsData || []);
                 setAllTeamsError(null);
@@ -368,9 +368,9 @@ export default function FreeFirePage() {
                     .from('tournament_participants')
                     .select('id, team_id, team_name, team_logo_url, tournaments!inner(game)')
                     .eq('tournaments.game', 'Free Fire');
-                
+
                 if (pError) throw pError;
-                
+
                 // 3b. Get unique teams *that have participated*
                 const uniqueParticipantTeams = Array.from(new Map(participants.map(p => [p.team_id, p])).values());
 
@@ -386,7 +386,7 @@ export default function FreeFirePage() {
                     if (rError) throw rError;
                     allResults = results || [];
                 }
-                
+
                 // 3d. Set Public Recent Matches (for Rundown tab)
                 const formattedRecentMatches = allResults.slice(0, 5).map(r => ({
                     ...r,
@@ -429,7 +429,7 @@ export default function FreeFirePage() {
                     }))
                     .filter(item => item.totalMatches > 0) // Only rank teams with matches
                     .sort((a, b) => b.winRate - a.winRate || b.totalWins - a.totalWins); // Sort by win rate, then wins
-                
+
                 setLeaderboard(calculatedLeaderboard);
                 setLeaderboardError(null);
 
@@ -449,7 +449,7 @@ export default function FreeFirePage() {
                 setLoadingMyData(false);
                 return;
             }
-            
+
             setLoadingMyData(true);
             setMyDataError(null);
             try {
@@ -472,7 +472,7 @@ export default function FreeFirePage() {
                     .select('id, tournaments!inner(id, name, game, start_date, status)')
                     .eq('tournaments.game', 'Free Fire')
                     .in('team_id', uniqueTeamIds);
-                
+
                 if (pError) throw pError;
                 if (!participantRecords || participantRecords.length === 0) {
                     setLoadingMyData(false);
@@ -498,7 +498,13 @@ export default function FreeFirePage() {
         fetchUserData(user?.id);
     }, [user]);
 
-    const navTabs = [ { name: 'RUNDOWN', path: 'rundown', icon: Hash }, { name: 'CUPS', path: 'cups', icon: Trophy }, { name: 'LEADERBOARD', path: 'leaderboard', icon: BarChart }, { name: 'TEAMS', path: 'teams', icon: Users }, ];
+    const navTabs = [ 
+        { name: 'RUNDOWN', path: 'rundown', icon: Hash }, 
+        { name: 'CUPS', path: 'cups', icon: Trophy }, 
+        { name: 'LEADERBOARD', path: 'leaderboard', icon: BarChart }, 
+        { name: 'TEAMS', path: 'teams', icon: Users },
+        { name: 'SCRIMS', path: '/freefire/scrims', icon: ListChecks, isLink: true } // <-- NEW SCRIMS LINK
+    ];
 
     const renderContent = () => {
         switch (activeTab) {
@@ -553,7 +559,21 @@ export default function FreeFirePage() {
                 </AnimatedSection>
                 <AnimatedSection delay={50} className="sticky top-16 bg-dark-900 z-30 shadow-md border-b border-dark-700">
                     <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex space-x-6 sm:space-x-8 text-base sm:text-lg font-semibold text-gray-400 overflow-x-auto">
-                        {navTabs.map((tab) => (<button key={tab.name} onClick={() => setActiveTab(tab.path)} className={`flex items-center py-4 px-1 whitespace-nowB-2 transition-all duration-200 ${activeTab === tab.path ? 'text-primary-400 border-primary-400' : 'border-transparent hover:text-white hover:border-gray-500'}`}><tab.icon size={18} className="mr-2 hidden sm:inline-block"/> {tab.name}</button>))}
+                        {navTabs.map((tab) => (
+                            tab.isLink ? (
+                                <Link 
+                                    key={tab.name} 
+                                    to={tab.path}
+                                    className={`flex items-center py-4 px-1 whitespace-nowrap border-b-2 transition-all duration-200 border-transparent hover:text-white hover:border-gray-500`}
+                                >
+                                    <tab.icon size={18} className="mr-2 hidden sm:inline-block"/> {tab.name}
+                                </Link>
+                            ) : (
+                                <button key={tab.name} onClick={() => setActiveTab(tab.path)} className={`flex items-center py-4 px-1 whitespace-nowrap border-b-2 transition-all duration-200 ${activeTab === tab.path ? 'text-primary-400 border-primary-400' : 'border-transparent hover:text-white hover:border-gray-500'}`}>
+                                    <tab.icon size={18} className="mr-2 hidden sm:inline-block"/> {tab.name}
+                                </button>
+                            )
+                        ))}
                     </nav>
                 </AnimatedSection>
                 <div className="max-w-7xl mx-auto mt-8">
@@ -562,4 +582,4 @@ export default function FreeFirePage() {
             </div>
         </div>
     );
-} 
+}

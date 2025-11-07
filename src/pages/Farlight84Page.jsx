@@ -2,15 +2,15 @@
 
 import { Link } from 'react-router-dom';
 import { Trophy, Users, ArrowRight, PlusCircle, Calendar, Gamepad2, Hash, Clock, BarChart, ListChecks, Loader2, AlertCircle } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react'; // <-- ADDED useCallback
 import AnimatedSection from '../components/AnimatedSection';
-import { supabase } from '../lib/supabaseClient'; // --- IMPORT SUPABASE ---
-import { useAuth } from '../contexts/AuthContext.jsx'; // --- IMPORT AUTH ---
+import { supabase } from '../lib/supabaseClient'; 
+import { useAuth } from '../contexts/AuthContext.jsx'; 
 
 // --- Game-specific config ---
 const GAME_NAME = "Farlight 84";
-const GAME_BANNER_URL = "/images/far_lan.jpg"; // Using a generic action banner
-const GAME_CUP_THUMBNAIL = "/images/far_ban.jpeg"; // <-- YOUR REQUESTED IMAGE
+const GAME_BANNER_URL = "/images/far_lan.jpg"; 
+const GAME_CUP_THUMBNAIL = "/images/far_ban.jpeg"; 
 // ---
 
 // --- Enhanced Cup List Item (Uses Supabase data) ---
@@ -28,13 +28,11 @@ const CupListItem = ({ cup, isPast = false }) => {
             to={`/tournament/${cup.id}`} // This is the correct link
             className="block relative group overflow-hidden rounded-xl shadow-lg border border-dark-700 hover:border-primary-500/50 transition-all duration-300"
         >
-            {/* --- *** UPDATED THIS IMAGE SRC *** --- */}
             <img
                 src={GAME_CUP_THUMBNAIL} // Use the constant Farlight 84 banner
                 alt="Farlight 84 Cup Background"
                 className={`absolute inset-0 w-full h-full object-cover transition-all duration-500 group-hover:scale-110 ${isPast ? 'opacity-20 group-hover:opacity-30' : 'opacity-30 group-hover:opacity-40'}`}
             />
-            {/* --- *** END UPDATE *** --- */}
 
             <div className="relative z-10 p-5 bg-gradient-to-r from-dark-800/90 via-dark-800/80 to-transparent flex items-center justify-between">
                 <div className="flex-grow pr-4">
@@ -254,7 +252,7 @@ const RundownContent = ({
                          )}
                     </AnimatedSection>
                 )}
-                
+
                 <AnimatedSection delay={500} className="card bg-dark-800 p-6 rounded-xl shadow-lg border border-dark-700">
                     {/* --- THIS SECTION IS NOW PUBLIC RECENT RESULTS --- */}
                     <h3 className="text-2xl font-bold text-primary-400 mb-6">RECENT RESULTS</h3>
@@ -291,7 +289,7 @@ const RundownContent = ({
 export default function Farlight84Page() {
     const { user } = useAuth();
     const [activeTab, setActiveTab] = useState('rundown');
-    
+
     // --- Public Data States ---
     const [upcomingCups, setUpcomingCups] = useState([]);
     const [pastCups, setPastCups] = useState([]);
@@ -306,205 +304,209 @@ export default function Farlight84Page() {
     const [publicMatchesError, setPublicMatchesError] = useState(null); 
     const [loadingAllTeams, setLoadingAllTeams] = useState(true);
     const [allTeamsError, setAllTeamsError] = useState(null);
-    
+
     // --- User-Specific Data States ---
     const [myTournaments, setMyTournaments] = useState([]);
     const [loadingMyData, setLoadingMyData] = useState(true);
     const [myDataError, setMyDataError] = useState(null);
 
-    // --- useEffect to fetch all data ---
-    useEffect(() => {
-        // Fetches public data (Cups, Teams, Leaderboard, Public Matches)
-        const fetchPublicData = async () => {
-            setLoadingCups(true);
-            setLoadingLeaderboard(true);
-            setLoadingPublicMatches(true);
-            setLoadingAllTeams(true);
-            
-            // --- 1. Fetch Cups ---
-            try {
-                const { data: cupData, error: cupError } = await supabase
-                    .from('tournaments')
-                    .select('id, name, format, max_participants, start_date, prize_pool_amount, prize_type, prize_currency, status, image')
-                    .eq('game', GAME_NAME)
-                    .eq('is_public', true)
-                    .order('start_date', { ascending: false }); // Get most recent first
 
-                if (cupError) throw new Error(`Cup Error: ${cupError.message}`);
+    // --- 1. Fetches Public Data (Cups, Teams, Leaderboard, Public Matches) ---
+    const fetchPublicData = useCallback(async () => {
+        setLoadingCups(true);
+        setLoadingLeaderboard(true);
+        setLoadingPublicMatches(true);
+        setLoadingAllTeams(true);
 
-                // --- FIX: Upcoming cups are any not 'Completed' ---
-                const past = cupData.filter(t => t.status === 'Completed');
-                const upcoming = cupData
-                    .filter(t => t.status !== 'Completed')
-                    .sort((a, b) => new Date(a.start_date) - new Date(b.start_date)); // Sort ascending
-                
-                setUpcomingCups(upcoming);
-                setPastCups(past);
-                // --- END FIX ---
-                
-                setCupsError(null);
-            } catch (cupError) {
-                console.error("Error fetching tournaments:", cupError);
-                setCupsError(cupError.message);
-            } finally {
-                setLoadingCups(false);
+        // --- 1. Fetch Cups ---
+        try {
+            const { data: cupData, error: cupError } = await supabase
+                .from('tournaments')
+                .select('id, name, format, max_participants, start_date, prize_pool_amount, prize_type, prize_currency, status, image')
+                .eq('game', GAME_NAME)
+                .eq('is_public', true)
+                .order('start_date', { ascending: false }); 
+
+            if (cupError) throw new Error(`Cup Error: ${cupError.message}`);
+
+            const past = cupData.filter(t => t.status === 'Completed');
+            const upcoming = cupData
+                .filter(t => t.status !== 'Completed')
+                .sort((a, b) => new Date(a.start_date) - new Date(b.start_date));
+
+            setUpcomingCups(upcoming);
+            setPastCups(past);
+            setCupsError(null);
+        } catch (cupError) {
+            console.error("Error fetching tournaments:", cupError);
+            setCupsError(cupError.message);
+        } finally {
+            setLoadingCups(false);
+        }
+
+        // --- 2. Fetch All Teams (for Teams Tab) ---
+        try {
+            const { data: teamsData, error: teamsError } = await supabase
+                .from('teams')
+                .select('id, name, game, logo_url')
+                .eq('game', GAME_NAME);
+
+            if (teamsError) throw teamsError;
+            setAllTeams(teamsData || []);
+            setAllTeamsError(null);
+        } catch (err) {
+            console.error("Error fetching all teams:", err);
+            setAllTeamsError(err.message);
+        } finally {
+            setLoadingAllTeams(false);
+        }
+
+        // --- 3. Fetch Leaderboard & Public Matches ---
+        try {
+            // 3a. Get all participants
+            const { data: participants, error: pError } = await supabase
+                .from('tournament_participants')
+                .select('id, team_id, team_name, team_logo_url, tournaments!inner(game)')
+                .eq('tournaments.game', GAME_NAME);
+
+            if (pError) throw pError;
+
+            // 3b. Get unique teams *that have participated*
+            const uniqueParticipantTeams = Array.from(new Map(participants.map(p => [p.team_id, p])).values());
+
+            // 3c. Get all results for these participants
+            const participantIds = participants.map(p => p.id);
+            let allResults = [];
+            if (participantIds.length > 0) {
+                const { data: results, error: rError } = await supabase
+                    .from('match_results')
+                    .select('participant_id, placement, created_at, kills, id, tournament_participants(team_name, tournaments(name))')
+                    .in('participant_id', participantIds)
+                    .order('created_at', { ascending: false }); 
+                if (rError) throw rError;
+                allResults = results || [];
             }
 
-            // --- 2. Fetch All Teams (for Teams Tab) ---
-            try {
-                const { data: teamsData, error: teamsError } = await supabase
-                    .from('teams')
-                    .select('id, name, game, logo_url')
-                    .eq('game', GAME_NAME);
-                
-                if (teamsError) throw teamsError;
-                setAllTeams(teamsData || []);
-                setAllTeamsError(null);
-            } catch (err) {
-                console.error("Error fetching all teams:", err);
-                setAllTeamsError(err.message);
-            } finally {
-                setLoadingAllTeams(false);
-            }
+            // 3d. Set Public Recent Matches (for Rundown tab)
+            const formattedRecentMatches = allResults.slice(0, 5).map(r => ({
+                ...r,
+                teamName: r.tournament_participants?.team_name || 'Unknown',
+                tournamentName: r.tournament_participants?.tournaments?.name || 'Tournament'
+            }));
+            setPublicRecentMatches(formattedRecentMatches);
+            setPublicMatchesError(null);
 
-            // --- 3. Fetch Leaderboard & Public Matches ---
-            try {
-                // 3a. Get all participants
-                const { data: participants, error: pError } = await supabase
-                    .from('tournament_participants')
-                    .select('id, team_id, team_name, team_logo_url, tournaments!inner(game)')
-                    .eq('tournaments.game', GAME_NAME);
-                
-                if (pError) throw pError;
-                
-                // 3b. Get unique teams *that have participated*
-                const uniqueParticipantTeams = Array.from(new Map(participants.map(p => [p.team_id, p])).values());
-
-                // 3c. Get all results for these participants
-                const participantIds = participants.map(p => p.id);
-                let allResults = [];
-                if (participantIds.length > 0) {
-                    const { data: results, error: rError } = await supabase
-                        .from('match_results')
-                        .select('participant_id, placement, created_at, kills, id, tournament_participants(team_name, tournaments(name))')
-                        .in('participant_id', participantIds)
-                        .order('created_at', { ascending: false }); // Order for recent matches
-                    if (rError) throw rError;
-                    allResults = results || [];
+            // 3e. Calculate Leaderboard
+            const statsMap = new Map();
+            uniqueParticipantTeams.forEach(team => {
+                if (team && team.team_id) {
+                     statsMap.set(team.team_id, { 
+                        team: { id: team.team_id, name: team.team_name, logo_url: team.team_logo_url }, 
+                        totalMatches: 0, 
+                        totalWins: 0 
+                    });
                 }
-                
-                // 3d. Set Public Recent Matches (for Rundown tab)
-                const formattedRecentMatches = allResults.slice(0, 5).map(r => ({
-                    ...r,
-                    teamName: r.tournament_participants?.team_name || 'Unknown',
-                    tournamentName: r.tournament_participants?.tournaments?.name || 'Tournament'
-                }));
-                setPublicRecentMatches(formattedRecentMatches);
-                setPublicMatchesError(null);
+            });
 
-                // 3e. Calculate Leaderboard
-                const statsMap = new Map();
-                uniqueParticipantTeams.forEach(team => {
-                    // Use participant data for logo/name, as it's from the time of registration
-                    if (team && team.team_id) {
-                         statsMap.set(team.team_id, { 
-                            team: { id: team.team_id, name: team.team_name, logo_url: team.team_logo_url }, 
-                            totalMatches: 0, 
-                            totalWins: 0 
-                        });
-                    }
-                });
-
-                allResults.forEach(result => {
-                    const participant = participants.find(p => p.id === result.participant_id);
-                    if (participant && participant.team_id) {
-                        const teamStats = statsMap.get(participant.team_id);
-                        if (teamStats) {
-                            teamStats.totalMatches += 1;
-                            if (result.placement === 1) {
-                                teamStats.totalWins += 1;
-                            }
+            allResults.forEach(result => {
+                const participant = participants.find(p => p.id === result.participant_id);
+                if (participant && participant.team_id) {
+                    const teamStats = statsMap.get(participant.team_id);
+                    if (teamStats) {
+                        teamStats.totalMatches += 1;
+                        if (result.placement === 1) {
+                            teamStats.totalWins += 1;
                         }
                     }
-                });
+                }
+            });
 
-                const calculatedLeaderboard = Array.from(statsMap.values())
-                    .map(item => ({
-                        ...item,
-                        winRate: item.totalMatches > 0 ? (item.totalWins / item.totalMatches) * 100 : 0
-                    }))
-                    .filter(item => item.totalMatches > 0) // Only rank teams with matches
-                    .sort((a, b) => b.winRate - a.winRate || b.totalWins - a.totalWins); // Sort by win rate, then wins
-                
-                setLeaderboard(calculatedLeaderboard);
-                setLeaderboardError(null);
+            const calculatedLeaderboard = Array.from(statsMap.values())
+                .map(item => ({
+                    ...item,
+                    winRate: item.totalMatches > 0 ? (item.totalWins / item.totalMatches) * 100 : 0
+                }))
+                .filter(item => item.totalMatches > 0)
+                .sort((a, b) => b.winRate - a.winRate || b.totalWins - a.totalWins);
 
-            } catch (teamError) {
-                console.error("Error fetching teams/leaderboard:", teamError);
-                setLeaderboardError(teamError.message);
-                setPublicMatchesError(teamError.message); // If this fails, recent matches also fail
-            } finally {
-                setLoadingLeaderboard(false);
-                setLoadingPublicMatches(false); // Ensure this is set false even on error
-            }
-        };
+            setLeaderboard(calculatedLeaderboard);
+            setLeaderboardError(null);
 
-        // Fetches user-specific data (My Tournaments)
-        const fetchUserData = async (userId) => {
-            if (!userId) {
+        } catch (teamError) {
+            console.error("Error fetching teams/leaderboard:", teamError);
+            setLeaderboardError(teamError.message);
+            setPublicMatchesError(teamError.message);
+        } finally {
+            setLoadingLeaderboard(false);
+            setLoadingPublicMatches(false);
+        }
+    }, [GAME_NAME]); // DEPENDENCY: GAME_NAME
+
+    // --- 2. Fetches User-Specific Data (My Tournaments) ---
+    const fetchUserData = useCallback(async (userId) => {
+        if (!userId) {
+            setLoadingMyData(false);
+            return;
+        }
+
+        setLoadingMyData(true);
+        setMyDataError(null);
+        try {
+            // 1. Get user's team IDs
+            const { data: teamsAsMember } = await supabase.from('team_members').select('team_id').eq('user_id', userId);
+            const { data: teamsAsOwner } = await supabase.from('teams').select('id').eq('owner_id', userId);
+            const memberTeamIds = teamsAsMember ? teamsAsMember.map(t => t.team_id) : [];
+            const ownerTeamIds = teamsAsOwner ? teamsAsOwner.map(t => t.id) : [];
+            const uniqueTeamIds = [...new Set([...memberTeamIds, ...ownerTeamIds])];
+
+            if (uniqueTeamIds.length === 0) {
                 setLoadingMyData(false);
+                setMyTournaments([]);
+                return; 
+            }
+
+            // 2. Get participant records for user's teams
+            const { data: participantRecords, error: pError } = await supabase
+                .from('tournament_participants')
+                .select('id, tournaments!inner(id, name, game, start_date, status)')
+                .eq('tournaments.game', GAME_NAME)
+                .in('team_id', uniqueTeamIds);
+
+            if (pError) throw pError;
+            if (!participantRecords || participantRecords.length === 0) {
+                setLoadingMyData(false);
+                setMyTournaments([]);
                 return;
             }
-            
-            setLoadingMyData(true);
-            setMyDataError(null);
-            try {
-                // 1. Get user's team IDs
-                const { data: teamsAsMember } = await supabase.from('team_members').select('team_id').eq('user_id', userId);
-                const { data: teamsAsOwner } = await supabase.from('teams').select('id').eq('owner_id', userId);
-                const memberTeamIds = teamsAsMember ? teamsAsMember.map(t => t.team_id) : [];
-                const ownerTeamIds = teamsAsOwner ? teamsAsOwner.map(t => t.id) : [];
-                const uniqueTeamIds = [...new Set([...memberTeamIds, ...ownerTeamIds])];
 
-                if (uniqueTeamIds.length === 0) {
-                    setLoadingMyData(false);
-                    setMyTournaments([]);
-                    return; // User has no teams
-                }
+            // 3. Set "My Tournaments"
+            const uniqueTournaments = Array.from(new Map(participantRecords.map(p => [p.tournaments.id, p.tournaments])).values())
+                .map(t => ({...t, status: new Date(t.start_date) > new Date() && t.status !== 'Completed' ? 'Upcoming' : t.status }))
+                .sort((a, b) => new Date(b.start_date) - new Date(a.start_date));
+            setMyTournaments(uniqueTournaments);
 
-                // 2. Get participant records for user's teams
-                const { data: participantRecords, error: pError } = await supabase
-                    .from('tournament_participants')
-                    .select('id, tournaments!inner(id, name, game, start_date, status)')
-                    .eq('tournaments.game', GAME_NAME)
-                    .in('team_id', uniqueTeamIds);
-                
-                if (pError) throw pError;
-                if (!participantRecords || participantRecords.length === 0) {
-                    setLoadingMyData(false);
-                    setMyTournaments([]);
-                    return; // User has not participated in tourneys
-                }
+        } catch (err) {
+            console.error("Error fetching user data:", err);
+            setMyDataError(err.message);
+        } finally {
+            setLoadingMyData(false);
+        }
+    }, [user, GAME_NAME]); // DEPENDENCY: user and GAME_NAME
 
-                // 3. Set "My Tournaments"
-                const uniqueTournaments = Array.from(new Map(participantRecords.map(p => [p.tournaments.id, p.tournaments])).values())
-                    .map(t => ({...t, status: new Date(t.start_date) > new Date() && t.status !== 'Completed' ? 'Upcoming' : t.status }))
-                    .sort((a, b) => new Date(b.start_date) - new Date(a.start_date));
-                setMyTournaments(uniqueTournaments);
 
-            } catch (err) {
-                console.error("Error fetching user data:", err);
-                setMyDataError(err.message);
-            } finally {
-                setLoadingMyData(false);
-            }
-        };
-
+    // --- 3. useEffect to trigger data fetch ---
+    useEffect(() => {
         fetchPublicData();
         fetchUserData(user?.id);
-    }, [user]);
+    }, [user, fetchPublicData, fetchUserData]); // <-- DEPENDENCY ARRAY NOW INCLUDES FUNCTIONS
 
-    const navTabs = [ { name: 'RUNDOWN', path: 'rundown', icon: Hash }, { name: 'CUPS', path: 'cups', icon: Trophy }, { name: 'LEADERBOARD', path: 'leaderboard', icon: BarChart }, { name: 'TEAMS', path: 'teams', icon: Users }, ];
+    const navTabs = [ 
+        { name: 'RUNDOWN', path: 'rundown', icon: Hash }, 
+        { name: 'CUPS', path: 'cups', icon: Trophy }, 
+        { name: 'LEADERBOARD', path: 'leaderboard', icon: BarChart }, 
+        { name: 'TEAMS', path: 'teams', icon: Users },
+        { name: 'SCRIMS', path: '/farlight84/scrims', icon: ListChecks, isLink: true } 
+    ];
 
     const renderContent = () => {
         switch (activeTab) {
@@ -559,7 +561,21 @@ export default function Farlight84Page() {
                 </AnimatedSection>
                 <AnimatedSection delay={50} className="sticky top-16 bg-dark-900 z-30 shadow-md border-b border-dark-700">
                     <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex space-x-6 sm:space-x-8 text-base sm:text-lg font-semibold text-gray-400 overflow-x-auto">
-                        {navTabs.map((tab) => (<button key={tab.name} onClick={() => setActiveTab(tab.path)} className={`flex items-center py-4 px-1 whitespace-nowrap border-b-2 transition-all duration-200 ${activeTab === tab.path ? 'text-primary-400 border-primary-400' : 'border-transparent hover:text-white hover:border-gray-500'}`}><tab.icon size={18} className="mr-2 hidden sm:inline-block"/> {tab.name}</button>))}
+                        {navTabs.map((tab) => (
+                            tab.isLink ? (
+                                <Link 
+                                    key={tab.name} 
+                                    to={tab.path}
+                                    className={`flex items-center py-4 px-1 whitespace-nowrap border-b-2 transition-all duration-200 border-transparent hover:text-white hover:border-gray-500`}
+                                >
+                                    <tab.icon size={18} className="mr-2 hidden sm:inline-block"/> {tab.name}
+                                </Link>
+                            ) : (
+                                <button key={tab.name} onClick={() => setActiveTab(tab.path)} className={`flex items-center py-4 px-1 whitespace-nowrap border-b-2 transition-all duration-200 ${activeTab === tab.path ? 'text-primary-400 border-primary-400' : 'border-transparent hover:text-white hover:border-gray-500'}`}>
+                                    <tab.icon size={18} className="mr-2 hidden sm:inline-block"/> {tab.name}
+                                </button>
+                            )
+                        ))}
                     </nav>
                 </AnimatedSection>
                 <div className="max-w-7xl mx-auto mt-8">

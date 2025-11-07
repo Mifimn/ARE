@@ -455,7 +455,7 @@ export default function CreateTournamentPage() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label className="block text-sm font-medium text-gray-300 mb-2">Total League Rounds</label>
-                            <input type="number" name="mlbb_league_rounds" value={formData.mlbb_league_rounds} onChange={onChange} className="input-field" min="1" required />
+                            <input type="number" name="mlbb_league_rounds" value={formData.mlbb_league_rounds} onChange={handleChange} className="input-field" min="1" required />
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-gray-300 mb-2">Teams Advancing to Playoffs</label>
@@ -545,7 +545,16 @@ export default function CreateTournamentPage() {
                     {/* Header */}
                     <div className="flex flex-col sm:flex-row items-center justify-between mb-8 border-b border-dark-700 pb-4">
                         <h1 className="text-3xl font-bold flex items-center text-primary-400 mb-4 sm:mb-0"><PlusCircle className="mr-3" size={32} />Create New Tournament</h1>
-                        <div className="flex gap-3"><Link to="/tournaments" className="btn-secondary flex items-center text-sm"><X className="mr-1.5" size={16} /> Cancel</Link></div>
+                        <div className="flex gap-3">
+                            {/* NEW BUTTON: Link to Create Scrim Page */}
+                            <Link 
+                                to="/admin/create-scrim" 
+                                className="btn-secondary flex items-center text-sm bg-primary-900/30 hover:bg-primary-900/50 text-primary-300 border-primary-700/50"
+                            >
+                                <Users className="mr-1.5" size={16} /> Create Scrim
+                            </Link>
+                            <Link to="/tournaments" className="btn-secondary flex items-center text-sm"><X className="mr-1.5" size={16} /> Cancel</Link>
+                        </div>
                     </div>
 
                     {/* Progress Bar (Unchanged) */}

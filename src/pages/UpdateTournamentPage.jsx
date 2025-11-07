@@ -306,7 +306,6 @@ const GroupedBRStageView = ({ tournament, participants, matches, results, onData
 
                     if (rpcError) throw rpcError;
 
-                    // The RPC returns a JSON string response we need to parse
                     const response = JSON.parse(rpcData); 
                     if (!response.success) throw new Error(response.message);
 
@@ -546,17 +545,23 @@ const GroupedBRStageView = ({ tournament, participants, matches, results, onData
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-dark-700">
-                                    {standings.map((stat, index) => (
-                                        <tr key={stat.team.id} className={`transition-colors hover:bg-dark-700`}>
-                                            <td className="px-4 py-3 whitespace-nowrap text-sm font-semibold text-primary-400">{index + 1}</td>
-                                            <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-white">{stat.team.team_name}</td>
-                                            <td className="px-4 py-3 whitespace-nowrap text-sm text-center text-gray-300">{stat.mapsPlayed}</td>
-                                            <td className="px-4 py-3 whitespace-nowrap text-sm text-center font-bold text-yellow-300">{stat.placementPoints}</td>
-                                            <td className="px-4 py-3 whitespace-nowrap text-sm text-center font-bold text-red-300">{stat.killPoints}</td>
-                                            <td className="px-4 py-3 whitespace-nowrap text-sm text-center font-extrabold text-primary-300">{stat.totalPoints}</td>
-                                            <td className="px-4 py-3 whitespace-nowrap text-sm text-center font-bold text-green-400">{stat.wins}</td>
-                                        </tr>
-                                    ))}
+                                    {standings.map((stat, index) => {
+                                        const isAdvancing = index < advancingCutoff && !isFinalStage;
+                                        let statusClass = 'hover:bg-dark-700';
+                                        if (isAdvancing) statusClass = 'bg-green-900/20 hover:bg-green-900/30 border-l-4 border-green-500';
+
+                                        return (
+                                            <tr key={stat.team.id} className={`transition-colors ${statusClass}`}>
+                                                <td className="px-4 py-3 whitespace-nowrap text-sm font-semibold text-primary-400">{index + 1}</td>
+                                                <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-white">{stat.team.team_name}</td>
+                                                <td className="px-4 py-3 whitespace-nowrap text-sm text-center text-gray-300">{stat.mapsPlayed}</td>
+                                                <td className="px-4 py-3 whitespace-nowrap text-sm text-center font-bold text-yellow-300">{stat.placementPoints}</td>
+                                                <td className="px-4 py-3 whitespace-nowrap text-sm text-center font-bold text-red-300">{stat.killPoints}</td>
+                                                <td className="px-4 py-3 whitespace-nowrap text-sm text-center font-extrabold text-primary-300">{stat.totalPoints}</td>
+                                                <td className="px-4 py-3 whitespace-nowrap text-sm text-center font-bold text-green-400">{stat.wins}</td>
+                                            </tr>
+                                        );
+                                    })}
                                 </tbody>
                             </table>
                         </div>
@@ -603,7 +608,7 @@ const GroupedBRStageView = ({ tournament, participants, matches, results, onData
                             <h3 className="font-bold mb-2 flex items-center"><Info size={16} className='mr-2'/> Stage {current_stage} Management</h3>
                             <p>Groups and schedule are set. Manage match times and enter results to calculate standings.</p>
                         </div>
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                             <button onClick={() => setViewMode('schedule')} className='btn-secondary py-3 flex items-center justify-center text-lg font-bold hover:bg-dark-600 border-primary-500/50'>
                                 <CalendarCheck size={20} className='mr-2 text-primary-400'/> Manage Schedule & Results
                             </button>
@@ -1557,8 +1562,9 @@ export default function UpdateTournamentPage() {
         try {
             const { data, error } = await supabase
                 .from('tournaments')
-                .select('id, name, game, format, status, max_participants')
+                .select('id, name, game, format, status, max_participants, type') // Fetch 'type'
                 .eq('organizer_id', userId)
+                .neq('type', 'scrim') // Filter OUT scrims from the tournament list
                 .order('created_at', { ascending: false });
 
             if (error) throw error;
@@ -1606,6 +1612,15 @@ export default function UpdateTournamentPage() {
     // --- RENDER FUNCTIONS ---
     const renderListView = () => (
         <AnimatedSection delay={100} className="card bg-dark-800 p-6 rounded-xl shadow-lg">
+
+             {/* --- START MODIFIED BUTTON: Links to  Manage Scrims Hub --- */}
+             <div className="flex justify-end mb-6">
+                    <Link to="/admin/manage-scrims" className="btn-primary flex items-center bg-green-600 hover:bg-green-700">
+                    <UsersRound size={16} className="mr-2" /> Manage Scrims
+                </Link>
+             </div>
+             {/* --- END MODIFIED BUTTON --- */}
+
             <h2 className="text-2xl font-bold mb-6 text-primary-300 border-b border-dark-700 pb-3">Your Tournaments ({tournamentsList.length})</h2>
             {tournamentsList.length > 0 ? (
                 <div className="space-y-6">

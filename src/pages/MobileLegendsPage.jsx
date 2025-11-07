@@ -505,7 +505,13 @@ export default function MobileLegendsPage() {
         fetchUserData(user?.id);
     }, [user]);
 
-    const navTabs = [ { name: 'RUNDOWN', path: 'rundown', icon: Hash }, { name: 'CUPS', path: 'cups', icon: Trophy }, { name: 'LEADERBOARD', path: 'leaderboard', icon: BarChart }, { name: 'TEAMS', path: 'teams', icon: Users }, ];
+    const navTabs = [ 
+        { name: 'RUNDOWN', path: 'rundown', icon: Hash }, 
+        { name: 'CUPS', path: 'cups', icon: Trophy }, 
+        { name: 'LEADERBOARD', path: 'leaderboard', icon: BarChart }, 
+        { name: 'TEAMS', path: 'teams', icon: Users },
+        { name: 'SCRIMS', path: '/mobilelegends/scrims', icon: ListChecks, isLink: true } // <-- NEW SCRIMS LINK
+    ];
 
     const renderContent = () => {
         switch (activeTab) {
@@ -560,7 +566,21 @@ export default function MobileLegendsPage() {
                 </AnimatedSection>
                 <AnimatedSection delay={50} className="sticky top-16 bg-dark-900 z-30 shadow-md border-b border-dark-700">
                     <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex space-x-6 sm:space-x-8 text-base sm:text-lg font-semibold text-gray-400 overflow-x-auto">
-                        {navTabs.map((tab) => (<button key={tab.name} onClick={() => setActiveTab(tab.path)} className={`flex items-center py-4 px-1 whitespace-nowrap border-b-2 transition-all duration-200 ${activeTab === tab.path ? 'text-primary-400 border-primary-400' : 'border-transparent hover:text-white hover:border-gray-500'}`}><tab.icon size={18} className="mr-2 hidden sm:inline-block"/> {tab.name}</button>))}
+                        {navTabs.map((tab) => (
+                            tab.isLink ? (
+                                <Link 
+                                    key={tab.name} 
+                                    to={tab.path}
+                                    className={`flex items-center py-4 px-1 whitespace-nowrap border-b-2 transition-all duration-200 border-transparent hover:text-white hover:border-gray-500`}
+                                >
+                                    <tab.icon size={18} className="mr-2 hidden sm:inline-block"/> {tab.name}
+                                </Link>
+                            ) : (
+                                <button key={tab.name} onClick={() => setActiveTab(tab.path)} className={`flex items-center py-4 px-1 whitespace-nowrap border-b-2 transition-all duration-200 ${activeTab === tab.path ? 'text-primary-400 border-primary-400' : 'border-transparent hover:text-white hover:border-gray-500'}`}>
+                                    <tab.icon size={18} className="mr-2 hidden sm:inline-block"/> {tab.name}
+                                </button>
+                            )
+                        ))}
                     </nav>
                 </AnimatedSection>
                 <div className="max-w-7xl mx-auto mt-8">

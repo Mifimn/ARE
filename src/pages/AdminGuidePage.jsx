@@ -4,7 +4,7 @@ import {
     HelpCircle, Trophy, Layers, Workflow, ListChecks, ArrowLeft, 
     UserCheck, Lock, Send, BarChart2, FileText, Gamepad2, Plus, 
     AlertCircle, Save, Calendar, Clock, Edit3, Shuffle, UsersRound, 
-    Swords, Target // <<< FIXED: ADDED Swords and Target >>>
+    Swords, Target, CheckCircle // <-- ADDED CheckCircle HERE
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import AnimatedSection from '../components/AnimatedSection';
@@ -57,6 +57,24 @@ export default function AdminGuidePage() {
                 </AnimatedSection>
 
                 <div className="space-y-8">
+
+                    {/* --- NEW SECTION: Scrim Management --- */}
+                    <GuideSection title="Scrim (Practice Match) Management" icon={UsersRound}>
+                        <p>Scrims are simplified, non-tournament, round-based events (4 matches, no stages).</p>
+
+                        <h3 className="text-xl font-semibold text-primary-300 pt-4 border-t border-dark-600">Management Flow</h3>
+
+                        <ol className="list-decimal list-inside space-y-3 pl-2">
+                            <li>**Navigate to Hub:** View all created scrims on the <Link to="/admin/manage-scrims" className="text-primary-400 hover:underline">Manage Scrims</Link> page.</li>
+                            <li>**Creation:** Click **Create Scrim** and fill in the simplified form. This creates a record with <Code>type: 'scrim'</Code> in the database.</li>
+                            <li>**Participant Entry:** On the Scrim Management Page, manually **Add Team** using the team's name.</li>
+                            <li>**Generate Rounds:** Click **<Shuffle size={14} className="inline-block mr-1"/> Generate Scrim Matches**. This generates the fixed number of rounds (e.g., 4 matches) for the event.</li>
+                            <li>**Result Entry:** For each round, click **Enter Results** and input Placement and Kills for all participating teams.</li>
+                            <li>**Finalize:** After all rounds are completed, click **<CheckCircle size={14} className="inline-block mr-1"/> Finalize Scrim** to mark the event as complete.</li>
+                        </ol>
+                    </GuideSection>
+                    {/* --- END NEW SECTION --- */}
+
                     {/* --- Section 1: Standard Tournament Overview --- */}
                     <GuideSection title="Tournament Creation Workflow" icon={Plus}>
                         <p>All tournaments are created via the <Link to="/create-tournament" className="text-primary-400 hover:underline">Create Tournament</Link> page, which locks the format and initial stage settings upon creation.</p>
