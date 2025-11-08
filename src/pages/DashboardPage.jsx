@@ -1,4 +1,5 @@
 // src/pages/DashboardPage.jsx
+
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabaseClient'; // Adjust path if needed
 import { useAuth } from '../contexts/AuthContext.jsx'; // Adjust path if needed
@@ -98,39 +99,55 @@ export default function DashboardPage() {
           const currentNotifications = [];
 
           try {
-              // --- 1. Fetch Team Count & Owned Teams ---
-              const { data: teamsAsMember } = await supabase
-                  .from('team_members')
-                  .select('team_id, teams!inner(owner_id)');
+              // --- 1. Fetch User-Specific Teams (REFACTORED FOR EFFICIENCY) ---
+              const [ownedRes, memberRes] = await Promise.all([
+                  // Get teams owned by the user
+                  supabase
+                      .from('teams')
+                      .select('id, name, logo_url, description, country, owner_id')
+                      .eq('owner_id', authUser.id),
+                  // Get teams the user is a member of
+                  supabase
+                      .from('team_members')
+                      .select('team_id')
+                      .eq('user_id', authUser.id)
+              ]);
 
-              const { data: teamsAsOwner } = await supabase
-                  .from('teams')
-                  .select('id, name, logo_url, description, country, owner_id');
+              if (ownedRes.error) throw ownedRes.error;
+              if (memberRes.error) throw memberRes.error;
 
-              const ownerTeams = teamsAsOwner ? teamsAsOwner.filter(t => t.owner_id === authUser.id) : [];
+              // Teams owned by the user (used for completeness check)
+              const ownerTeams = ownedRes.data || [];
               const ownerTeamIds = ownerTeams.map(t => t.id);
 
-              const memberTeamIds = teamsAsMember ? teamsAsMember.map(t => t.team_id) : [];
-              const combinedTeamIds = [...new Set([...memberTeamIds, ...ownerTeamIds])];
+              // IDs of teams the user is a member of
+              const memberTeamIds = memberRes.data.map(t => t.team_id);
+
+              // Combine unique IDs for all teams associated with the user
+              const combinedTeamIds = [...new Set([...ownerTeamIds, ...memberTeamIds])];
               const totalTeams = combinedTeamIds.length;
+
               let userParticipantIds = [];
               let tournamentsPlayed = 0;
               let winRate = 0;
 
-              // ... (Calculation of winRate and tournamentsPlayed) ...
+              // --- 2. Calculate Stats based on User's Teams ---
               if (combinedTeamIds.length > 0) {
+                  // Get participant records where team_id is one of the user's teams
                   const { data: participantRecords } = await supabase
                       .from('tournament_participants')
                       .select('id, tournament_id')
                       .in('team_id', combinedTeamIds);
 
                   if (participantRecords && participantRecords.length > 0) {
+                      // Get unique tournament IDs
                       tournamentsPlayed = [...new Set(participantRecords.map(p => p.tournament_id))].length;
                       userParticipantIds = participantRecords.map(p => p.id);
                   }
 
-                   if (userParticipantIds.length > 0) {
-                       const { data: matchResults } = await supabase
+                  if (userParticipantIds.length > 0) {
+                      // Get match results for these participant records
+                      const { data: matchResults } = await supabase
                           .from('match_results')
                           .select('placement')
                           .in('participant_id', userParticipantIds);
@@ -140,12 +157,12 @@ export default function DashboardPage() {
                           const totalWins = matchResults.filter(r => r.placement === 1).length;
                           winRate = Math.round((totalWins / totalMatches) * 100);
                       }
-                   }
+                  }
               }
 
-              // --- 2. Fetch Notification Data ---
+              // --- 3. Fetch Notification Data (using the user's data) ---
 
-              // 2a. Check for pending team invites (Action Required)
+              // 3a. Check for pending team invites (Action Required)
               const { count: inviteCount } = await supabase
                   .from('team_invites')
                   .select('id', { count: 'exact' })
@@ -161,7 +178,7 @@ export default function DashboardPage() {
                   });
               }
 
-              // 2b. Check User Profile Completeness (Warning)
+              // 3b. Check User Profile Completeness (Warning)
               const isUserIncomplete = !profile.full_name || !profile.country || profile.avatar_url === null; 
               if (isUserIncomplete) {
                    currentNotifications.push({ 
@@ -172,7 +189,7 @@ export default function DashboardPage() {
                   });
               }
 
-              // 2c. Check Owned Team Profile Completeness (Warning)
+              // 3c. Check Owned Team Profile Completeness (Warning - uses the correctly filtered `ownerTeams`)
               ownerTeams.forEach(team => {
                   const isTeamIncomplete = !team.description || !team.country || team.logo_url === null;
                   if (isTeamIncomplete) {
@@ -185,7 +202,7 @@ export default function DashboardPage() {
                   }
               });
 
-              // 2d. Upcoming Matches (starting in next 30 minutes - Critical Alert)
+              // 3d. Upcoming Matches (starting in next 30 minutes - Critical Alert)
               const now = Date.now();
               const next30Mins = new Date(now + 30 * 60 * 1000).toISOString();
               const nowISO = new Date(now).toISOString();
@@ -213,8 +230,7 @@ export default function DashboardPage() {
                   });
               }
 
-              // 2e. Recent Tournaments matching favorite game (Created in last 24 hours - New Content)
-              // --- FIX: Use 24 hours ago and .in() for robust game comparison ---
+              // 3e. Recent Tournaments matching favorite game (Created in last 24 hours - New Content)
               const favoriteGamesArray = profile.favorite_games 
                     ? (Array.isArray(profile.favorite_games) ? profile.favorite_games : [profile.favorite_games])
                     : [];
@@ -238,7 +254,7 @@ export default function DashboardPage() {
                   }
               }
 
-              // --- 3. Set Final States ---
+              // --- 4. Set Final States ---
               setStats(prevStats => ({
                   ...prevStats,
                   activeTeams: totalTeams,
@@ -252,7 +268,7 @@ export default function DashboardPage() {
 
               setNotifications(currentNotifications);
 
-              // --- 4. Upcoming Matches for Central Panel (excluding critical alerts) ---
+              // --- 5. Upcoming Matches for Central Panel (excluding critical alerts) ---
               const { data: upcomingData } = await supabase
                   .from('match_participants')
                   .select('tournament_matches!inner(*, tournaments(name))')
