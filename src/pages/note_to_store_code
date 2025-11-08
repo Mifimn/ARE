@@ -4,7 +4,6 @@ import React, { useState, useEffect } from 'react';
 import { Link, useParams, Navigate } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
 import { useAuth } from '../contexts/AuthContext.jsx';
-// Added/changed icons: Heart, Clock, BarChart, Crosshair, Percent, User, LogOut, CheckCircle, XCircle, AlertCircle, Info, Mail
 import {
     Users, Trophy, Calendar, MapPin, Star, Mail, UserPlus, Settings, BarChart, Percent, Crosshair, Loader2, AlertCircle, Gamepad2, User, UserX, LogOut, Heart, Clock as ClockIcon, CheckCircle, XCircle, Info, X as CloseIcon
 } from 'lucide-react';
@@ -45,7 +44,7 @@ const CustomModal = ({ isOpen, onClose, title, children, confirmText = 'OK', onC
 };
 // --- End Custom Modal ---
 
-// --- SCORING ENGINE (BR - Free Fire Standard) (unchanged) ---
+// --- SCORING ENGINE (unchanged) ---
 const calculatePlacementPoints = (placement) => {
     if (placement < 1 || placement > 12) return 0;
     return 39 - (3 * (placement - 1)); 
@@ -55,7 +54,7 @@ const calculateKillPoints = (kills) => {
 };
 // ---
 
-// --- Helper function to fetch a Team's Achievements (unchanged) ---
+// --- Helper functions fetchTeamAchievements and fetchTeamPerformance (unchanged) ---
 const fetchTeamAchievements = async (teamId) => {
     try {
         const { data: achievementsData, error: achievementError } = await supabase
@@ -83,9 +82,7 @@ const fetchTeamAchievements = async (teamId) => {
         return [];
     }
 };
-// ---
 
-// --- Helper function to fetch team stats, matches, events, and ACHIEVEMENTS (unchanged) ---
 const fetchTeamPerformance = async (teamId) => {
     if (!teamId) return { stats: null, recentMatches: [], upcomingEvents: [], achievements: [] };
 
@@ -170,70 +167,7 @@ const fetchTeamPerformance = async (teamId) => {
 };
 // ---
 
-// --- NEW HELPER: Function to fetch live stats for a single user/member (CRITICAL FOR FIX) ---
-const fetchLiveMemberStats = async (userId) => {
-    // This is a condensed version of the ProfilePage's performance logic.
-    try {
-        const { data: teamsAsMember } = await supabase.from('team_members').select('team_id, joined_at').eq('user_id', userId);
-        const { data: teamsAsOwner } = await supabase.from('teams').select('id, created_at').eq('owner_id', userId);
-
-        const allTeamMemberships = [
-            ...(teamsAsMember ? teamsAsMember.map(t => ({ team_id: t.team_id, join_date: t.joined_at })) : []),
-            ...(teamsAsOwner ? teamsAsOwner.map(t => ({ team_id: t.id, join_date: t.created_at })) : [])
-        ];
-
-        const uniqueTeamMemberships = allTeamMemberships.reduce((acc, current) => {
-            if (!acc.has(current.team_id) || new Date(current.join_date) < new Date(acc.get(current.team_id).join_date)) {
-                acc.set(current.team_id, current);
-            }
-            return acc;
-        }, new Map());
-
-        const uniqueTeamIds = Array.from(uniqueTeamMemberships.keys());
-
-        if (uniqueTeamIds.length === 0) return { totalWins: 0, totalLosses: 0, winRate: 0 };
-
-        const { data: participantRecords } = await supabase
-            .from('tournament_participants')
-            .select('id, team_id');
-
-        const userParticipantRecords = (participantRecords || []).filter(p => uniqueTeamIds.includes(p.team_id));
-        const userParticipantIds = userParticipantRecords.map(p => p.id);
-
-        if (userParticipantIds.length === 0) return { totalWins: 0, totalLosses: 0, winRate: 0 };
-
-        const { data: matchResultsRaw } = await supabase
-            .from('match_results')
-            .select('placement, participant_id, tournament_matches!match_id(scheduled_time)');
-
-        const filteredMatchResults = (matchResultsRaw || []).filter(r => {
-            const participant = userParticipantRecords.find(p => p.id === r.participant_id);
-            if (!participant) return false;
-
-            const matchTime = new Date(r.tournament_matches?.scheduled_time);
-            const membership = uniqueTeamMemberships.get(participant.team_id);
-
-            if (membership) {
-                const joinDate = new Date(membership.join_date);
-                if (isNaN(matchTime.getTime()) || isNaN(joinDate.getTime())) return false;
-                return matchTime >= joinDate;
-            }
-            return false;
-        });
-
-        const totalMatches = filteredMatchResults.length;
-        const totalWins = filteredMatchResults.filter(r => r.placement === 1).length;
-        const totalLosses = totalMatches - totalWins;
-        const winRate = totalMatches > 0 ? Math.round((totalWins / totalMatches) * 100) : 0;
-
-        return { totalWins, totalLosses, winRate };
-
-    } catch (error) {
-        console.error("Error fetching live member stats:", error.message);
-        return { totalWins: 0, totalLosses: 0, winRate: 0 };
-    }
-};
-// ---
+// --- Removed fetchLiveMemberStats helper function ---
 
 export default function TeamPage() {
     const { teamId } = useParams();
@@ -270,10 +204,9 @@ export default function TeamPage() {
 
     // --- MODAL STATE ---
     const [isModalOpen, setIsModalOpen] = useState(false);
-    // FIX: Initialize with useState({})
+    // FIX: Initialized with useState({})
     const [modalContent, setModalContent] = useState({}); 
-    // --- NEW STATE for calculated member stats (CRITICAL FOR FIX) ---
-    const [memberStatsMap, setMemberStatsMap] = useState({});
+    // --- Removed memberStatsMap state ---
 
     const openModal = (content) => { setModalContent(content); setIsModalOpen(true); };
     const closeModal = () => { setIsModalOpen(false); setModalContent({}); };
@@ -393,7 +326,7 @@ export default function TeamPage() {
     // --- End Handlers ---
 
 
-    // --- Fetch Team Data, Members, Stats, etc. (UPDATED useEffect) ---
+    // --- Fetch Team Data, Members, Stats, etc. (OPTIMIZED useEffect) ---
     useEffect(() => {
         let isMounted = true;
         const fetchData = async () => {
@@ -413,7 +346,6 @@ export default function TeamPage() {
             setTeamAchievements([]); 
             setHasPendingRequests(false); 
             setIsProfileIncomplete(false); 
-            setMemberStatsMap({}); // Reset member stats map
 
             try {
                 // Fetch team data (including owner and likes column)
@@ -433,7 +365,7 @@ export default function TeamPage() {
 
                 const ownerCheck = authUser && teamResult.owner_id === authUser.id;
                 setIsOwner(ownerCheck);
-
+                
                 // --- Fetch Pending Requests, Completeness Checks (unchanged) ---
                 const incomplete = !teamResult.description || !teamResult.country || teamResult.banner_url === '/images/lan_9.jpg';
                 if (isMounted) setIsProfileIncomplete(incomplete);
@@ -449,19 +381,18 @@ export default function TeamPage() {
                 // --- END CHECKS ---
 
 
-                // 1. Fetch members (only basic profile fields)
+                // 1. Fetch members (NOW FETCHING PERSISTED STATS from profiles table)
                 const { data: membersResult, error: membersError } = await supabase
                     .from('team_members')
-                    // FIX: Removed illegal comment from select string
                     .select(`
                         *,
-                        profiles ( id, username, avatar_url, game_details ) 
+                        profiles ( id, username, avatar_url, game_details, total_wins, total_losses ) 
                     `)
                     .eq('team_id', numericTeamId).order('joined_at');
                 if (membersError) throw membersError;
                 if (!isMounted) return;
                 setMembers(membersResult || []);
-
+                
                 const memberCheck = authUser && membersResult?.some(m => m.user_id === authUser.id);
                 setIsMember(memberCheck);
 
@@ -475,20 +406,7 @@ export default function TeamPage() {
                     setTeamAchievements(achievements); 
                 }
 
-                // 3. Fetch LIVE stats for each member in parallel (CRITICAL FIX)
-                const memberStatPromises = (membersResult || []).map(member => 
-                    // Call the new helper function for live calculation
-                    fetchLiveMemberStats(member.user_id).then(stats => ({ userId: member.user_id, stats }))
-                );
-                const results = await Promise.all(memberStatPromises);
-
-                const statsMap = results.reduce((acc, { userId, stats }) => {
-                    acc[userId] = stats;
-                    return acc;
-                }, {});
-
-                if (isMounted) setMemberStatsMap(statsMap);
-                // ... (Fetch Like & Join Request Status - unchanged) ...
+                // *** Since stats are loaded directly in step 1, no need for the separate calculation. ***
 
             } catch (err) {
                  if (isMounted) setError(`Failed to load team data: ${err.message}`);
@@ -719,21 +637,19 @@ export default function TeamPage() {
                              {members.length > 0 ? (
                                  <div className="space-y-5">
                                      {members.map((member, index) => {
-                                         // --- GET LIVE CALCULATED MEMBER STATS (CRITICAL FOR FIX) ---
+                                         // --- GET PERSISTED MEMBER STATS FROM DB ---
                                          const profile = member.profiles;
                                          if (!profile) return null; 
 
                                          const memberGameDetails = profile.game_details?.[teamData.game];
-                                         const liveStats = memberStatsMap[member.user_id];
-
-                                         // Default to 0 while loading or if calculation fails
-                                         const memberWins = liveStats?.totalWins ?? 0;
-                                         const memberLosses = liveStats?.totalLosses ?? 0;
-                                         const memberWinRate = liveStats?.winRate ?? 0;
-
-                                         // Check status based on the live calculation result
-                                         const isStatsZero = memberWins === 0 && memberLosses === 0 && memberWinRate === 0;
-                                         const isLoadingStats = !liveStats && !loading; // Show loading if no stats yet and page finished initial loading
+                                         
+                                         // Read directly from DB (total_wins/losses)
+                                         const memberWins = profile.total_wins ?? 0;
+                                         const memberLosses = profile.total_losses ?? 0;
+                                         const memberTotal = memberWins + memberLosses;
+                                         const memberWinRate = memberTotal > 0 ? Math.round((memberWins / memberTotal) * 100) : 0;
+                                         
+                                         const isStatsZero = memberWins === 0 && memberLosses === 0;
                                          // --- END STATS RETRIEVAL ---
 
                                          return (
@@ -767,13 +683,9 @@ export default function TeamPage() {
                                                      )}
 
                                                      {/* --- INDIVIDUAL PROFILE STATS DISPLAY --- */}
-                                                     {isLoadingStats ? (
-                                                         <p className="text-sm text-gray-500 italic pt-2 flex items-center">
-                                                            <Loader2 size={14} className="mr-1.5 animate-spin"/> Calculating stats...
-                                                         </p>
-                                                     ) : isStatsZero ? ( 
+                                                     {isStatsZero ? ( 
                                                          <p className="text-sm text-gray-400 italic pt-2 flex items-center">
-                                                            <Info size={14} className="mr-1.5"/> No team match history found for this member.
+                                                            <Info size={14} className="mr-1.5"/> Stats available after first tournament result.
                                                          </p>
                                                      ) : (
                                                          <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm pt-2 border-t border-dark-600/50">

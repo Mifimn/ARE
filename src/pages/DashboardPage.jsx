@@ -4,7 +4,8 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabaseClient'; // Adjust path if needed
 import { useAuth } from '../contexts/AuthContext.jsx'; // Adjust path if needed
 import { useTeamUpdate } from '../contexts/TeamUpdateContext.jsx'; // Import for global state synchronization
-import { Calendar, Trophy, Users, Bell, TrendingUp, Clock, Star, Loader2, AlertCircle, X, Mail, Info, ArrowRight } from 'lucide-react'; 
+// Added Crosshair for Kills
+import { Calendar, Trophy, Users, Bell, TrendingUp, Clock, Star, Loader2, AlertCircle, X, Mail, Info, ArrowRight, Crosshair } from 'lucide-react'; 
 import AnimatedSection from '../components/AnimatedSection';
 import { Link } from 'react-router-dom'; // Import Link
 
@@ -23,7 +24,8 @@ export default function DashboardPage() {
     rank: 'N/A',
     tournamentsPlayed: 0,
     winRate: 0,
-    activeTeams: 0
+    activeTeams: 0,
+    totalKills: 0, // Kept in state for other dashboard components/future use
   });
   const [upcomingMatches, setUpcomingMatches] = useState([]);
   const [loadingStats, setLoadingStats] = useState(true);
@@ -41,7 +43,7 @@ export default function DashboardPage() {
     return () => clearTimeout(timer); 
   }, []);
 
-  // --- Effect 2: Fetch Profile (MODIFIED to fetch favorite_games) ---
+  // --- Effect 2: Fetch Profile ---
   useEffect(() => {
     const fetchProfile = async () => {
       if (!authUser) {
@@ -55,7 +57,7 @@ export default function DashboardPage() {
       try {
         const { data, error: profileError } = await supabase
           .from('profiles')
-          // --- FIX: Ensure favorite_games (PLURAL) is selected ---
+          // Ensure favorite_games (PLURAL) is selected
           .select('username, avatar_url, full_name, favorite_games, country, city') 
           .eq('id', authUser.id)
           .single();
@@ -86,7 +88,7 @@ export default function DashboardPage() {
     fetchProfile();
   }, [authUser]); 
 
-  // --- Effect 3: Fetch Dashboard Stats & Notifications (Expanded) ---
+  // --- Effect 3: Fetch Dashboard Stats & Notifications (EXPANDED & FIXED) ---
   useEffect(() => {
       // Ensure profile data is loaded before fetching stats/notifications
       if (!authUser || !profile) {
@@ -99,68 +101,103 @@ export default function DashboardPage() {
           const currentNotifications = [];
 
           try {
-              // --- 1. Fetch User-Specific Teams (REFACTORED FOR EFFICIENCY) ---
+              // --- 1. Fetch User-Specific Teams & Membership Dates ---
               const [ownedRes, memberRes] = await Promise.all([
-                  // Get teams owned by the user
                   supabase
                       .from('teams')
-                      .select('id, name, logo_url, description, country, owner_id')
+                      // Fetch team creation date for owner join date
+                      .select('id, name, logo_url, description, country, owner_id, created_at')
                       .eq('owner_id', authUser.id),
-                  // Get teams the user is a member of
                   supabase
                       .from('team_members')
-                      .select('team_id')
+                      // Fetch user's join date
+                      .select('team_id, joined_at')
                       .eq('user_id', authUser.id)
               ]);
 
               if (ownedRes.error) throw ownedRes.error;
               if (memberRes.error) throw memberRes.error;
 
-              // Teams owned by the user (used for completeness check)
               const ownerTeams = ownedRes.data || [];
-              const ownerTeamIds = ownerTeams.map(t => t.id);
 
-              // IDs of teams the user is a member of
-              const memberTeamIds = memberRes.data.map(t => t.team_id);
+              // All unique team IDs associated with the user, mapped to their earliest join date
+              const allTeamMemberships = [
+                  ...(memberRes.data || []).map(t => ({ team_id: t.team_id, join_date: t.joined_at })),
+                  // Owner is implicitly a member, joining on creation date:
+                  ...ownerTeams.map(t => ({ team_id: t.id, join_date: t.created_at }))
+              ];
 
-              // Combine unique IDs for all teams associated with the user
-              const combinedTeamIds = [...new Set([...ownerTeamIds, ...memberTeamIds])];
+              const uniqueTeamMemberships = allTeamMemberships.reduce((acc, current) => {
+                  if (!acc.has(current.team_id) || new Date(current.join_date) < new Date(acc.get(current.team_id).join_date)) {
+                      acc.set(current.team_id, current);
+                  }
+                  return acc;
+              }, new Map());
+
+              const combinedTeamIds = Array.from(uniqueTeamMemberships.keys());
               const totalTeams = combinedTeamIds.length;
 
               let userParticipantIds = [];
               let tournamentsPlayed = 0;
               let winRate = 0;
+              let totalKills = 0;
+              let totalMatches = 0;
 
-              // --- 2. Calculate Stats based on User's Teams ---
+              // --- 2. Calculate Stats based on User's Teams (WITH DATE FILTERING) ---
               if (combinedTeamIds.length > 0) {
                   // Get participant records where team_id is one of the user's teams
                   const { data: participantRecords } = await supabase
                       .from('tournament_participants')
-                      .select('id, tournament_id')
-                      .in('team_id', combinedTeamIds);
+                      .select('id, tournament_id, team_id');
 
-                  if (participantRecords && participantRecords.length > 0) {
-                      // Get unique tournament IDs
-                      tournamentsPlayed = [...new Set(participantRecords.map(p => p.tournament_id))].length;
-                      userParticipantIds = participantRecords.map(p => p.id);
+                  // Filter participant records to only include those belonging to the user's teams
+                  const userParticipantRecords = (participantRecords || []).filter(p => combinedTeamIds.includes(p.team_id));
+
+
+                  if (userParticipantRecords.length > 0) {
+                      tournamentsPlayed = [...new Set(userParticipantRecords.map(p => p.tournament_id))].length;
+                      userParticipantIds = userParticipantRecords.map(p => p.id);
                   }
 
                   if (userParticipantIds.length > 0) {
-                      // Get match results for these participant records
-                      const { data: matchResults } = await supabase
+                      // Fetch all match results, kills, and their scheduled time
+                      const { data: matchResultsRaw } = await supabase
                           .from('match_results')
-                          .select('placement')
+                          .select('placement, kills, participant_id, tournament_matches!match_id(scheduled_time)')
                           .in('participant_id', userParticipantIds);
 
-                      const totalMatches = matchResults?.length || 0;
+                      // --- CRITICAL FILTERING: Match date vs. User join date ---
+                      const filteredMatchResults = (matchResultsRaw || []).filter(r => {
+                          // Find the participant record to get the team_id
+                          const participant = userParticipantRecords.find(p => p.id === r.participant_id);
+                          // Ensure this participant belongs to one of the user's teams
+                          if (!participant) return false;
+
+                          const matchTime = new Date(r.tournament_matches?.scheduled_time);
+                          const membership = uniqueTeamMemberships.get(participant.team_id);
+
+                          // Check if membership data exists and if the match occurred after or on join date
+                          if (membership) {
+                              const joinDate = new Date(membership.join_date);
+                              // Validate dates before comparison
+                              if (isNaN(matchTime.getTime()) || isNaN(joinDate.getTime())) return false;
+
+                              return matchTime >= joinDate;
+                          }
+                          return false;
+                      });
+
+                      totalMatches = filteredMatchResults.length;
                       if (totalMatches > 0) {
-                          const totalWins = matchResults.filter(r => r.placement === 1).length;
+                          const totalWins = filteredMatchResults.filter(r => r.placement === 1).length;
+                          // Calculate total kills from filtered set
+                          totalKills = filteredMatchResults.reduce((sum, r) => sum + (r.kills || 0), 0);
                           winRate = Math.round((totalWins / totalMatches) * 100);
                       }
                   }
               }
 
-              // --- 3. Fetch Notification Data (using the user's data) ---
+              // --- 3. Notification Data (Unchanged logic, uses correct user data) ---
 
               // 3a. Check for pending team invites (Action Required)
               const { count: inviteCount } = await supabase
@@ -189,7 +226,7 @@ export default function DashboardPage() {
                   });
               }
 
-              // 3c. Check Owned Team Profile Completeness (Warning - uses the correctly filtered `ownerTeams`)
+              // 3c. Check Owned Team Profile Completeness (Warning)
               ownerTeams.forEach(team => {
                   const isTeamIncomplete = !team.description || !team.country || team.logo_url === null;
                   if (isTeamIncomplete) {
@@ -210,7 +247,7 @@ export default function DashboardPage() {
               const { data: impendingMatchesData } = await supabase
                   .from('match_participants')
                   .select('tournament_matches!inner(id, tournaments(name))')
-                  .in('participant_id', userParticipantIds)
+                  .in('participant_id', userParticipantIds) 
                   .gte('tournament_matches.scheduled_time', nowISO) 
                   .lte('tournament_matches.scheduled_time', next30Mins) 
                   .eq('tournament_matches.status', 'Scheduled');
@@ -230,7 +267,7 @@ export default function DashboardPage() {
                   });
               }
 
-              // 3e. Recent Tournaments matching favorite game (Created in last 24 hours - New Content)
+              // 3e. Recent Tournaments matching favorite game (New Content)
               const favoriteGamesArray = profile.favorite_games 
                     ? (Array.isArray(profile.favorite_games) ? profile.favorite_games : [profile.favorite_games])
                     : [];
@@ -241,7 +278,7 @@ export default function DashboardPage() {
                   const { count: recentTourneyCount } = await supabase
                       .from('tournaments')
                       .select('id', { count: 'exact' })
-                      .in('game', favoriteGamesArray) // Use .in() for robustness
+                      .in('game', favoriteGamesArray)
                       .gte('created_at', oneDayAgo); 
 
                   if (recentTourneyCount > 0) {
@@ -258,8 +295,9 @@ export default function DashboardPage() {
               setStats(prevStats => ({
                   ...prevStats,
                   activeTeams: totalTeams,
-                  tournamentsPlayed: tournamentsPlayed,
-                  winRate: winRate
+                  tournamentsPlayed: totalMatches, // This is actually Total Matches Played
+                  winRate: winRate,
+                  totalKills: totalKills, // Set total kills
               }));
 
               // Sort notifications by type priority
@@ -273,7 +311,7 @@ export default function DashboardPage() {
                   .from('match_participants')
                   .select('tournament_matches!inner(*, tournaments(name))')
                   .in('participant_id', userParticipantIds)
-                  .gte('tournament_matches.scheduled_time', next30Mins) // Scheduled time AFTER the 30-minute critical window
+                  .gte('tournament_matches.scheduled_time', next30Mins)
                   .order('scheduled_time', { referencedTable: 'tournament_matches', ascending: true })
                   .limit(3);
 
@@ -291,7 +329,6 @@ export default function DashboardPage() {
           }
       };
 
-      // Call fetchDashboardData and include teamUpdateKey
       fetchDashboardData();
   }, [authUser, teamUpdateKey, profile]); 
 
@@ -302,11 +339,15 @@ export default function DashboardPage() {
    ];
   // --- End Placeholder Data ---
 
-  // --- Combine stats into one array for rendering ---
+  // --- Combine stats into one array for rendering (UPDATED) ---
   const statsCards = [
-    { label: 'Current Rank', value: stats.rank, icon: Star, color: 'text-yellow-400' },
-    { label: 'Tournaments Played', value: loadingStats ? '...' : stats.tournamentsPlayed, icon: Trophy, color: 'text-green-400' },
+    // 1. Current Rank
+    { label: 'Current Rank', value: stats.rank, icon: Star, color: 'text-yellow-400' }, 
+    // 2. Tournament Played / Total Matches Played
+    { label: 'Total Matches Played', value: loadingStats ? '...' : stats.tournamentsPlayed, icon: Trophy, color: 'text-green-400' },
+    // 3. Win Rate
     { label: 'Win Rate', value: loadingStats ? '...' : `${stats.winRate}%`, icon: TrendingUp, color: 'text-blue-400' },
+    // 4. Active Teams
     { label: 'Active Teams', value: loadingStats ? '...' : stats.activeTeams, icon: Users, color: 'text-purple-400' },
   ];
 
@@ -331,7 +372,7 @@ export default function DashboardPage() {
     <div className="bg-dark-900 text-white">
       <div className="space-y-8">
 
-        {/* --- *** NEW: GUIDANCE ALERT *** --- */}
+        {/* --- GUIDANCE ALERT (Unchanged) --- */}
         {showGuidanceAlert && (
           <div className="relative bg-primary-800 text-white p-4 rounded-lg shadow-lg flex items-center justify-between border border-primary-600 animate-fade-in">
             <span className="font-medium text-sm sm:text-base">
@@ -346,7 +387,7 @@ export default function DashboardPage() {
             </button>
           </div>
         )}
-        {/* --- *** END ALERT *** --- */}
+        {/* --- END ALERT --- */}
 
 
         {/* Welcome Header */}
@@ -357,8 +398,8 @@ export default function DashboardPage() {
           <p className="text-gray-400">Ready to dominate the competition today?</p>
         </AnimatedSection>
 
-        {/* Stats Cards - Updated to use dynamic data */}
-        <AnimatedSection tag="div" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8" delay={200}>
+        {/* Stats Cards (UPDATED to match requested metrics) */}
+        <AnimatedSection tag="div" className="grid grid-cols-2 lg:grid-cols-4 gap-6 mb-8" delay={200}>
           {statsCards.map((stat, index) => {
             const Icon = stat.icon;
             return (
@@ -378,7 +419,7 @@ export default function DashboardPage() {
          {/* Matches and News Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
 
-          {/* --- UPDATED: Upcoming Matches --- */}
+          {/* --- Upcoming Matches --- */}
           <AnimatedSection tag="div" className="bg-dark-800 p-6 rounded-xl border border-dark-700 shadow-lg" direction="left" delay={300} id="upcoming">
              <div className="flex items-center justify-between mb-6">
                 <h2 className="text-xl font-bold flex items-center">
@@ -442,7 +483,7 @@ export default function DashboardPage() {
           </AnimatedSection>
         </div>
 
-        {/* Notifications (DYNAMIC) */}
+        {/* Notifications (DYNAMIC) (Unchanged) */}
         <AnimatedSection tag="div" className="bg-dark-800 p-6 rounded-xl border border-dark-700 shadow-lg mt-8" delay={500}>
              <h2 className="text-xl font-bold mb-6 flex items-center"> 
                 <Bell className="mr-2 text-primary-500" size={24} /> Recent Notifications ({notifications.length})

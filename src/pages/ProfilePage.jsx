@@ -9,62 +9,72 @@ import AnimatedSection from '../components/AnimatedSection';
 
 // Helper function
 const normalizeUrl = (url) => {
-    if (!url) return '';
-    if (!/^https?:\/\//i.test(url)) {
-        return `https://${url}`;
-    }
-    return url;
+if (!url) return '';
+if (!/^https?:\/\//i.test(url)) {
+return `https://${url}`;
+}
+return url;
 };
 
 // --- Helper function to fetch user's teams (owned & member) ---
 const fetchUserTeams = async (userId) => {
-    try {
-        // 1. Get teams user owns
-        const { data: ownedTeamsData, error: ownedError } = await supabase
-            .from('teams')
-            .select('*')
-            .eq('owner_id', userId);
+try {
+// 1. Get teams user owns
+const { data: ownedTeamsData, error: ownedError } = await supabase
+.from('teams')
+.select('*')
+.eq('owner_id', userId);
 
-        if (ownedError) console.error('Error fetching owned teams:', ownedError.message);
+if (ownedError) console.error('Error fetching owned teams:', ownedError.message);
 
-        // 2. Get teams user is a member of
-        const { data: memberTeamsData, error: memberError } = await supabase
-            .from('team_members')
-            .select('role, teams(*)') // Fetches role and all team data
-            .eq('user_id', userId);
+// 2. Get teams user is a member of
+const { data: memberTeamsData, error: memberError } = await supabase
+.from('team_members')
+.select('role, teams(*)') // Fetches role and all team data
+.eq('user_id', userId);
 
-        if (memberError) console.error('Error fetching member teams:', memberError.message);
+if (memberError) console.error('Error fetching member teams:', memberError.message);
 
-        // 3. Combine and deduplicate
-        const ownedTeams = (ownedTeamsData || []).map(t => ({ ...t, role: 'Owner' }));
-        const memberTeams = (memberTeamsData || []).map(m => ({ ...m.teams, role: m.role }));
+// 3. Combine and deduplicate
+const ownedTeams = (ownedTeamsData || []).map(t => ({ ...t, role: 'Owner' }));
+const memberTeams = (memberTeamsData || []).map(m => ({ ...m.teams, role: m.role }));
 
-        const teamMap = new Map();
-        // Add member teams first
-        memberTeams.forEach(t => t && teamMap.set(t.id, t));
-        // Add owned teams (will overwrite member entry if user is both, prioritizing Owner role)
-        ownedTeams.forEach(t => t && teamMap.set(t.id, t));
+const teamMap = new Map();
+// Add member teams first
+memberTeams.forEach(t => t && teamMap.set(t.id, t));
+// Add owned teams (will overwrite member entry if user is both, prioritizing Owner role)
+ownedTeams.forEach(t => t && teamMap.set(t.id, t));
 
-        return Array.from(teamMap.values()).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+return Array.from(teamMap.values()).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
-    } catch (error) {
-        console.error("Error in fetchUserTeams:", error.message);
-        return [];
-    }
+} catch (error) {
+console.error("Error in fetchUserTeams:", error.message);
+return [];
+}
 };
 
 // --- UPDATED: Helper function to fetch all tournament stats, matches, AND ACHIEVEMENTS ---
 const fetchUserPerformance = async (userId) => {
     try {
-        // 1. Get all team IDs for the user
-        const { data: teamsAsMember } = await supabase.from('team_members').select('team_id').eq('user_id', userId);
-        const { data: teamsAsOwner } = await supabase.from('teams').select('id').eq('owner_id', userId);
+        // 1. Get all team IDs AND user's membership join dates for filtering
+        const { data: teamsAsMember } = await supabase.from('team_members').select('team_id, joined_at').eq('user_id', userId);
+        const { data: teamsAsOwner } = await supabase.from('teams').select('id, created_at').eq('owner_id', userId); // Owner join date is creation date
 
-        const allTeamIds = [
-            ...(teamsAsMember ? teamsAsMember.map(t => t.team_id) : []),
-            ...(teamsAsOwner ? teamsAsOwner.map(t => t.id) : [])
+        const allTeamMemberships = [
+            ...(teamsAsMember ? teamsAsMember.map(t => ({ team_id: t.team_id, join_date: t.joined_at })) : []),
+            // Owner is implicitly a member, joining on creation date:
+            ...(teamsAsOwner ? teamsAsOwner.map(t => ({ team_id: t.id, join_date: t.created_at })) : [])
         ];
-        const uniqueTeamIds = [...new Set(allTeamIds)];
+
+        // Use a map to get unique team IDs and their *earliest* join date if they somehow have multiple entries
+        const uniqueTeamMemberships = allTeamMemberships.reduce((acc, current) => {
+            if (!acc.has(current.team_id) || new Date(current.join_date) < new Date(acc.get(current.team_id).join_date)) {
+                acc.set(current.team_id, current);
+            }
+            return acc;
+        }, new Map());
+
+        const uniqueTeamIds = Array.from(uniqueTeamMemberships.keys());
 
         if (uniqueTeamIds.length === 0) {
             return { recentMatches: [], stats: null, achievements: [] };
@@ -73,7 +83,7 @@ const fetchUserPerformance = async (userId) => {
         // 2. Get all participant records for those teams
         const { data: participantRecords, error: pError } = await supabase
             .from('tournament_participants')
-            .select('id, team_name, tournaments(id, game, name)') // Get tournament info
+            .select('id, team_id, team_name, tournaments(id, game, name)') // Get tournament info
             .in('team_id', uniqueTeamIds);
 
         if (pError) throw pError;
@@ -84,36 +94,60 @@ const fetchUserPerformance = async (userId) => {
         const participantIds = participantRecords.map(p => p.id);
 
         // 3. Get all match results for these participants
+        // FETCH scheduled_time via foreign table join
         const { data: matchResults, error: resultsError } = await supabase
             .from('match_results')
-            .select('*')
+            .select('*, tournament_matches!match_id(scheduled_time)') 
             .in('participant_id', participantIds)
             .order('created_at', { ascending: false }); // Order by creation date for "recent"
 
         if (resultsError) throw resultsError;
 
-        const results = matchResults || [];
+        let results = matchResults || [];
 
-        // 4. Calculate Stats (Simplified as requested)
+        // --------------------------------------------------------
+        // CRITICAL FILTERING STEP: Ensure match date is >= join date
+        // --------------------------------------------------------
+        const filteredResults = results.filter(r => {
+            const participant = participantRecords.find(p => p.id === r.participant_id);
+            if (!participant) return false; // Should not happen
+
+            const teamId = participant.team_id;
+            // Use scheduled_time from the nested object
+            const matchScheduledTime = new Date(r.tournament_matches?.scheduled_time); 
+            const teamMembership = uniqueTeamMemberships.get(teamId);
+
+            if (!teamMembership) return false; // Should not happen
+
+            const joinDate = new Date(teamMembership.join_date);
+
+            // Check for valid dates first
+            if (isNaN(matchScheduledTime.getTime()) || isNaN(joinDate.getTime())) return false;
+
+            // ONLY COUNT results if the match was scheduled *after or on* the player's join date.
+            return matchScheduledTime >= joinDate;
+        });
+
+        // 4. Calculate Stats using filteredResults
         let totalKills = 0;
         let totalWins = 0;
-        results.forEach(r => {
+        filteredResults.forEach(r => {
             totalKills += r.kills || 0; 
             if (r.placement === 1) totalWins++;
         });
 
-        const totalMatches = results.length;
+        const totalMatches = filteredResults.length;
         const totalLosses = totalMatches - totalWins;
         const stats = {
             totalMatches: totalMatches,
             totalWins: totalWins,
             totalLosses: totalLosses,
-            totalKills: totalKills, // Kept this metric internal
+            totalKills: totalKills, // Include Kills in stats
             winRate: totalMatches > 0 ? Math.round((totalWins / totalMatches) * 100) : 0,
         };
 
-        // 5. Format Recent Matches (Top 5)
-        const recentMatches = results.slice(0, 5).map(r => {
+        // 5. Format Recent Matches (Top 5) using filteredResults
+        const recentMatches = filteredResults.slice(0, 5).map(r => {
             const participant = participantRecords.find(p => p.id === r.participant_id);
             return {
                 id: r.id,
@@ -121,12 +155,12 @@ const fetchUserPerformance = async (userId) => {
                 tournamentName: participant?.tournaments?.name || 'Unknown Tournament',
                 teamName: participant?.team_name || 'Unknown Team',
                 placement: r.placement,
-                kills: r.kills,
+                kills: r.kills, // Include Kills
                 date: r.created_at
             };
         });
 
-        // 6. Fetch Achievements
+        // 6. Fetch Achievements (remains unchanged)
         const { data: achievementsData, error: achievementError } = await supabase
             .from('tournament_standings')
             .select(`
@@ -178,7 +212,7 @@ export default function ProfilePage() {
     const [achievements, setAchievements] = useState([]); // <--- NEW STATE
     // ---
 
-    // --- Handlers ---
+    // --- Handlers (unchanged) ---
     const handleLikeProfile = async () => {
         if (!authUser) {
             setLikeError("You must be logged in to like a profile.");
@@ -363,7 +397,7 @@ export default function ProfilePage() {
       : 0;
     // --- End Fix ---
 
-    // --- Render Loading/Error States ---
+    // --- Render Loading/Error States (unchanged) ---
     if (loading) {
          return ( <div className="flex justify-center items-center min-h-[calc(100vh-10rem)]"> <Loader2 className="w-16 h-16 text-primary-500 animate-spin" /> <p className="ml-4 text-xl">Loading Profile...</p> </div> );
     }
@@ -401,7 +435,7 @@ export default function ProfilePage() {
                                      <p className="text-xl text-gray-300 mb-2">{profile.fullName || ''}</p>
                                      <div className="flex items-center justify-center md:justify-start text-gray-400 text-sm mb-2"> <MapPin size={14} className="mr-1" /> {profile.city && profile.country ? `${profile.city}, ${profile.country}` : (profile.country || 'Location not set')} </div>
                                 </div>
-                                {/* Action Buttons: Edit or Like */}
+                                {/* Action Buttons: Edit or Like (unchanged) */}
                                 <div className="flex flex-col items-center self-center md:self-end mt-4 md:mt-0 flex-shrink-0">
                                     <div className="flex gap-3 items-center">
                                         {isOwnProfile ? (
@@ -453,7 +487,7 @@ export default function ProfilePage() {
                     </div>
                 </AnimatedSection>
 
-                 {/* Button to Players Directory */}
+                 {/* Button to Players Directory (unchanged) */}
                  <AnimatedSection delay={180} className="text-center">
                      <Link to="/players" className="inline-flex items-center btn-secondary px-6 py-2 group hover:bg-dark-700 transition-colors">
                          <Search size={18} className="mr-2 text-primary-400 group-hover:text-primary-300" />
@@ -466,7 +500,7 @@ export default function ProfilePage() {
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 pt-8">
                     <div className="lg:col-span-2 space-y-8">
 
-                        {/* --- NEW: Achievements Section (Epic Design) --- */}
+                        {/* --- NEW: Achievements Section (Epic Design) (unchanged) --- */}
                         <AnimatedSection tag="div" className="card bg-dark-800 p-6 rounded-xl shadow-lg" delay={200}>
                             <h2 className="text-2xl font-bold mb-6 text-primary-300 flex items-center">
                                 <Trophy size={24} className="mr-3"/> Top 3 Achievements ({achievements.length})
@@ -651,7 +685,7 @@ export default function ProfilePage() {
                            <p className="text-gray-400 text-sm">Social media links will appear here.</p>
                            {/* TODO: Render profile.socialLinks */}
                         </AnimatedSection>
-                         {/* Tournament Statistics (REMOVED KILLS/PLACEMENT) */}
+                         {/* Tournament Statistics (UPDATED: Added Kills) */}
                         <AnimatedSection tag="div" className="card bg-dark-800 p-6 rounded-xl shadow-lg" delay={800}>
                              <h2 className="text-xl font-bold mb-4 text-primary-300">Tournament Statistics</h2>
                              {gameStats ? (
@@ -659,6 +693,7 @@ export default function ProfilePage() {
                                     <p className="flex items-center justify-between"><span className="text-gray-400 flex items-center"><BarChart size={14} className="mr-1.5"/>Total Matches:</span> <span className="font-bold text-lg text-white">{gameStats.totalMatches}</span></p>
                                     <p className="flex items-center justify-between"><span className="text-gray-400 flex items-center"><Trophy size={14} className="mr-1.5"/>Total Wins:</span> <span className="font-bold text-lg text-green-400">{gameStats.totalWins}</span></p>
                                     <p className="flex items-center justify-between"><span className="text-gray-400 flex items-center"><UserX size={14} className="mr-1.5"/>Total Losses:</span> <span className="font-bold text-lg text-red-400">{gameStats.totalLosses}</span></p>
+                                    <p className="flex items-center justify-between"><span className="text-gray-400 flex items-center"><Crosshair size={14} className="mr-1.5"/>Total Kills:</span> <span className="font-bold text-lg text-red-400">{gameStats.totalKills}</span></p>
                                     <p className="flex items-center justify-between"><span className="text-gray-400 flex items-center"><Percent size={14} className="mr-1.5"/>Win Rate:</span> <span className="font-bold text-lg text-blue-400">{gameStats.winRate}%</span></p>
                                 </div>
                             ) : (
